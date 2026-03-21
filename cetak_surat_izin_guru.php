@@ -2,8 +2,13 @@
 require_once('../../config.php');
 require_once($CFG->libdir.'/pdflib.php');
 require_once($CFG->dirroot.'/local/jurnalmengajar/libwa.php');
+$stempel_path = jurnalmengajar_get_stempel_path();
 
 global $DB, $USER;
+$namasekolah = get_config('local_jurnalmengajar', 'nama_sekolah');
+$tempatttd   = get_config('local_jurnalmengajar', 'tempat_ttd');
+$namakepsek  = get_config('local_jurnalmengajar', 'nama_kepsek');
+$nipkepsek   = get_config('local_jurnalmengajar', 'nip_kepsek');
 
 $id = required_param('id', PARAM_INT);
 $printedbyid = optional_param('printedbyid', 0, PARAM_INT);
@@ -40,12 +45,18 @@ kirim_wa_izin_guru($guru, $nip, $surat->alasan, $surat->keperluan, $tanggal, $ja
 
 // Fungsi untuk membentuk HTML surat izin guru
 function suratizin_guru_html($guru, $nip, $surat, $tanggal, $userpencetak) {
+
+    $namasekolah = get_config('local_jurnalmengajar', 'nama_sekolah');
+    $tempatttd   = get_config('local_jurnalmengajar', 'tempat_ttd');
+    $namakepsek  = get_config('local_jurnalmengajar', 'nama_kepsek');
+    $nipkepsek   = get_config('local_jurnalmengajar', 'nip_kepsek');
+
     $html = <<<HTML
     <div style="page-break-inside: avoid; margin-bottom: 10px; font-size:10px; line-height:1.1;">
     <h3 style="text-align:center; line-height:1.1; font-size:12px; margin-bottom: 5px;">
         SURAT IZIN KELUAR<br>
         TENAGA PENDIDIK DAN TENAGA KEPENDIDIKAN<br>
-        SMA NEGERI 2 KANDANGAN
+        {$namasekolah}
     </h3>
     <table cellpadding="2" style="font-size:10px; width:100%;">
         <tr><td width="90">Nama</td><td>: {$guru->lastname}</td></tr>
@@ -57,10 +68,10 @@ function suratizin_guru_html($guru, $nip, $surat, $tanggal, $userpencetak) {
         <tr>
             <td width="50%"></td>
             <td width="50%" style="text-align:left; padding-left:5px;">
-                Kandangan, {$tanggal}<br>
-                Kepala SMAN 2 Kandangan,<br><br><br><br>
-                Jainuddin, S.Ag, M.Pd.I<br>
-                NIP. 19771005 200904 1 002
+                {$tempatttd}, {$tanggal}<br>
+                Kepala {$namasekolah},<br><br><br><br>
+                {$namakepsek}<br>
+                NIP. {$nipkepsek}
             </td>
         </tr>
     </table>
@@ -74,7 +85,8 @@ $pdf = new pdf();
 $pdf->AddPage('P', 'F4');
 $pdf->SetFont('helvetica', '', 10);
 
-$stempel = __DIR__ . '/assets/ttd.png';
+require_once($CFG->dirroot.'/local/jurnalmengajar/lib.php');
+$stempel = jurnalmengajar_get_stempel_path();
 
 // Cetak 4 surat per halaman
 $htmlsurat = suratizin_guru_html($guru, $nip, $surat, $tanggal, $userpencetak);

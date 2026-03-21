@@ -2,12 +2,20 @@
 defined('MOODLE_INTERNAL') || die();
 
 function get_nomor_kepsek(): string {
-    return '628115002681'; // Ganti ke nomor kepala sekolah yang benar
+    return get_config('local_jurnalmengajar', 'nomor_kepsek');
 }
 
 function jurnalmengajar_kirim_wa($nomor, $pesan): void {
-    $apikey = '4L94T0YIsPSOmB1W3Q8Gzlj637DMLigCMrucozQjwVtvAd1JnkqulZT.MQmnZVjd'; // Sesuaikan dengan API key aktif
-    $url = 'https://sby.wablas.com/api/v2/send-message';
+    $apikey = get_config('local_jurnalmengajar', 'apikey');
+    $secret = get_config('local_jurnalmengajar', 'secretkey');
+    $wablas_url = get_config('local_jurnalmengajar', 'wablas_url');
+
+    if (empty($apikey) || empty($secret) || empty($wablas_url)) {
+        debugging('Config Wablas belum lengkap', DEBUG_DEVELOPER);
+        return;
+    }
+
+    $token = $apikey . '.' . $secret;
 
     $data = ['data' => [[
         'phone' => $nomor,
@@ -17,9 +25,9 @@ function jurnalmengajar_kirim_wa($nomor, $pesan): void {
     ]]];
 
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_URL, $wablas_url);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: $apikey",
+        "Authorization: $token",
         "Content-Type: application/json"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -35,9 +43,10 @@ function jurnalmengajar_kirim_wa($nomor, $pesan): void {
     curl_close($ch);
 }
 
-function kirim_wa_izin_guru($guru, $nip, $alasan, $keperluan, $tanggal, $jam, $dicatatoleh): void {
+function kirim_wa_izin_guru($guru, $nip, $alasan, $keperluan, $tanggal, $dicatatoleh): void {
     $nomor_kepsek = get_nomor_kepsek();
-$jam = date('H:i');
+    $jam = date('H:i');
+
     $pesan = "*-Surat Izin Keluar Guru/Pegawai-*\n"
            . "👮‍Nama: {$guru->lastname}\n"
            . "NIP/NIPPPK: {$nip}\n"

@@ -23,7 +23,8 @@ global $DB, $CFG;
 function resolve_logo_path(?string $input) {
     global $CFG;
     // default plugin logo
-    $default = $CFG->dirroot . '/local/jurnalmengajar/logo.png';
+    require_once($CFG->dirroot.'/local/jurnalmengajar/lib.php');
+$logo = jurnalmengajar_get_logo_url();
 
     // jika input kosong, return default (jika ada), atau empty string
     if (empty($input)) {

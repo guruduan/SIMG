@@ -2,6 +2,7 @@
 
 require_once('../../config.php');
 require_once($CFG->libdir.'/pdflib.php');
+require_once($CFG->dirroot.'/local/jurnalmengajar/lib.php');
 
 $id = required_param('id', PARAM_INT);
 global $DB;
@@ -90,7 +91,7 @@ $separator = <<<HTML
 <br><br>
 HTML;
 
-$stempel_path = $CFG->dirroot . '/local/jurnalmengajar/assets/stempel.png';
+$stempel_path = jurnalmengajar_get_stempel_path();
 //kena nama pengaawas $pdf->Image($stempel_path, 90, 50, 30, 30, 'PNG'); // stempel pertama
 //$pdf->Image($stempel_path, 90, 120, 30, 30, 'PNG'); // stempel kedua (jika dua surat per halaman)
 

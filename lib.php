@@ -96,6 +96,7 @@ function jurnalmengajar_kirim_wa($nomor, $pesan) {
 
     $apikey = get_config('local_jurnalmengajar', 'apikey');
     $secret = get_config('local_jurnalmengajar', 'secretkey');
+    $wablas_url = get_config('local_jurnalmengajar', 'wablas_url');
 
     if (empty($apikey) || empty($secret)) {
         debugging("API Wablas belum diisi", DEBUG_DEVELOPER);
@@ -103,7 +104,7 @@ function jurnalmengajar_kirim_wa($nomor, $pesan) {
     }
 
     $token = $apikey . '.' . $secret;
-    $url = 'https://sby.wablas.com/api/v2/send-message';
+    $url = $wablas_url;
 
     $data = [
         'data' => [[
@@ -255,4 +256,75 @@ function jurnalmengajar_notifikasi_izin($record, $pengawas_nama) {
     if ($nomor_wali) {
         jurnalmengajar_kirim_wa($nomor_wali, $pesan);
     }
+}
+function jurnalmengajar_get_logo_url() {
+    global $CFG;
+
+    $context = context_system::instance();
+    $fs = get_file_storage();
+
+    $files = $fs->get_area_files(
+        $context->id,
+        'local_jurnalmengajar',
+        'logo',
+        0,
+        'itemid, filepath, filename',
+        false
+    );
+
+    foreach ($files as $file) {
+        return moodle_url::make_pluginfile_url(
+            $file->get_contextid(),
+            $file->get_component(),
+            $file->get_filearea(),
+            0,
+            $file->get_filepath(),
+            $file->get_filename()
+        );
+    }
+
+    return '';
+}
+
+function jurnalmengajar_get_stempel_path() {
+    global $CFG;
+
+    $context = context_system::instance();
+    $fs = get_file_storage();
+
+    $files = $fs->get_area_files(
+        $context->id,
+        'local_jurnalmengajar',
+        'stempel',
+        0,
+        'itemid, filepath, filename',
+        false
+    );
+
+    foreach ($files as $file) {
+        $temp = $CFG->tempdir . '/' . $file->get_filename();
+        $file->copy_content_to($temp);
+        return $temp;
+    }
+
+    return '';
+}
+
+function local_jurnalmengajar_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options=array()) {
+
+    if ($context->contextlevel != CONTEXT_SYSTEM) {
+        return false;
+    }
+
+    $fs = get_file_storage();
+    $filename = array_pop($args);
+    $filepath = '/';
+
+    $file = $fs->get_file($context->id, 'local_jurnalmengajar', $filearea, 0, $filepath, $filename);
+
+    if (!$file) {
+        return false;
+    }
+
+    send_stored_file($file, 0, 0, $forcedownload, $options);
 }

@@ -5,17 +5,8 @@ define('CLI_SCRIPT', true);
 require(__DIR__ . '/../../../config.php'); // tetap load Moodle (untuk mtrace)
 date_default_timezone_set('Asia/Makassar'); // WITA
 
-/* =================== Wablas Config (langsung di file) =================== */
-$WABLAS_TOKEN  = '4L94T0YIsPSOmB1W3Q8Gzlj637DMLigCMrucozQjwVtvAd1JnkqulZT';
-$WABLAS_SECRET = 'zNYpFdMZ';
-$WABLAS_URL    = 'https://sby.wablas.com/api/v2/send-message';
 
 /* ============================ CLI args ================================== */
-// --mode=auto|before|after
-// --target=YYYY-MM-DD
-// --debug
-// --group=JID_OR_ID (override tujuan)
-// --jid=auto|raw|gus|both  (cara bentuk phone grup)
 $mode   = 'auto';
 $targetOverride = null;
 $debug  = false;
@@ -29,6 +20,14 @@ foreach ($argv as $arg) {
     elseif (preg_match('/^--group=(.+)$/', $arg, $m))    $groupOverride = trim($m[1]);
     elseif (preg_match('/^--jid=(auto|raw|gus|both)$/i', $arg, $m)) $jidmode = strtolower($m[1]);
 }
+
+/* =================== Wablas Config dari Settings Plugin =================== */
+$config = get_config('local_jurnalmengajar');
+
+$WABLAS_TOKEN  = $config->apikey;
+$WABLAS_SECRET = $config->secretkey;
+$WABLAS_URL    = $config->wablas_url;
+$GROUP_ID      = $groupOverride ?: $config->wablas_group;
 
 /* ======================= Tentukan target (H) ============================ */
 $now = new DateTime('now');
@@ -64,9 +63,65 @@ $wom     = week_of_month($target);     // 1..5
 $tanggal = indo_tanggal($target);
 $label   = label_waktu($now, $target);
 
-/* ====== Group ID Default (boleh override lewat --group) ====== */
-$GROUP_BASE = '120363196604363056'; // BARU Guru (pakai JID lengkap kalau punya)
-$GROUP_ID   = $groupOverride ?: $GROUP_BASE;
+function jurnalmengajar_cek_libur($tanggal) {
+    $tanggallibur = get_config('local_jurnalmengajar', 'tanggallibur');
+
+    if (empty($tanggallibur)) return false;
+
+    $lines = explode("\n", $tanggallibur);
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line == '') continue;
+
+        // Rentang tanggal
+        if (stripos($line, 's/d') !== false) {
+            list($start, $end) = explode('s/d', $line);
+            $start = trim($start);
+            $end   = trim($end);
+
+            if ($tanggal >= $start && $tanggal <= $end) {
+                return true;
+            }
+        } else {
+            // Satu tanggal
+            if ($tanggal == $line) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/* ====================== Cek Hari Sekolah ====================== */
+$hariIndoList = [
+    1 => 'Senin',
+    2 => 'Selasa',
+    3 => 'Rabu',
+    4 => 'Kamis',
+    5 => 'Jumat',
+    6 => 'Sabtu',
+    7 => 'Minggu'
+];
+
+$hariIndo = $hariIndoList[(int)$target->format('N')];
+
+$hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
+$hariSekolah = array_map('trim', explode(',', $hariSekolah));
+
+if (!in_array($hariIndo, $hariSekolah)) {
+    mtrace("Hari $hariIndo bukan hari sekolah.");
+    exit(0);
+}
+
+/* ====================== Cek Tanggal Libur ====================== */
+$targetDate = $target->format('Y-m-d');
+
+if (function_exists('jurnalmengajar_cek_libur') && jurnalmengajar_cek_libur($targetDate)) {
+    mtrace("Tanggal $targetDate adalah hari libur.");
+    exit(0);
+}
 
 if ($debug) {
     mtrace("DEBUG now     : ".$now->format('Y-m-d H:i:s').' WITA');
