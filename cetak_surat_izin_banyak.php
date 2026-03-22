@@ -5,14 +5,6 @@ require_once($CFG->libdir . '/pdflib.php');
 require_login();
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);
-/**
- * Parse input ids yang bisa berupa:
- *  - satu angka: "1526"
- *  - daftar koma: "1526,1528,1530"
- *  - rentang: "1526-1530"
- *  - gabungan: "1526-1528,1530,1532-1533"
- * Mengembalikan array unik terurut ASC.
- */
  
  // ==========================
 // SETTINGS SEKOLAH
@@ -85,17 +77,38 @@ $nip_for = function (int $userid) use ($DB, $fieldid_nip): string {
     ]) ?? '');
 };
 
+// ==========================
+// TANGGAL UNTUK JUDUL & NAMA FILE
+// ==========================
+$bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+$tanggal = date('j') . ' ' . $bulan[date('n')-1] . ' ' . date('Y');
 
 // Siapkan PDF (TCPDF via moodlelib)
 $pdf = new pdf();
 $pdf->setPrintHeader(false);
 $pdf->setPrintFooter(false);
-$pdf->SetAuthor('SIM SMAN 2 Kandangan');
-$pdf->SetTitle('Surat Izin Siswa (Massal)');
+$pdf->SetAuthor($sekolah);
+$pdf->SetTitle('Surat Izin Murid - ' . $sekolah . ' - ' . $tanggal);
 $pdf->SetSubject('Cetak Massal Surat Izin');
 
-// Lokasi stempel (opsional)
-$stempel_path = $CFG->dirroot . '/local/jurnalmengajar/assets/stempel.png';
+// Ambil stempel dari settings plugin
+$fs = get_file_storage();
+$context = context_system::instance();
+
+$files = $fs->get_area_files(
+    $context->id,
+    'local_jurnalmengajar',
+    'stempel',
+    0,
+    'itemid, filepath, filename',
+    false
+);
+
+$stempel_path = '';
+foreach ($files as $file) {
+    $stempel_path = $file->copy_content_to_temp();
+}
+//
 
 // Fungsi render satu surat (1 halaman)
 $render_surat = function (pdf $pdf, stdClass $record) use ($DB, $fmt, $nip_for, $stempel_path, $sekolah, $tempat) {
@@ -121,7 +134,7 @@ $render_surat = function (pdf $pdf, stdClass $record) use ($DB, $fmt, $nip_for, 
 $sekolah_upper = mb_strtoupper($sekolah);
 $html = <<<HTML
 <h3 style="text-align: center;">
-SURAT IZIN KELUAR/MASUK SISWA<br>
+SURAT IZIN KELUAR/MASUK MURID<br>
 {$sekolah_upper}
 </h3>
 
@@ -189,4 +202,4 @@ if ($printed < 1 || $pdf->getNumPages() < 1) {
 }
 
 // Keluarkan PDF ke browser
-$pdf->Output('surat_izin_massal.pdf', 'I');
+$pdf->Output('surat_izin_massal-' . $tanggal . '.pdf', 'I');

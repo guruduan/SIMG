@@ -100,8 +100,30 @@ if (($do_submit || $do_save) && confirm_sesskey()) {
         $id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
     }
 
-    // ================= KIRIM WA =================
-    jurnalmengajar_notifikasi_izin($record, $pengawas);
+// ================= KIRIM WA =================
+$siswa = $DB->get_record('user', ['id' => $record->userid]);
+if ($siswa) {
+    $kelas = get_nama_kelas($record->kelasid);
+    $nama  = ucwords(strtolower($siswa->lastname));
+    $gurunama = $DB->get_field('user', 'lastname', ['id' => $record->guru_pengajar]);
+    $waktu_full = format_waktu_indo($record->timecreated);
+
+    $pesan = "*[Surat Izin Murid]*\n\n"
+           . "📅 Waktu: $waktu_full\n"
+           . "👤 Nama: $nama\n"
+           . "🏫 Kelas: $kelas\n"
+           . "🎓 Guru Pengajar: $gurunama\n"
+           . "📝 Alasan: {$record->alasan}\n"
+           . "📌 Keperluan: {$record->keperluan}\n"
+           . "✍️ Pengawas Hari ini: $pengawas\n\n"
+           . "_Dikirim kepada Wali kelas sebagai laporan_";
+
+    $nomor_wali = get_nomor_wali_kelas($record->kelasid);
+
+    if ($nomor_wali) {
+        jurnalmengajar_kirim_wa($nomor_wali, $pesan);
+    }
+}
 
     // ================= REDIRECT =================
     if ($do_save) {

@@ -98,8 +98,8 @@ $settings->add(new admin_setting_configstoredfile(
 // Upload Stempel
 $settings->add(new admin_setting_configstoredfile(
     'local_jurnalmengajar/stempel',
-    'Stempel & TTD',
-    'Upload stempel dan tanda tangan (PNG transparan)',
+    'Stempel',
+    'Upload stempel (PNG transparan)',
     'stempel'
 ));
 $settings->add(new admin_setting_configtext(

@@ -232,8 +232,8 @@ foreach ($urut as $kelas => $jamlist) {
 
     $ringkas = implode('; ', $ringkasParts);
 
-    $pesan = "Notifikasi SiM\n"
-           . "Bpk/Ibu {$info['lastname']}, mohon mengisi jurnal mengajar hari ini ($todayLabel) untuk:\n"
+    $pesan = "Notifikasi SiM ❗\n"
+           . "Bpk/Ibu Guru {$info['lastname']}, mohon mengisi jurnal mengajar hari ini ($todayLabel) untuk:\n"
            . $listkelas
            . "\nTerima kasih.\n_abaikan jika sudah mengisi_";
 

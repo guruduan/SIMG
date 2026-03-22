@@ -11,7 +11,7 @@ function get_nama_kelas($id) {
 }
 
 /**
- * Ambil nowa langsung dari database
+ * Ambil nomor WA user dari profile field nowa
  */
 function get_user_nowa($userid) {
     global $DB;
@@ -36,7 +36,7 @@ function get_user_nowa($userid) {
 }
 
 /**
- * Format waktu Indonesia (GLOBAL)
+ * Format waktu Indonesia
  */
 function format_waktu_indo($timestamp) {
     $hari = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
@@ -53,10 +53,9 @@ function format_waktu_indo($timestamp) {
 }
 
 /**
- * Format tanggal untuk judul (contoh: Kamis 19 Maret 2026)
+ * Format tanggal judul
  */
 function format_tanggal_judul($timestamp = null) {
-
     $timestamp = $timestamp ?: time();
 
     $hari = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
@@ -72,15 +71,52 @@ function format_tanggal_judul($timestamp = null) {
 }
 
 /**
- * Format jam saja (contoh: 19:25)
+ * Format jam saja
  */
 function format_jam($timestamp = null) {
-
     if (!$timestamp) {
         $timestamp = time();
     }
-
     return date('H:i', $timestamp);
+}
+
+/**
+ * Cek boleh kirim WA atau tidak
+ */
+function jurnalmengajar_boleh_kirim_wa() {
+
+    // ======================
+    // Cek hari sekolah
+    // ======================
+    $hariIndoList = [
+        1 => 'Senin',
+        2 => 'Selasa',
+        3 => 'Rabu',
+        4 => 'Kamis',
+        5 => 'Jumat',
+        6 => 'Sabtu',
+        7 => 'Minggu'
+    ];
+
+    $hariIndo = $hariIndoList[(int)date('N')];
+
+    $hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
+    $hariSekolah = array_map('trim', explode(',', $hariSekolah));
+
+    if (!in_array($hariIndo, $hariSekolah)) {
+        return false;
+    }
+
+    // ======================
+    // Cek tanggal libur
+    // ======================
+    $tanggal = date('Y-m-d');
+
+    if (function_exists('jurnalmengajar_cek_libur') && jurnalmengajar_cek_libur($tanggal)) {
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -89,22 +125,50 @@ function format_jam($timestamp = null) {
 function jurnalmengajar_kirim_wa($nomor, $pesan) {
     global $CFG;
 
-    if (empty($nomor)) {
-        debugging("Nomor WA kosong", DEBUG_DEVELOPER);
+    $logdir = $CFG->dataroot . '/logs';
+    if (!file_exists($logdir)) {
+        mkdir($logdir, 0777, true);
+    }
+
+    $logfile = $logdir . '/wa_debug.log';
+
+    file_put_contents($logfile,
+        date('Y-m-d H:i:s') . " | Mulai kirim WA ke $nomor\n",
+        FILE_APPEND
+    );
+
+    // CEK BOLEH KIRIM
+    if (!jurnalmengajar_boleh_kirim_wa()) {
+        file_put_contents($logfile,
+            date('Y-m-d H:i:s') . " | DIBATALKAN: Hari libur / bukan hari sekolah\n",
+            FILE_APPEND
+        );
         return false;
     }
+
+    file_put_contents($logfile,
+        date('Y-m-d H:i:s') . " | Lolos filter hari sekolah\n",
+        FILE_APPEND
+    );
 
     $apikey = get_config('local_jurnalmengajar', 'apikey');
     $secret = get_config('local_jurnalmengajar', 'secretkey');
     $wablas_url = get_config('local_jurnalmengajar', 'wablas_url');
 
+    file_put_contents($logfile,
+        date('Y-m-d H:i:s') . " | URL: $wablas_url\n",
+        FILE_APPEND
+    );
+
     if (empty($apikey) || empty($secret)) {
-        debugging("API Wablas belum diisi", DEBUG_DEVELOPER);
+        file_put_contents($logfile,
+            date('Y-m-d H:i:s') . " | ERROR: API key kosong\n",
+            FILE_APPEND
+        );
         return false;
     }
 
     $token = $apikey . '.' . $secret;
-    $url = $wablas_url;
 
     $data = [
         'data' => [[
@@ -117,7 +181,7 @@ function jurnalmengajar_kirim_wa($nomor, $pesan) {
 
     $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
+        CURLOPT_URL => $wablas_url,
         CURLOPT_HTTPHEADER => [
             "Authorization: $token",
             "Content-Type: application/json"
@@ -130,22 +194,18 @@ function jurnalmengajar_kirim_wa($nomor, $pesan) {
     $response = curl_exec($ch);
 
     if (curl_errno($ch)) {
-        debugging('cURL error: ' . curl_error($ch), DEBUG_DEVELOPER);
+        file_put_contents($logfile,
+            date('Y-m-d H:i:s') . " | CURL ERROR: " . curl_error($ch) . "\n",
+            FILE_APPEND
+        );
+    } else {
+        file_put_contents($logfile,
+            date('Y-m-d H:i:s') . " | RESPONSE: $response\n",
+            FILE_APPEND
+        );
     }
 
     curl_close($ch);
-
-    // logging
-    $logdir = $CFG->dataroot . '/logs';
-    if (!file_exists($logdir)) {
-        mkdir($logdir, 0777, true);
-    }
-
-    file_put_contents(
-        $logdir . '/wablas.log',
-        date('Y-m-d H:i:s') . " | Ke: $nomor | $response\n",
-        FILE_APPEND
-    );
 
     return $response;
 }
@@ -184,35 +244,18 @@ function jurnalmengajar_notifikasi_wa($data, $user) {
 
     $sekolah = get_config('local_jurnalmengajar', 'nama_sekolah') ?: 'Nama Sekolah';
 
-    // absen
-    $absen = '-';
-    if (!empty($data->absen)) {
-        $arr = json_decode($data->absen, true);
-        if (is_array($arr)) {
-            $i = 1;
-            $list = [];
-            foreach ($arr as $nama => $alasan) {
-                $list[] = $i++ . ". $nama: $alasan";
-            }
-            $absen = implode("\n", $list);
-        }
-    }
+    $tanggal_judul = format_tanggal_judul();
+    $jam = format_jam();
 
-$tanggal_judul = format_tanggal_judul();
-$jam = format_jam();
-
-$pesan = "*📘 Jurnal KBM $tanggal_judul*\n\n"
+    $pesan = "*📘 Jurnal KBM $tanggal_judul*\n\n"
        . "👤 Guru yang mengajar: $namaguru\n"
        . "🏫 Kelas: $kelas\n"
        . "⏰ Jam ke: $jamke\n"
        . "📚 Mata Pelajaran: $mapel\n"
        . "📒 Materi: $materi\n"
        . "📝 Aktivitas:\n$aktivitas\n\n"
-       . "🔴 Murid tidak hadir:\n$absen\n\n"
-       . "Keterangan tambahan:\n$keterangan\n\n"
        . "🕒 Waktu: $jam WITA\n"
-       . "📌 Tercatat di eJurnal KBM $sekolah\n\n"
-       . "_Dikirim ke Wali kelas dan Guru ybs sebagai laporan_";
+       . "📌 Tercatat di eJurnal KBM $sekolah";
 
     $nomor_guru = get_user_nowa($user->id);
     $nomor_wali = get_nomor_wali_kelas($kelasid);
@@ -226,37 +269,8 @@ $pesan = "*📘 Jurnal KBM $tanggal_judul*\n\n"
 }
 
 /**
- * Notifikasi WA Surat Izin
+ * Ambil URL logo
  */
-function jurnalmengajar_notifikasi_izin($record, $pengawas_nama) {
-    global $DB;
-
-    $siswa = $DB->get_record('user', ['id' => $record->userid]);
-    if (!$siswa) return;
-
-    $kelas = get_nama_kelas($record->kelasid);
-    $nama  = ucwords(strtolower($siswa->lastname));
-
-    $gurunama = $DB->get_field('user', 'lastname', ['id' => $record->guru_pengajar]);
-
-    $waktu_full = format_waktu_indo($record->timecreated);
-
-    $pesan = "*[Surat Izin Murid]*\n\n"
-           . "📅 Waktu: $waktu_full\n"
-           . "👤 Nama: $nama\n"
-           . "🏫 Kelas: $kelas\n"
-           . "🎓 Guru Pengajar: $gurunama\n"
-           . "📝 Alasan: {$record->alasan}\n"
-           . "📌 Keperluan: {$record->keperluan}\n"
-           . "✍️ Pengawas Hari ini: $pengawas_nama\n\n"
-           . "_Dikirim kepada Wali kelas sebagai laporan_";
-
-    $nomor_wali = get_nomor_wali_kelas($record->kelasid);
-
-    if ($nomor_wali) {
-        jurnalmengajar_kirim_wa($nomor_wali, $pesan);
-    }
-}
 function jurnalmengajar_get_logo_url() {
     global $CFG;
 
@@ -286,6 +300,9 @@ function jurnalmengajar_get_logo_url() {
     return '';
 }
 
+/**
+ * Ambil path stempel
+ */
 function jurnalmengajar_get_stempel_path() {
     global $CFG;
 
@@ -308,23 +325,4 @@ function jurnalmengajar_get_stempel_path() {
     }
 
     return '';
-}
-
-function local_jurnalmengajar_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options=array()) {
-
-    if ($context->contextlevel != CONTEXT_SYSTEM) {
-        return false;
-    }
-
-    $fs = get_file_storage();
-    $filename = array_pop($args);
-    $filepath = '/';
-
-    $file = $fs->get_file($context->id, 'local_jurnalmengajar', $filearea, 0, $filepath, $filename);
-
-    if (!$file) {
-        return false;
-    }
-
-    send_stored_file($file, 0, 0, $forcedownload, $options);
 }

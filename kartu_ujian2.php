@@ -19,44 +19,33 @@ $PAGE->set_heading('Generate Kartu Peserta Ujian / Daftar Hadir');
 
 global $DB, $CFG;
 
-// ===== helper kecil: resolve path logo (aman, batasi hanya dalam dirroot) =====
-function resolve_logo_path(?string $input) {
+function get_logo_plugin_path() {
     global $CFG;
-    // default plugin logo
-    require_once($CFG->dirroot.'/local/jurnalmengajar/lib.php');
-$logo = jurnalmengajar_get_logo_url();
 
-    // jika input kosong, return default (jika ada), atau empty string
-    if (empty($input)) {
-        return (file_exists($default) && is_readable($default)) ? $default : '';
-    }
+    require_once($CFG->libdir . '/filelib.php');
 
-    $p = trim($input);
+    $context = context_system::instance();
+    $fs = get_file_storage();
 
-    // jika user memberikan path relatif (contoh: local/jurnalmengajar/logo.png atau /local/...), buat path ke dirroot
-    if ($p[0] !== '/') {
-        $candidate = $CFG->dirroot . '/' . ltrim($p, '/');
-    } else {
-        // jika absolute path diberikan, gunakan langsung tetapi pastikan berada di dalam dirroot
-        $candidate = $p;
-    }
+    $files = $fs->get_area_files(
+        $context->id,
+        'local_jurnalmengajar',
+        'logo',
+        0,
+        'itemid, filepath, filename',
+        false
+    );
 
-    // normalisasi realpath (jika tersedia)
-    $real = @realpath($candidate);
-    $rootreal = @realpath($CFG->dirroot);
-
-    // pastikan file ada, readable, dan berada di dalam dirroot (prevent keluar dari webroot)
-    if ($real && $rootreal && strpos($real, $rootreal) === 0 && is_file($real) && is_readable($real)) {
-        $ext = strtolower(pathinfo($real, PATHINFO_EXTENSION));
-        if (in_array($ext, ['png','jpg','jpeg'])) {
-            return $real;
+    foreach ($files as $file) {
+        if ($file->get_filename() !== '.') {
+            $tempfile = $CFG->tempdir . '/logo_jurnal.png';
+            $file->copy_content_to($tempfile);
+            return $tempfile;
         }
     }
 
-    // fallback default jika ada
-    return (file_exists($default) && is_readable($default)) ? $default : '';
+    return '';
 }
-
 
 // ambil semua cohort
 $allcohorts = $DB->get_records('cohort', null, 'name ASC');
@@ -219,7 +208,7 @@ if (($action === 'generate' || $action === 'attendance') && confirm_sesskey()) {
     $jumlah_hari   = required_param('jumlah_hari', PARAM_INT);
     $jumlah_ruang  = required_param('jumlah_ruang', PARAM_INT);
     $logo_path_input = optional_param('logo_path', '', PARAM_RAW_TRIMMED);
-    $resolved_logo_path = resolve_logo_path($logo_path_input);
+    $resolved_logo_path = get_logo_plugin_path();
 
     $rooms = [];
     for ($r = 1; $r <= $jumlah_ruang; $r++) {
@@ -796,12 +785,6 @@ echo html_writer::tag('h3', 'Generate Kartu Peserta Ujian dan Daftar Hadir');
 
 echo html_writer::start_tag('form', ['method'=>'post','action'=>new moodle_url('/local/jurnalmengajar/kartu_ujian2.php'), 'id'=>'form-kartu-ujian']);
 
-echo html_writer::label('Path Logo (opsional)','logo_path');
-echo html_writer::empty_tag('input',[
-    'type'=>'text','name'=>'logo_path','id'=>'logo_path',
-    'value'=>'/local/jurnalmengajar/logo.png','size'=>60,
-    'placeholder'=>'Contoh: /local/jurnalmengajar/logo.png'
-]);
 echo html_writer::empty_tag('br');
 
 // input basic

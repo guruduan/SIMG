@@ -4,9 +4,10 @@ require_once('../../config.php');
 require_once($CFG->libdir.'/pdflib.php');
 require_once($CFG->dirroot.'/local/jurnalmengajar/lib.php');
 
+require_login();
+
 $id = required_param('id', PARAM_INT);
 global $DB;
-setlocale(LC_TIME, 'id_ID.UTF-8');
 
 // Ambil data surat
 $data = $DB->get_record('local_jurnalmengajar_suratizin', ['id' => $id], '*', MUST_EXIST);
@@ -21,24 +22,47 @@ $guru = $DB->get_record('user', ['id' => $data->guru_pengajar], 'id, lastname');
 $sekolah = get_config('local_jurnalmengajar', 'nama_sekolah');
 $tempat  = get_config('local_jurnalmengajar', 'tempat_ttd');
 
-// Ambil NIP dari field profil khusus (misalnya: profile_field_nip)
+// Ambil NIP
+$fieldid_nip = $DB->get_field('user_info_field', 'id', ['shortname' => 'nip']);
+
 $nip_guru = $DB->get_field('user_info_data', 'data', [
     'userid' => $guru->id,
-    'fieldid' => $DB->get_field('user_info_field', 'id', ['shortname' => 'nip'])
+    'fieldid' => $fieldid_nip
 ]);
+
 $nip_penginput = $DB->get_field('user_info_data', 'data', [
     'userid' => $penginput->id,
-    'fieldid' => $DB->get_field('user_info_field', 'id', ['shortname' => 'nip'])
+    'fieldid' => $fieldid_nip
 ]);
 
-// Format tanggal dalam Bahasa Indonesia
-//$tanggal = strftime('%A, %d %B %Y', $data->timecreated); // Pastikan locale ID diaktifkan
-$fmt = new IntlDateFormatter('id_ID', IntlDateFormatter::FULL, IntlDateFormatter::NONE, 'Asia/Makassar', null, 'EEEE, dd MMMM yyyy');
+// Format tanggal Indonesia
+$fmt = new IntlDateFormatter(
+    'id_ID',
+    IntlDateFormatter::FULL,
+    IntlDateFormatter::NONE,
+    'Asia/Makassar',
+    null,
+    'EEEE, dd MMMM yyyy'
+);
+
 $tanggal = $fmt->format($data->timecreated);
 
+// ==========================
+// TANGGAL UNTUK NAMA FILE
+// ==========================
+$bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+$tanggalfile = date('j') . ' ' . $bulan[date('n')-1] . ' ' . date('Y');
 
-// Siapkan PDF
+// ==========================
+// SIAPKAN PDF
+// ==========================
 $pdf = new pdf();
+$pdf->setPrintHeader(false);
+$pdf->setPrintFooter(false);
+$pdf->SetAuthor($sekolah);
+$pdf->SetTitle('Surat Izin Murid - ' . $sekolah . ' - ' . $tanggalfile);
+$pdf->SetSubject('Surat Izin Murid');
+
 $pdf->AddPage();
 $pdf->SetFont('helvetica', '', 10);
 
@@ -46,7 +70,7 @@ $pdf->SetFont('helvetica', '', 10);
 $sekolah_upper = mb_strtoupper($sekolah);
 $html = <<<HTML
 <h3 style="text-align: center;">
-SURAT IZIN KELUAR/MASUK SISWA<br>
+SURAT IZIN KELUAR/MASUK MURID<br>
 {$sekolah_upper}
 </h3>
 
@@ -82,28 +106,22 @@ SURAT IZIN KELUAR/MASUK SISWA<br>
 </table>
 HTML;
 
-// Cetak PDF
-//$pdf->writeHTML($html);
-// Tambahkan simbol gunting dan garis putus-putus
+// Garis potong
 $separator = <<<HTML
 <br>
 <hr style="border-top: 1px dashed #000;">
 <br><br>
 HTML;
 
-$stempel_path = jurnalmengajar_get_stempel_path();
-//kena nama pengaawas $pdf->Image($stempel_path, 90, 50, 30, 30, 'PNG'); // stempel pertama
-//$pdf->Image($stempel_path, 90, 120, 30, 30, 'PNG'); // stempel kedua (jika dua surat per halaman)
-
-$pdf->Image($stempel_path, 70, 42, 38, 38, 'PNG'); // stempel pertama
-//$pdf->Image($stempel_path, 70, 120, 30, 30, 'PNG'); // stempel kedua (jika dua surat per halaman)
-
-// Gabungkan dua surat izin dalam satu halaman
-//$htmloutput = $html . $separator . $html;
-//$pdf->writeHTML($htmloutput);
-//$pdf->Output('surat_izin.pdf', 'I');
-
-// Cetak hanya satu surat saja
+// Tulis HTML
 $htmloutput = $html . $separator;
 $pdf->writeHTML($htmloutput);
-$pdf->Output('surat_izin.pdf', 'I');
+
+// Ambil stempel dari settings
+$stempel_path = jurnalmengajar_get_stempel_path();
+if (!empty($stempel_path) && file_exists($stempel_path)) {
+    $pdf->Image($stempel_path, 70, 42, 38, 38, 'PNG');
+}
+
+// Output PDF
+$pdf->Output('surat_izin-' . $tanggalfile . '.pdf', 'I');

@@ -1,7 +1,4 @@
 <?php
-// local/jurnalmengajar/kartu_ujian.php
-// Generate Kartu Peserta Ujian + Generate Daftar Hadir (A4 Portrait per-hari)
-// Revisi: Daftar hadir per hari, halaman portrait, header menunjukkan tanggal hari, Ruang
 
 require(__DIR__ . '/../../config.php');
 require_login();
@@ -16,6 +13,34 @@ $PAGE->set_title('Generate Kartu Peserta Ujian / Daftar Hadir');
 $PAGE->set_heading('Generate Kartu Peserta Ujian / Daftar Hadir');
 
 global $DB, $CFG;
+
+function get_logo_plugin_path() {
+    global $CFG;
+
+    require_once($CFG->libdir . '/filelib.php');
+
+    $context = context_system::instance();
+    $fs = get_file_storage();
+
+    $files = $fs->get_area_files(
+        $context->id,
+        'local_jurnalmengajar',
+        'logo',
+        0,
+        'itemid, filepath, filename',
+        false
+    );
+
+    foreach ($files as $file) {
+        if ($file->get_filename() !== '.') {
+            $tempfile = $CFG->tempdir . '/logo_jurnal.png';
+            $file->copy_content_to($tempfile);
+            return $tempfile;
+        }
+    }
+
+    return '';
+}
 
 // ambil semua cohort
 $allcohorts = $DB->get_records('cohort', null, 'name ASC');
@@ -41,13 +66,56 @@ function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari) {
         if ($cnt > $maxcount) $maxcount = $cnt;
     }
 
-    $ordered_students = [];
-    $seen = [];
-    for ($i = 0; $i < $maxcount; $i++) {
-        foreach ($allcohorts as $c) {
-            $cid = $c->id;
-            if (isset($students_by_cohort[$cid][$i])) {
-                $stu = $students_by_cohort[$cid][$i];
+  // --- mulai penggantian: build ordered_students sesuai pola XA, XI-A, XII-A, XB, ... ---
+$ordered_students = [];
+$seen = [];
+
+// buat map cohort id->name dan normalized name -> id
+$cohortnames_by_id = [];
+$norm_to_id = [];
+foreach ($allcohorts as $c) {
+    $cohortnames_by_id[$c->id] = $c->name;
+    // normalisasi: huruf besar, hilangkan spasi, ganti underscore dan multiple dash tetap
+    $norm = strtoupper(preg_replace('/[^A-Z0-9\-]/', '', str_replace('_', '', str_replace(' ', '', $c->name))));
+    $norm_to_id[$norm] = $c->id;
+}
+
+// bangun students_by_cohort_name (normalized => array students)
+$students_by_cohort_name = [];
+foreach ($students_by_cohort as $cid => $arr) {
+    $cname = isset($cohortnames_by_id[$cid]) ? $cohortnames_by_id[$cid] : '';
+    $norm = strtoupper(preg_replace('/[^A-Z0-9\-]/', '', str_replace('_', '', str_replace(' ', '', $cname))));
+    $students_by_cohort_name[$norm] = array_values($arr);
+}
+
+// urutan huruf yang Anda pakai (A..G)
+$letters = ['A','B','C','D','E','F','G'];
+
+// build groups per letter: X{L}, XI-{L}, XII-{L}
+$sequence_groups = [];
+foreach ($letters as $L) {
+    $g = [];
+    $g[] = strtoupper('X' . $L);       // contoh: XA
+    $g[] = strtoupper('XI-' . $L);     // contoh: XI-A
+    $g[] = strtoupper('XII-' . $L);    // contoh: XII-A (mungkin tidak ada untuk F/G)
+    $sequence_groups[] = $g;
+}
+
+// cari panjang maksimal di antara cohort yang ada (untuk indeks iterasi)
+$maxcount = 0;
+foreach ($sequence_groups as $grp) {
+    foreach ($grp as $cohnorm) {
+        $cnt = isset($students_by_cohort_name[$cohnorm]) ? count($students_by_cohort_name[$cohnorm]) : 0;
+        if ($cnt > $maxcount) $maxcount = $cnt;
+    }
+}
+
+// interleave per indeks: untuk i = 0..maxcount-1, ambil X?, XI-?, XII-? (jika ada)
+for ($i = 0; $i < $maxcount; $i++) {
+    foreach ($sequence_groups as $grp) {
+        foreach ($grp as $cohnorm) {
+            if (!empty($students_by_cohort_name[$cohnorm]) && isset($students_by_cohort_name[$cohnorm][$i])) {
+                $stu = $students_by_cohort_name[$cohnorm][$i];
                 if (!isset($seen[$stu->id])) {
                     $ordered_students[] = $stu;
                     $seen[$stu->id] = true;
@@ -55,6 +123,26 @@ function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari) {
             }
         }
     }
+}
+
+// jika ada siswa dari cohort lain yang tidak tercakup, tambahkan di akhir (preserve order by cohort id)
+foreach ($students_by_cohort as $cid => $arr) {
+    $cname = isset($cohortnames_by_id[$cid]) ? $cohortnames_by_id[$cid] : '';
+    $norm = strtoupper(preg_replace('/[^A-Z0-9\-]/', '', str_replace('_', '', str_replace(' ', '', $cname))));
+    // cek apakah norm sudah tercakup dalam sequence_groups
+    $inSequence = false;
+    foreach ($sequence_groups as $g) {
+        if (in_array($norm, $g, true)) { $inSequence = true; break; }
+    }
+    if ($inSequence) continue;
+    foreach ($arr as $stu) {
+        if (!isset($seen[$stu->id])) {
+            $ordered_students[] = $stu;
+            $seen[$stu->id] = true;
+        }
+    }
+}
+// --- selesai penggantian ---
 
     $total_students = count($ordered_students);
     $total_capacity = 0;
@@ -86,6 +174,10 @@ function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari) {
     // exam dates (Mon-Fri)
     $exam_dates = [];
     $d = strtotime($tanggal_mulai);
+    // safety: jika strtotime gagal, fallback ke hari ini
+    if ($d === false || $d === null) {
+        $d = time();
+    }
     while (count($exam_dates) < $jumlah_hari) {
         $w = (int) date('N', $d);
         if ($w >= 1 && $w <= 5) $exam_dates[] = date('Y-m-d', $d);
@@ -110,7 +202,17 @@ if (($action === 'generate' || $action === 'attendance') && confirm_sesskey()) {
     $tanggal_mulai = required_param('tanggal_mulai', PARAM_RAW_TRIMMED);
     $jumlah_hari   = required_param('jumlah_hari', PARAM_INT);
     $jumlah_ruang  = required_param('jumlah_ruang', PARAM_INT);
+    $logo_path_input = optional_param('logo_path', '', PARAM_RAW_TRIMMED);
+    $resolved_logo_path = get_logo_plugin_path();
 
+$selected_cohorts = optional_param_array('cohorts', [], PARAM_INT);
+
+if (empty($selected_cohorts)) {
+    echo $OUTPUT->header();
+    echo $OUTPUT->notification('Pilih minimal satu cohort.', 'notifyproblem');
+    echo $OUTPUT->footer();
+    exit;
+}
     $rooms = [];
     for ($r = 1; $r <= $jumlah_ruang; $r++) {
         $rname = optional_param('ruang_'.$r, '', PARAM_RAW_TRIMMED);
@@ -123,11 +225,17 @@ if (($action === 'generate' || $action === 'attendance') && confirm_sesskey()) {
         echo $OUTPUT->footer();
         exit;
     }
-
-    $plan = build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari);
+// Ambil hanya cohort yang dipilih
+$filtered_cohorts = [];
+foreach ($selected_cohorts as $cid) {
+    if (isset($allcohorts[$cid])) {
+        $filtered_cohorts[$cid] = $allcohorts[$cid];
+    }
+}
+$plan = build_plan($filtered_cohorts, $rooms, $tanggal_mulai, $jumlah_hari);
 }
 
-// ---------------- ACTION: GENERATE KARTU (tidak diubah) ----------------
+// ---------------- ACTION: GENERATE KARTU (fix tombol previously) ----------------
 if ($action === 'generate' && confirm_sesskey()) {
     $assignments = [];
     for ($s = 1; $s <= $plan->num_sessions; $s++) {
@@ -156,8 +264,6 @@ if ($action === 'generate' && confirm_sesskey()) {
     $cardw = $pagewidth / $cols;
     $cardh = $pageheight / $rows;
 
-    $tanggal_ujian_teks = build_tanggal_range($plan->exam_dates[0] ?? '', end($plan->exam_dates) ?? '');
-
     $i = 0;
     foreach ($assignments as $assign) {
         if ($i > 0 && $i % 9 == 0) $pdf->AddPage('L');
@@ -175,29 +281,66 @@ if ($action === 'generate' && confirm_sesskey()) {
         $meja = $assign['meja'];
         $sno = $assign['session'];
 
-        // header
-        $pdf->SetFont('helvetica','B',11);
-        $pdf->SetXY($x, $y + $pady);
-        $pdf->Cell($cardw,5,'KARTU PESERTA',0,1,'C');
-        $pdf->SetFont('helvetica','',10);
-        $pdf->SetX($x); $pdf->Cell($cardw,5,$nama_ujian,0,1,'C');
-        $pdf->SetX($x); $pdf->Cell($cardw,5,$nama_sekolah,0,1,'C');
-        $pdf->SetX($x); $pdf->Cell($cardw,5,'Tahun Ajaran '.$tahun_ajaran,0,1,'C');
-        $pdf->SetX($x); $pdf->Cell($cardw,5,$tanggal_ujian_teks,0,1,'C');
-        $pdf->Ln(1);
+// --- tampilkan logo sekolah (jika ada) dan header area -----------------
+$logo_abs_path = $resolved_logo_path ?? '';
+
+$logoW = 12; // mm, ubah kalau mau lebih kecil/besar
+$logoTopOffset = 6;
+$logoLeftOffset = 6;
+
+$headerAreaX = $x;
+$headerAreaW = $cardw;
+$spaceAfterLogo = 4;
+
+if (!empty($logo_abs_path)) {
+    $pdf->Image($logo_abs_path, $x + $logoLeftOffset, $y + $logoTopOffset, $logoW, 0, '', '', 'T', false, 300, '', false, false, 0, false, false, false);
+    $used = $logoLeftOffset + $logoW + $spaceAfterLogo;
+    if ($used < ($cardw - 10)) {
+        $headerAreaX = $x + $used;
+        $headerAreaW = $cardw - $used - 4;
+    } else {
+        $headerAreaX = $x + 6;
+        $headerAreaW = $cardw - 12;
+    }
+}
+
+// Header teks menggunakan headerAreaX/headerAreaW (agar tak overlap logo)
+$pdf->SetFont('helvetica','B',11);
+$pdf->SetXY($headerAreaX, $y + $pady);
+$pdf->Cell($headerAreaW,5,'KARTU PESERTA',0,1,'C');
+$pdf->SetFont('helvetica','',10);
+$pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,$nama_ujian,0,1,'C');
+$pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,$nama_sekolah,0,1,'C');
+$pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,'Tahun Ajaran '.$tahun_ajaran,0,1,'C');
+
+// tanggal ujian juga di headerArea agar tidak tertutup logo
+$student_dates = $plan->exam_dates;
+$cohortname_for_check = isset($stu->cohortname) ? trim($stu->cohortname) : '';
+if ($cohortname_for_check !== '' && (preg_match('/^XI/i', $cohortname_for_check) || preg_match('/^XII/i', $cohortname_for_check))) {
+    if (count($student_dates) > 1) array_pop($student_dates);
+}
+$student_dates = is_array($student_dates) ? array_values(array_filter($student_dates, function($v){ return !is_null($v) && $v !== ''; })) : [];
+if (empty($student_dates) && !empty($plan->exam_dates)) $student_dates = array_values($plan->exam_dates);
+
+$tanggal_ujian_teks = build_tanggal_range($student_dates[0] ?? '', end($student_dates) ?? '');
+$pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,$tanggal_ujian_teks,0,1,'C');
+$pdf->Ln(1);
+
+// Posisi kolom Nama/Kelas: gunakan headerAreaX sebagai anchor kiri agar sejajar
+$leftX = $x + $padx;
+$rightX = $x + ($cardw/2);
 
         // Nama (bold normal) left, Kelas bold normal right
-        $leftX = $x + $padx; $rightX = $x + ($cardw/2);
         $pdf->SetFont('helvetica','B',9);
         $pdf->SetXY($leftX, $pdf->GetY());
-        $pdf->Cell(($cardw/2)-$padx, 6, 'Nama Murid : ' . $stu->lastname, 0, 0, 'L');
+        $pdf->Cell(($cardw/2)-$padx, 6, 'Nama : ' . $stu->lastname, 0, 0, 'L');
         $pdf->SetXY($rightX, $pdf->GetY());
         $pdf->Cell(($cardw/2)-$padx, 6, 'Kelas : ' . $stu->cohortname, 0, 1, 'R');
         $pdf->Ln(1);
 
         $pdf->SetFont('helvetica','',9);
         $pdf->SetX($leftX);
-        $pdf->Cell(($cardw/2)-$padx, 4, 'Nama Ruang : ' . $roomname, 0, 0, 'L');
+        $pdf->Cell(($cardw/2)-$padx, 4, 'Ruang : ' . $roomname, 0, 0, 'L');
         $pdf->SetX($rightX);
         $pdf->Cell(($cardw/2)-$padx, 4, 'Username : ' . $stu->username, 0, 1, 'L');
 
@@ -209,7 +352,8 @@ if ($action === 'generate' && confirm_sesskey()) {
 
         // sesi table (Hari / Tanggal / Sesi) -- gunakan s_on_day relatif ke sno
         $pdf->Ln(1);
-        $numDates = max(1, count($plan->exam_dates));
+        // gunakan tanggal spesifik per siswa (XI/XII mungkin dipendekkan)
+        $numDates = max(1, count($student_dates));
         $cellw = ($cardw - 2*$padx) / $numDates;
         if ($numDates <= 6) { $fontDay = 8; $fontSession = 10; }
         elseif ($numDates <= 10) { $fontDay = 7; $fontSession = 9; }
@@ -217,34 +361,65 @@ if ($action === 'generate' && confirm_sesskey()) {
         // Hari labels
         $pdf->SetFont('helvetica','B',$fontDay);
         $pdf->SetX($leftX);
-        foreach ($plan->exam_dates as $ed) {
-            $wday = (int) date('N', strtotime($ed));
-            $label = ['','Sen','Sel','Rab','Kam','Jum'][$wday] ?? '';
+        foreach ($student_dates as $ed) {
+            $wday = null;
+            if (!empty($ed)) {
+                $ts = strtotime((string)$ed);
+		if ($ts !== false) $wday = (int) date('N', $ts);
+
+            }
+            $label = '';
+            if ($wday !== null) $label = ['','Sen','Sel','Rab','Kam','Jum'][$wday] ?? '';
             $pdf->Cell($cellw,5,$label,0,0,'C');
         }
         $pdf->Ln(5);
         // Tanggal labels
         $pdf->SetFont('helvetica','',$fontDay);
         $pdf->SetX($leftX);
-        foreach ($plan->exam_dates as $ed) {
-            $dt = date_create_from_format('Y-m-d',$ed);
-            $lab = $dt ? intval($dt->format('j')).'/'.$dt->format('n') : $ed;
+        foreach ($student_dates as $ed) {
+            $lab = '';
+            if (!empty($ed)) {
+                $dt = date_create_from_format('Y-m-d',$ed);
+                $lab = $dt ? intval($dt->format('j')).'/'.$dt->format('n') : '';
+            }
             $pdf->Cell($cellw,5,$lab,0,0,'C');
         }
         $pdf->Ln(5);
         // Sesi labels (per tanggal): for Sen-Thu two-wave as requested
         $pdf->SetFont('helvetica','B',$fontSession);
         $pdf->SetX($leftX);
-        for ($didx=0;$didx<$numDates;$didx++) {
-            $ed = $plan->exam_dates[$didx];
-            $s_on_day = ((($sno - 1) + $didx) % $plan->num_sessions) + 1;
-            $w = (int) date('N', strtotime($ed));
-            if ($w >=1 && $w <=4) {
-                $second = $s_on_day + $plan->num_sessions;
-                $txt = $s_on_day . ' & ' . $second;
+        for ($didx = 0; $didx < $numDates; $didx++) {
+            if (!isset($student_dates[$didx]) || empty($student_dates[$didx])) {
+                $ed = $plan->exam_dates[$didx] ?? null;
             } else {
-                $txt = (string)$s_on_day;
+                $ed = $student_dates[$didx];
             }
+
+           $s_on_day = ((($sno - 1) + $didx) % $plan->num_sessions) + 1;
+$txt = (string)$s_on_day;
+
+// treat last date as single-session always
+$is_last_date_for_student = ($didx === ($numDates - 1));
+
+if ($ed !== null && $ed !== '') {
+    $ts = @strtotime((string)$ed);
+    if ($ts !== false && $ts !== -1) {
+        $w = (int) date('N', $ts);
+        // only show two-wave if NOT the last date AND weekday is Mon-Thu
+        if (!$is_last_date_for_student && $w >= 1 && $w <= 4) {
+            $second = $s_on_day + $plan->num_sessions;
+            $txt = $s_on_day . ' & ' . $second;
+        } else {
+            $txt = (string)$s_on_day;
+        }
+    } else {
+        $txt = (string)$s_on_day;
+    }
+} else {
+    $txt = '-';
+}
+
+
             $pdf->Cell($cellw,6,$txt,0,0,'C');
         }
         $pdf->Ln(6);
@@ -256,7 +431,7 @@ if ($action === 'generate' && confirm_sesskey()) {
     exit;
 }
 
-// ---------------- ACTION: attendance (PORTRAIT, per-day, simplified columns) ----------------
+// ---------------- ACTION: attendance (landscape, paginated, two subcols for Sen-Thu) ----------------
 if ($action === 'attendance' && confirm_sesskey()) {
     global $CFG;
     require_once($CFG->libdir . '/pdflib.php');
@@ -265,142 +440,348 @@ if ($action === 'attendance' && confirm_sesskey()) {
     $num_sessions = $plan->num_sessions;
     $exam_dates = $plan->exam_dates;
 
-    // build assignments map: userid -> ['session'=>, 'room'=>, 'meja'=>]
-    $assignments = [];
-    foreach ($seating_by_session as $sno => $slots) {
-        $students_in_s = $plan->sessions[$sno] ?? [];
-        for ($i = 0; $i < count($slots); $i++) {
-            $slot = $slots[$i];
-            $stu = $students_in_s[$i] ?? null;
-            if ($stu) {
-                $assignments[$stu->id] = ['session' => $sno, 'room' => $slot['room'], 'meja' => $slot['meja'], 'user' => $stu];
-            }
-        }
+    // map user->s0 (initial session)
+    $user_session = [];
+    foreach ($plan->sessions as $sno => $list) {
+        foreach ($list as $stu) $user_session[$stu->id] = $sno;
     }
 
-    // PDF A4 portrait
-    $pdf = new pdf('P', 'mm', 'A4', true, 'UTF-8', false);
+    // PDF A4 landscape
+    $pdf = new pdf(PDF_PAGE_ORIENTATION, 'mm', 'A4', true, 'UTF-8', false);
     $pdf->SetCreator('Moodle');
     $pdf->SetAuthor(fullname($USER));
     $pdf->setPrintHeader(false);
     $pdf->setPrintFooter(false);
 
+    // margins
     $leftMargin = 12; $rightMargin = 12; $topMargin = 12; $bottomMargin = 12;
     $pdf->SetMargins($leftMargin,$topMargin,$rightMargin);
     $pdf->SetAutoPageBreak(false);
 
-    // For each date, produce pages per room
-    foreach ($exam_dates as $ed) {
-        // compute which session numbers occur on this date: for weekdays Mon-Thu -> two waves (s_on_day and s_on_day + num_sessions)
-        foreach ($rooms as $rinfo) {
-            $rname = $rinfo['name'];
+    // For each initial session s (1..num_sessions)
+    for ($s = 1; $s <= $num_sessions; $s++) {
+        $slots = $seating_by_session[$s] ?? [];
+        $students_in_s = $plan->sessions[$s] ?? [];
+        // map slot index -> student assigned in session s
+        $slot_student = [];
+        for ($i = 0; $i < count($slots); $i++) {
+            $slot_student[$i] = $students_in_s[$i] ?? null;
+        }
 
-            // collect rows: iterate assignments and pick those assigned to this room and whose session matches the sessions on this date
-            $rows = [];
-
-            // for each possible base session (1..num_sessions), compute s_on_day for that base
-            // Students who have assignment 'session' equal to s_on_day OR s_on_day + num_sessions (if second wave) attend on this date.
-            for ($base = 1; $base <= $num_sessions; $base++) {
-                $s_on_day = ((($base - 1) + array_search($ed, $exam_dates)) % $num_sessions) + 1; // not used directly
-                // Instead, we will compute for each student whether their assigned session maps to this date by reverse check below
-            }
-
-            // We'll determine by checking for each assigned student whether their assigned session occurs on this date.
-            foreach ($assignments as $aid => $ainfo) {
-                if ($ainfo['room'] !== $rname) continue;
-                $assigned_session = $ainfo['session'];
-                // check if assigned_session occurs on this date:
-                // For a given date index $di, the session numbers that take place that date are:
-                // s = ((di) % num_sessions) + 1  (this is s_on_day for base session 1), but actually mapping per original code: for session s, s_on_day = ((s-1)+di)%num_sessions +1
-                // To find whether assigned_session maps to date index $di: we search for any base s such that ((s-1)+di)%num_sessions +1 == assigned_session OR + num_sessions
-                $di = array_search($ed, $exam_dates);
-                $occurs = false;
-                // iterate base session s_base (1..num_sessions) and see what session numbers occur that date
-                for ($sbase = 1; $sbase <= $num_sessions; $sbase++) {
-                    $s_on_day = ((($sbase - 1) + $di) % $num_sessions) + 1;
-                    // first wave
-                    if ($assigned_session === $s_on_day) { $occurs = true; break; }
-                    // second wave (if Mon-Thu) assumed as + num_sessions
-                    $w = (int) date('N', strtotime($ed));
-                    if ($w >=1 && $w <=4) {
-                        if ($assigned_session === ($s_on_day + $num_sessions)) { $occurs = true; break; }
-                    }
-                }
-                if ($occurs) {
-                    $rows[] = $ainfo; // includes user object
+        // group slots by room
+        $roomnames = array_map(function($r){ return $r['name']; }, $rooms);
+        foreach ($roomnames as $rname) {
+            // collect rows: all slots that belong to this room (preserve slot order)
+            $all_rows = [];
+            foreach ($slots as $idx => $slot) {
+                if ($slot['room'] === $rname) {
+                    $stu = $slot_student[$idx] ?? null;
+                    $all_rows[] = ['slotindex' => $idx, 'student' => $stu];
                 }
             }
 
-            // sort rows by meja
-            usort($rows, function($a, $b){ return $a['meja'] <=> $b['meja']; });
+            // layout calculations (landscape)
+            $pageWidthTotal = 297;
+            $printableW = $pageWidthTotal - $leftMargin - $rightMargin; // mm
 
-            // pagination: simple: rows per page depending on font and space
-            $pdf->SetFont('helvetica','',10);
-            $pageWidth = 210; $pageHeight = 297;
-            $printableW = $pageWidth - $leftMargin - $rightMargin;
-            $printableH = $pageHeight - $topMargin - $bottomMargin;
+// asumsi: $pdf sudah di-set font yang sama nanti dipakai untuk tabel
+// contoh: $pdf->SetFont('helvetica','',10);
 
-            // column widths (mm)
-            $colMejaW = 20; // No meja
-            $colNamaW = 70;
-            $colKelasW = 30;
-            $colSesiW = max(15, floor(($printableW - ($colMejaW + $colNamaW + $colKelasW)) / 2));
+$maxNameW = 0; $maxClassW = 0;
+foreach ($all_rows as $rr) {
+    if (!empty($rr['student'])) {
+        $n = trim($rr['student']->lastname);
+        $c = trim($rr['student']->cohortname);
+        // ukur lebar aktual teks dengan font saat ini
+        $wname = $pdf->GetStringWidth($n);
+        $wclass = $pdf->GetStringWidth($c);
+        if ($wname > $maxNameW) $maxNameW = $wname;
+        if ($wclass > $maxClassW) $maxClassW = $wclass;
+    }
+}
 
-            $headerH = 14; // title area
+// padding kecil dalam satuan unit PDF
+$namePadding = 4; $kelasPadding = 3;
+$estNameW = round($maxNameW + $namePadding);
+$estKelasW = round($maxClassW + $kelasPadding);
+
+// tetap pakai batas min/max relatif printable area tapi lebih konservatif
+$colNoW = round($printableW * 0.06);
+$colNamaMin = round($printableW * 0.10); // minimal 10%
+$colNamaMax = round($printableW * 0.35); // maksimal 35% (kurangi dari 45%)
+$colKelasMin = round($printableW * 0.06);
+$colKelasMax = round($printableW * 0.12); // maksimal 12% (lebih kecil)
+
+$colNamaW = min(max($estNameW, $colNamaMin), $colNamaMax);
+$colKelasW = min(max($estKelasW, $colKelasMin), $colKelasMax);
+
+// cek jika total melebihi printableW (termasuk kolom lain jika ada)
+$totalNeeded = $colNoW + $colNamaW + $colKelasW; // + kolom lain...
+if ($totalNeeded > $printableW) {
+    $available = $printableW - $colNoW;
+    // prioritaskan kelas minimal dulu:
+    $colKelasW = min($colKelasW, round($available * 0.12));
+    $colNamaW = $available - $colKelasW;
+    // pastikan nama tidak di bawah min
+    if ($colNamaW < $colNamaMin) {
+        // jika tetap overflow, kecilkan font 1pt dan rekalkulasi (sederhana):
+        $currentFontSize = 10; // set sesuai
+        for ($fs = $currentFontSize - 1; $fs >= 6; $fs--) {
+            $pdf->SetFont('helvetica','',$fs);
+            // hitung ulang lebar maksimum nama
+            $maxNameW = 0;
+            foreach ($all_rows as $rr) {
+                if (!empty($rr['student'])) {
+                    $n = trim($rr['student']->lastname);
+                    $w = $pdf->GetStringWidth($n);
+                    if ($w > $maxNameW) $maxNameW = $w;
+                }
+            }
+            $estNameW = round($maxNameW + $namePadding);
+            $colNamaW = min(max($estNameW, $colNamaMin), $colNamaMax);
+            $totalNeeded = $colNoW + $colNamaW + $colKelasW;
+            if ($totalNeeded <= $printableW) break;
+        }
+    }
+}
+// Determine number of subcolumns: for each date Sen-Thu => 2 subcols, Fri =>1
+// BUT force the last date in the sequence to be single subcol (1)
+$subcols_count = 0;
+$date_subcounts = []; // per date, value 2 or 1
+$total_exam_dates = count($exam_dates);
+foreach ($exam_dates as $di => $ed) {
+    $is_last_date_global = ($di === ($total_exam_dates - 1));
+    $w = null;
+    if (!empty($ed)) {
+        $ts = @strtotime((string)$ed);
+        if ($ts !== false && $ts !== -1) $w = (int) date('N', $ts);
+    }
+    // if it's the last date, force 1 subcol
+    if ($is_last_date_global) {
+        $sc = 1;
+    } else {
+        $sc = ($w !== null && $w >= 1 && $w <= 4) ? 2 : 1;
+    }
+    $date_subcounts[] = $sc;
+    $subcols_count += $sc;
+}
+
+            // remaining width for subcolumns
+            $remainingW = $printableW - ($colNoW + $colNamaW + $colKelasW);
+            if ($remainingW < 10) $remainingW = 10;
+            $subcolW = floor($remainingW / max(1,$subcols_count));
+            // build array of subcol widths per date (if date has 2 subcols, two entries)
+            $subcolWidths = [];
+            foreach ($date_subcounts as $sc) {
+                for ($k=0;$k<$sc;$k++) $subcolWidths[] = $subcolW;
+            }
+            // fix leftover pixels to last subcol
+            $leftover = $remainingW - ($subcolW * count($subcolWidths));
+            if ($leftover > 0 && count($subcolWidths)>0) $subcolWidths[count($subcolWidths)-1] += $leftover;
+
+            // Now compute pagination as before
+            $usableH = 210 - $topMargin - $bottomMargin;
+            $headerArea = 28; // header includes two header rows + sesi row
             $tableHeaderH = 8;
-            $rowH = 8;
-            $rows_per_page = floor(($printableH - $headerH - 30) / $rowH);
-            if ($rows_per_page < 4) $rows_per_page = 4;
+            $pengawasDoubleH = 12;
+            $pengawasSignH = 10;
+            $availableForRowsPerPage = $usableH - $headerArea - $tableHeaderH - $pengawasDoubleH - $pengawasSignH - 6;
+            $minRowH = 5;
+            $rowh = 8;
+            $rows_per_page = floor($availableForRowsPerPage / $rowh);
+            if ($rows_per_page < 4) {
+                $rowh = max($minRowH, floor($availableForRowsPerPage / max(1,6)));
+                $rows_per_page = floor($availableForRowsPerPage / $rowh);
+            }
+            if ($rows_per_page < 1) $rows_per_page = 1;
 
-            $chunks = array_chunk($rows, $rows_per_page);
-            if (empty($chunks)) $chunks = [[]];
+            if ($rowh >= 12) $fontRow = 11;
+            elseif ($rowh >= 9) $fontRow = 10;
+            elseif ($rowh >= 7) $fontRow = 9;
+            elseif ($rowh >= 6) $fontRow = 8;
+            else $fontRow = 7;
 
-            foreach ($chunks as $pindex => $chunkRows) {
-                $pdf->AddPage('P');
+            // paginate rows
+            $total_rows = count($all_rows);
+            $pages = [];
+            if ($total_rows === 0) $pages[] = []; else {
+                $i = 0;
+                while ($i < $total_rows) {
+                    $pages[] = array_slice($all_rows, $i, $rows_per_page);
+                    $i += $rows_per_page;
+                }
+            }
 
-                // Title
-                $pdf->SetFont('helvetica','B',14);
-                $pdf->Cell(0,7, 'Daftar Hadir Ujian - ' . $nama_ujian, 0, 1, 'C');
-                $pdf->SetFont('helvetica','',10);
-                $subtitle = 'Sekolah: ' . $nama_sekolah . ' | Tanggal: ' . format_tanggal_indonesia($ed) . ' | Ruang: ' . $rname;
-                $pdf->Cell(0,6, $subtitle, 0, 1, 'C');
-                $pdf->Ln(4);
+            // Render pages. We must print header with date (spanning its subcols) then second header row with subcol labels.
+            $pageIndex = 0;
+            foreach ($pages as $pageRows) {
+                $isLastPage = ($pageIndex === count($pages)-1);
+                $pdf->AddPage('L');
+                
+// ===== HEADER: logo di kiri, Title & Subtitle centered dan sejajar vertically =====
+$logoX = $leftMargin;            // mulai dari margin kiri
+$logoMaxW = 22;                  // lebar logo maksimal (mm), sesuaikan jika perlu
+$logoMaxH = 18;                  // tinggi maksimal (mm)
+$headerTop = $topMargin - 2;     // area header top (mm)
 
-                // Table header
-                $pdf->SetFont('helvetica','B',10);
-                $pdf->Cell($colMejaW, $tableHeaderH, 'No Meja', 1, 0, 'C');
+// center baseline untuk judul/subtitle (posisi vertikal pusat header)
+$centerY = $headerTop + 10;      // sesuaikan +10 jika perlu lebih turun/naik
+
+// jika ada logo, hitung ukuran fisik sesuai aspect ratio, batasi ke max
+$logoH = 0;
+if (!empty($resolved_logo_path) && is_file($resolved_logo_path)) {
+    $imginfo = @getimagesize($resolved_logo_path);
+    if ($imginfo) {
+        list($pw, $ph) = $imginfo;
+        if ($ph > 0) {
+            $ratio = $pw / $ph;
+            // usaha isi logoMaxW dulu, hitung tinggi berdasarkan ratio
+            $tryW = $logoMaxW;
+            $tryH = $tryW / $ratio;
+            if ($tryH > $logoMaxH) {
+                // jika tinggi melebihi max, batasi tinggi dan hitung lebar
+                $tryH = $logoMaxH;
+                $tryW = $tryH * $ratio;
+            }
+            $logoW = $tryW;
+            $logoH = $tryH;
+        } else {
+            $logoW = $logoMaxW;
+            $logoH = $logoMaxH;
+        }
+    } else {
+        // fallback ukuran bila getimagesize gagal
+        $logoW = $logoMaxW;
+        $logoH = $logoMaxH;
+    }
+
+    // posisikan logo sehingga centerY sejajar vertical tengah logo
+    $logoY = $centerY - ($logoH / 2);
+    $pdf->Image($resolved_logo_path, $logoX, $logoY, $logoW, $logoH, '', '', 'T', false, 300);
+}
+
+// Tetapkan posisi teks agar terpusat (center) secara horizontal,
+// dan sejajar secara vertikal relatif ke $centerY.
+// Title sedikit di atas center, subtitle sedikit di bawah.
+
+$titleFontSize = 14;
+$subtitleFontSize = 10;
+
+// Title (center)
+$pdf->SetFont('helvetica','B', $titleFontSize);
+$pdf->SetXY(0, $centerY - 6);              // -6 agar garis tengah judul sedikit di atas center
+$pdf->Cell(0, 7, 'Daftar Hadir - ' . $nama_ujian, 0, 1, 'C');
+
+// Subtitle (center)
+$pdf->SetFont('helvetica','', $subtitleFontSize);
+$pdf->SetXY(0, $centerY + 2);              // +2 agar subtitle sedikit di bawah center
+$subtitle = $nama_sekolah . ' | Mulai Sesi : ' . $s . ' | Ruang: ' . $rname;
+$pdf->Cell(0, 6, $subtitle, 0, 1, 'C');
+
+$pdf->Ln(2); // jarak ke konten tabel
+// ===== akhir header baru =====
+
+                // First header row: No | Nama | Kelas | for each date print a cell with width = sum of its subcols
+                $pdf->SetFont('helvetica','B', max(8, $fontRow));
+                $pdf->Cell($colNoW, $tableHeaderH, 'No', 1, 0, 'C');
                 $pdf->Cell($colNamaW, $tableHeaderH, 'Nama', 1, 0, 'C');
                 $pdf->Cell($colKelasW, $tableHeaderH, 'Kelas', 1, 0, 'C');
-                $pdf->Cell($colSesiW, $tableHeaderH, 'Sesi 1', 1, 0, 'C');
-                $pdf->Cell($colSesiW, $tableHeaderH, 'Sesi 2', 1, 0, 'C');
+
+                // iterate dates and compute total width per date by summing next N subcolWidths
+                $subidx = 0;
+                foreach ($date_subcounts as $di => $sc) {
+                    $totalW = 0;
+                    for ($k=0;$k<$sc;$k++) { $totalW += $subcolWidths[$subidx + $k]; }
+                    // show date label (e.g. Sen 1/12)
+                    $ed = $exam_dates[$di] ?? null;
+                    $wday = null;
+                    if (!empty($ed)) {
+                        $ts = @strtotime((string)$ed);
+                        if ($ts !== false && $ts !== -1) $wday = (int) date('N', $ts);
+                    }
+                    $labelDay = '';
+                    if ($wday !== null) $labelDay = ['','Sen','Sel','Rab','Kam','Jum'][$wday] ?? '';
+                    $dt = ($ed !== null && $ed !== '') ? date_create_from_format('Y-m-d', $ed) : false;
+                    $labelDate = $dt ? intval($dt->format('j')) . '/' . $dt->format('n') : '';
+                    $headerLabel = trim($labelDay . ' ' . $labelDate);
+                    $pdf->Cell($totalW, $tableHeaderH, $headerLabel, 1, 0, 'C');
+                    $subidx += $sc;
+                }
                 $pdf->Ln();
 
-                // rows
-                $pdf->SetFont('helvetica','',10);
-                $no = ($pindex * $rows_per_page) + 1;
-                foreach ($chunkRows as $r) {
-                    $u = $r['user'];
-                    $pdf->Cell($colMejaW, $rowH, $r['meja'], 1, 0, 'C');
-                    $nameText = $u ? format_string($u->lastname) : '';
-                    $pdf->Cell($colNamaW, $rowH, $nameText, 1, 0, 'L');
-                    $kelasText = $u ? format_string($u->cohortname) : '';
-                    $pdf->Cell($colKelasW, $rowH, $kelasText, 1, 0, 'C');
-                    // empty attendance boxes for sesi columns
-                    $pdf->Cell($colSesiW, $rowH, '', 1, 0, 'C');
-                    $pdf->Cell($colSesiW, $rowH, '', 1, 0, 'C');
+                // Second header row: empty under No | Nama put 'Sesi' | empty under Kelas to align
+                $pdf->SetFont('helvetica','B', max(8, $fontRow));
+                $pdf->Cell($colNoW, $tableHeaderH, 'Meja', 1, 0, 'C');
+                $pdf->Cell($colNamaW, $tableHeaderH, 'Murid', 1, 0, 'C');
+                $pdf->Cell($colKelasW, $tableHeaderH, 'Sesi->', 1, 0, 'C');
+
+                // For each date, print its subcols: Sen-Thu => two cells with sesi labels; Fri => one cell
+                $subidx = 0;
+                foreach ($date_subcounts as $di => $sc) {
+                    $ed = $exam_dates[$di] ?? null;
+                    $s_on_day = ((($s - 1) + $di) % $num_sessions) + 1;
+                    $w = null;
+                    if (!empty($ed)) {
+                        $ts = @strtotime((string)$ed);
+                        if ($ts !== false && $ts !== -1) $w = (int) date('N', $ts);
+                    }
+                    if ($sc == 2) {
+                        // left subcol: s_on_day
+                        $pdf->Cell($subcolWidths[$subidx], $tableHeaderH, (string)$s_on_day, 1, 0, 'C');
+                        // right subcol: s_on_day + num_sessions
+                        $pdf->Cell($subcolWidths[$subidx+1], $tableHeaderH, (string)($s_on_day + $num_sessions), 1, 0, 'C');
+                        $subidx += 2;
+                    } else {
+                        // single subcol (Friday) - put s_on_day centered
+                        $pdf->Cell($subcolWidths[$subidx], $tableHeaderH, (string)$s_on_day, 1, 0, 'C');
+                        $subidx += 1;
+                    }
+                }
+                $pdf->Ln();
+
+                // rows on this page
+                $pdf->SetFont('helvetica','', $fontRow);
+                $no = ($pageIndex * $rows_per_page) + 1;
+                foreach ($pageRows as $rrow) {
+                    $stu = $rrow['student'];
+                    $pdf->Cell($colNoW, $rowh, $no, 1, 0, 'C');
+                    $nameText = $stu ? format_string($stu->lastname) : '';
+                    $pdf->Cell($colNamaW, $rowh, $nameText, 1, 0, 'L');
+                    $kelasText = $stu ? format_string($stu->cohortname) : '';
+                    $pdf->Cell($colKelasW, $rowh, $kelasText, 1, 0, 'L');
+
+                    // print empty cells for each subcol (these are the signature cells)
+                    foreach ($subcolWidths as $sw) {
+                        $pdf->Cell($sw, $rowh, '', 1, 0, 'C');
+                    }
                     $pdf->Ln();
                     $no++;
                 }
 
-                // if last page for this room on this date, add signature lines
-                if ($pindex === count($chunks)-1) {
-                    $pdf->Ln(6);
-                    $pdf->Cell(0,6, 'Pengawas: ____________________________     NIP: __________________', 0, 1, 'L');
-                }
-            }
+                // Last page: add pengawas double row + 'Tanda Tangan Pengawas'
+                if ($isLastPage) {
+                    $ph = max($rowh * 3, 12);
+                    $pdf->SetFont('helvetica','B',$fontRow);
+                    $pdf->Cell($colNoW, $ph, '', 1, 0, 'C');
+                    $pdf->Cell($colNamaW, $ph, 'NAMA PENGAWAS', 1, 0, 'L');
+                    $pdf->Cell($colKelasW, $ph, '', 1, 0, 'L');
+                    foreach ($subcolWidths as $sw) $pdf->Cell($sw, $ph, '', 1, 0, 'C');
+                    $pdf->Ln();
 
-        }
-    }
+                    $th = max(10, round($rowh * 1.0));
+                    $pdf->SetFont('helvetica','', $fontRow);
+                    $pdf->Cell($colNoW, $th, '', 1, 0, 'C');
+                    $pdf->Cell($colNamaW, $th, 'Tanda Tangan Pengawas', 1, 0, 'L');
+                    $pdf->Cell($colKelasW, $th, '', 1, 0, 'L');
+                    foreach ($subcolWidths as $sw) $pdf->Cell($sw, $th, '', 1, 0, 'C');
+                    $pdf->Ln();
+                }
+
+                $pageIndex++;
+            } // pages
+
+        } // rooms
+    } // sessions
 
     // output
     $pdf->Output('daftar_hadir_ujian_' . userdate(time(), '%Y%m%d_%H%M') . '.pdf', 'I');
@@ -409,9 +790,16 @@ if ($action === 'attendance' && confirm_sesskey()) {
 
 // ===== FORM =====
 echo $OUTPUT->header();
-echo html_writer::tag('h3', 'Generate Kartu Peserta Ujian / Daftar Hadir (Semua Cohort)');
+echo html_writer::tag('h3', 'Generate Kartu Peserta Ujian dan Daftar Hadir');
 
-echo html_writer::start_tag('form', ['method'=>'post','action'=>new moodle_url('/local/jurnalmengajar/kartu_ujian.php'), 'id'=>'form-kartu-ujian']);
+echo html_writer::start_tag('form', [
+    'method'=>'post',
+    'action'=>$PAGE->url,
+    'id'=>'form-kartu-ujian',
+    'target'=>'_blank'
+]);
+
+echo html_writer::empty_tag('br');
 
 // input basic
 echo html_writer::label('Nama Ujian','nama_ujian');
@@ -426,11 +814,11 @@ echo html_writer::label('Tahun Ajaran','tahun_ajaran');
 echo html_writer::empty_tag('input',['type'=>'text','name'=>'tahun_ajaran','id'=>'tahun_ajaran','value'=>'2025/2026','size'=>20,'required'=>'required']);
 echo html_writer::empty_tag('br');
 
-echo html_writer::label('Tanggal Mulai (pertama ujian)','tanggal_mulai');
+echo html_writer::label('Tanggal Mulai Ujian','tanggal_mulai');
 echo html_writer::empty_tag('input',['type'=>'date','name'=>'tanggal_mulai','id'=>'tanggal_mulai','required'=>'required']);
 echo html_writer::empty_tag('br');
 
-echo html_writer::label('Jumlah hari ujian (hari kerja, Senin–Jumat)','jumlah_hari');
+echo html_writer::label('Jumlah Hari Ujian','jumlah_hari');
 echo html_writer::empty_tag('input',['type'=>'number','name'=>'jumlah_hari','id'=>'jumlah_hari','value'=>1,'min'=>1,'required'=>'required']);
 echo html_writer::empty_tag('br');
 
@@ -440,6 +828,32 @@ echo html_writer::empty_tag('input',[
     'value'=>1,'min'=>1,'required'=>'required','oninput'=>'renderRuangInputs()'
 ]);
 echo html_writer::empty_tag('br');
+
+echo html_writer::empty_tag('br');
+
+echo html_writer::tag('b', 'Pilih Cohort yang diikutkan:');
+
+// container grid
+echo html_writer::start_tag('div', [
+    'style' => 'display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; max-width:600px;'
+]);
+
+foreach ($allcohorts as $c) {
+    echo html_writer::start_tag('div');
+    
+    echo html_writer::empty_tag('input', [
+        'type' => 'checkbox',
+        'name' => 'cohorts[]',
+        'value' => $c->id,
+        'id' => 'cohort_'.$c->id
+    ]);
+    
+    echo html_writer::label($c->name, 'cohort_'.$c->id);
+
+    echo html_writer::end_tag('div');
+}
+
+echo html_writer::end_tag('div');
 
 echo html_writer::tag('div','',['id'=>'ruang-container']);
 
@@ -477,21 +891,25 @@ echo $OUTPUT->footer();
 // ===== helper functions =====
 function get_student_plain_password(stdClass $user): string {
     global $DB;
-    $fieldshort = ['passwordujian','password_ujian','exam_password','password'];
+    // pastikan 'pwexam' ada paling depan sehingga diambil dulu
+    $fieldshort = ['pwexam','passwordujian','password_ujian','exam_password','password'];
     foreach ($fieldshort as $short) {
-        $field = $DB->get_record('user_info_field', ['shortname'=>$short], 'id', IGNORE_MISSING);
+        $field = $DB->get_record('user_info_field', ['shortname' => $short], 'id', IGNORE_MISSING);
         if ($field) {
-            $rec = $DB->get_record('user_info_data', ['fieldid'=>$field->id,'userid'=>$user->id], 'data', IGNORE_MISSING);
+            $rec = $DB->get_record('user_info_data', ['fieldid' => $field->id, 'userid' => $user->id], 'data', IGNORE_MISSING);
             if ($rec && trim($rec->data) !== '') return trim($rec->data);
         }
     }
-    if (!empty($user->idnumber) && strlen(trim($user->idnumber))>=3) return trim($user->idnumber);
+    // fallback ke idnumber jika masuk akal
+    if (!empty($user->idnumber) && strlen(trim($user->idnumber)) >= 3) return trim($user->idnumber);
+    // jika password belum di-hash (kasus langka), tampilkan; jika hash, tidak bisa ditampilkan
     if (!empty($user->password)) {
         $pw = trim($user->password);
         if (strpos($pw, '$') === false && strlen($pw) <= 60 && strlen($pw) >= 4) return $pw;
     }
     return '******';
 }
+
 
 function build_tanggal_range(string $mulai, string $sampai): string {
     if (!$mulai) return '';
