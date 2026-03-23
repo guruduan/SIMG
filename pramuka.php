@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($nomorwa) {
 
-        $waktu = format_waktu_indo($record->timecreated);
+        $waktu = tanggal_indo($record->timecreated);
 
         $absen_data = json_decode($record->absen, true);
         $daftarabsen = '-';
@@ -181,7 +181,7 @@ if (is_numeric($r->kelas)) {
 
         $table->data[] = [
             $no++,
-            format_waktu_indo($r->timecreated), // ✅ FIX
+            tanggal_indo($r->timecreated), // ✅ FIX
             $guru,
             $kelas,
             format_string($r->materi),

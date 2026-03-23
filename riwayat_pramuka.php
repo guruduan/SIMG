@@ -64,7 +64,7 @@ if ($records) {
 
         $table->data[] = [
             $no++,
-            format_waktu_indo($r->timecreated),
+    tanggal_indo($r->timecreated),
             $guru,
             $kelas,
             format_string($r->materi),

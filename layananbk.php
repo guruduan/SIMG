@@ -74,7 +74,7 @@ if ($mform->is_cancelled()) {
 
     if ($nomorwa) {
 
-        $waktu = format_waktu_indo($record->timecreated);
+        $waktu = tanggal_indo($record->timecreated);
 
         $peserta = json_decode($record->peserta, true);
         $peserta_str = is_array($peserta) && !empty($peserta)
@@ -151,7 +151,7 @@ if ($records) {
 
         $gurubk = $DB->get_field('user','lastname',['id'=>$r->userid]) ?? '-';
 
-        $waktu = format_waktu_indo($r->timecreated);
+        $waktu = tanggal_indo($r->timecreated);
 
         $table->data[] = [
             $waktu,
@@ -166,7 +166,7 @@ if ($records) {
     echo html_writer::table($table);
 
 } else {
-    \core\notification::add('Belum ada data Jurnal Layanan BK.', \core\output\notification::NOTIFY_INFO);
+    echo html_writer::notification('Belum ada data Jurnal Layanan BK.', 'notifymessage');
 }
 
 echo $OUTPUT->footer();

@@ -121,7 +121,7 @@ $no = 1;
 foreach ($riwayat as $r) {
 
     // ✅ pakai format global
-    $tanggal = format_waktu_indo($r->waktuinput);
+    $tanggal = tanggal_indo($r->waktuinput);
 
     $hapusurl = new moodle_url('/local/jurnalmengajar/hapus_surat_izin_guru.php', [
         'id' => $r->id,

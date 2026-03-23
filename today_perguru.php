@@ -1,6 +1,7 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
+require_once(__DIR__ . '/lib.php');
 
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);
@@ -23,9 +24,8 @@ echo html_writer::link(new moodle_url('/local/jurnalmengajar/bydate.php'), '📅
 echo html_writer::end_div();
 
 global $DB;
-date_default_timezone_set('Asia/Makassar');
-$start = strtotime('today midnight');
-$end = strtotime('tomorrow midnight') - 1;
+$start = strtotime('today 00:00:00');
+$end   = strtotime('today 23:59:59');
 
 $sql = "SELECT j.*, u.lastname
         FROM {local_jurnalmengajar} j
@@ -33,12 +33,6 @@ $sql = "SELECT j.*, u.lastname
         WHERE j.timecreated BETWEEN :start AND :end
         ORDER BY u.lastname ASC, j.timecreated ASC";
 $entries = $DB->get_records_sql($sql, ['start' => $start, 'end' => $end]);
-
-function format_waktu_indonesia($t) {
-    $hari = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    $bulan = [1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'];
-    return $hari[date('w',$t)].', '.date('j',$t).' '.$bulan[date('n',$t)].' '.date('Y',$t).', '.date('H:i',$t).' WITA';
-}
 
 // 🔁 Group by Guru
 $grouped = [];
@@ -55,7 +49,7 @@ if ($grouped) {
             $abs = json_decode($e->absen, true);
             $abtxt = is_array($abs) ? implode(', ', array_map(fn($n, $a) => "$n ($a)", array_keys($abs), $abs)) : $e->absen;
             echo html_writer::tag('li', "Kelas $kelas jam ke {$e->jamke} – <em>{$e->matapelajaran}</em> – " .
-                shorten_text($e->materi, 40) . ' – ' . format_waktu_indonesia($e->timecreated));
+                shorten_text($e->materi, 40) . ' – ' . tanggal_indo($e->timecreated));
         }
         echo html_writer::end_tag('ul');
     }

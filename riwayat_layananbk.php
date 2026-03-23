@@ -29,7 +29,7 @@ if ($records) {
     foreach ($records as $r) {
 
         $kelas = get_nama_kelas($r->kelas);
-        $waktu = format_waktu_indo($r->timecreated);
+        $waktu = tanggal_indo($r->timecreated);
 
         $peserta = json_decode($r->peserta, true);
         $peserta_str = is_array($peserta) ? implode(', ', $peserta) : '-';
@@ -65,10 +65,8 @@ if ($records) {
 
     echo html_writer::table($table);
 
-//} else {
-//    echo html_writer::notification('Belum ada data.', 'notifymessage');
-//}
 } else {
-    \core\notification::add('Belum ada data Jurnal Layanan BK.', \core\output\notification::NOTIFY_INFO);
+    echo html_writer::notification('Belum ada data.', 'notifymessage');
 }
+
 echo $OUTPUT->footer();

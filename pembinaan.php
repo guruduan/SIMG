@@ -73,7 +73,7 @@ if ($mform->is_cancelled()) {
 
     if ($nomorwa) {
 
-        $waktu = format_waktu_indo($record->timecreated);
+        $waktu = tanggal_indo($record->timecreated);
 
         $peserta = json_decode($record->peserta, true);
         $peserta_str = is_array($peserta) && !empty($peserta)
@@ -153,7 +153,7 @@ if ($records) {
         $gurubk = $DB->get_field('user', 'lastname', ['id' => $r->userid]) ?? '-';
 
         // ✅ pakai fungsi global
-        $waktu = format_waktu_indo($r->timecreated);
+        $waktu = tanggal_indo($r->timecreated);
 
         $table->data[] = [
             $no++,
