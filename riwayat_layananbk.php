@@ -66,7 +66,7 @@ if ($records) {
     echo html_writer::table($table);
 
 } else {
-    echo html_writer::notification('Belum ada data.', 'notifymessage');
+    echo $OUTPUT->notification('Belum ada data.', 'notifymessage');
 }
 
 echo $OUTPUT->footer();

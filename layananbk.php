@@ -168,7 +168,7 @@ if ($records) {
     echo html_writer::table($table);
 
 } else {
-    echo html_writer::notification('Belum ada data Jurnal Layanan BK.', 'notifymessage');
+    echo $OUTPUT->notification('Belum ada data Jurnal Layanan BK.', 'notifymessage');
 }
 
 echo $OUTPUT->footer();
