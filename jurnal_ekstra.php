@@ -82,8 +82,11 @@ if ($selected_ekstra) {
     echo 'Tanggal:<br>';
     echo '<input type="date" name="tanggal" value="'.date('Y-m-d').'"><br><br>';
 
-    echo 'Materi / Kegiatan:<br>';
+    echo 'Materi :<br>';
     echo '<textarea name="materi" rows="4" cols="70" required></textarea><br><br>';
+
+    echo 'Kegiatan:<br>';
+    echo '<textarea name="catatan" rows="3" cols="70"></textarea><br><br>';
 
     echo '<b>Absensi Murid ('.count($siswa).' murid)</b><br>';
 
@@ -115,10 +118,6 @@ if ($selected_ekstra) {
     }
 
     echo '</table><br>';
-
-    echo 'Catatan:<br>';
-    echo '<textarea name="catatan" rows="3" cols="70"></textarea><br><br>';
-
     echo '<button type="submit">Simpan Jurnal</button>';
     echo '</form>';
 }

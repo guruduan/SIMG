@@ -15,7 +15,7 @@ global $DB, $OUTPUT;
 
 // ===== Filter =====
 $guru  = optional_param('guru', '', PARAM_TEXT);
-$kelas = optional_param('kelas', 0, PARAM_INT);
+$kelas = optional_param('kelas', '', PARAM_TEXT);
 $mapel = optional_param('mapel', '', PARAM_TEXT);
 $page  = optional_param('page', 0, PARAM_INT);
 
@@ -40,7 +40,7 @@ foreach ($listguru as $g) {
 
 // ===== Dropdown Kelas =====
 $listkelas = $DB->get_records('cohort', null, 'name');
-$opsikelas = [0 => 'Semua Kelas'];
+$opsikelas = ['' => 'Semua Kelas'];
 foreach ($listkelas as $k) {
     $opsikelas[$k->id] = $k->name;
 }
@@ -136,6 +136,7 @@ if ($entries) {
         html_writer::tag('th', 'Materi') .
         html_writer::tag('th', 'Absen') .
         html_writer::tag('th', 'Waktu') .
+        html_writer::tag('th', 'Status') .
         html_writer::tag('th', 'Aksi')
     );
 
@@ -162,6 +163,16 @@ if ($entries) {
             'id' => $e->id,
             'sesskey' => sesskey()
         ]);
+        
+$status = '<span style="color:green;">Normal</span>';
+
+if ($e->timemodified > 0) {
+    if (date('Y-m-d', $e->timecreated) != date('Y-m-d', $e->timemodified)) {
+        $status = '<span style="color:orange;">Susulan</span>';
+    } else {
+        $status = '<span style="color:red;">Diedit</span>';
+    }
+}
 
         $aksi = html_writer::link($editurl, 'Edit');
         $aksi .= ' | ' . html_writer::link(
@@ -182,6 +193,7 @@ if ($entries) {
             html_writer::tag('td', shorten_text($e->materi, 30), ['title' => $e->materi]) .
             html_writer::tag('td', shorten_text($absentext, 25), ['title' => $absentext]) .
             html_writer::tag('td', tanggal_indo($e->timecreated)) .
+            html_writer::tag('td', $status) .
             html_writer::tag('td', $aksi)
         );
 

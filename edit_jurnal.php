@@ -12,7 +12,7 @@ $context = context_system::instance();
 require_capability('moodle/site:config', $context);
 
 $PAGE->set_context($context);
-$PAGE->set_url(new moodle_url('/local/jurnalmengajar/edit_jurnall.php', ['id' => $id]));
+$PAGE->set_url(new moodle_url('/local/jurnalmengajar/edit_jurnal.php', ['id' => $id]));
 $PAGE->set_title('Edit Jurnal (Admin)');
 $PAGE->set_heading('Edit Jurnal (Admin)');
 
@@ -24,7 +24,7 @@ $PAGE->requires->js_init_code(<<<JS
 $(document).ready(function() {
 
 function loadSiswa(kelas, absenData = {}) {
-    if (!kelas || isNaN(kelas)) {
+    if (!kelas) {
         console.warn("Kelas tidak valid:", kelas);
         return;
     }
@@ -118,13 +118,14 @@ global $DB;
 $record = $DB->get_record('local_jurnalmengajar', [
     'id' => $id
 ], '*', MUST_EXIST);
+$record->tanggaldibuat = $record->timecreated;
 
 // Hindari null
 $record->aktivitas = $record->aktivitas ?? '';
 $record->id = $id;
 
 // ✅ Form
-$mform = new jurnal_form(null, null);
+$mform = new jurnal_form(null, ['mode' => 'edit']);
 
 if ($mform->is_cancelled()) {
     redirect(new moodle_url('/local/jurnalmengajar/all.php'));
@@ -137,16 +138,23 @@ if ($mform->is_cancelled()) {
     }
 
     $record->kelas = $data->kelas;
-    $record->jamke = $data->jamke;
-    $record->matapelajaran = $data->matapelajaran;
-    $record->materi = $data->materi;
-    $record->aktivitas = $data->aktivitas;
-    $record->absen = $data->absen; // JSON dari JS
-    $record->keterangan = $data->keterangan;
+$record->jamke = $data->jamke;
+$record->matapelajaran = $data->matapelajaran;
+$record->materi = $data->materi;
+$record->aktivitas = $data->aktivitas;
+$record->absen = $data->absen;
+$record->keterangan = $data->keterangan;
 
-    $DB->update_record('local_jurnalmengajar', $record);
+// 🔥 tanggal jurnal dari form edit
+$record->timecreated = $data->tanggaldibuat;
 
-    redirect(new moodle_url('/local/jurnalmengajar/all_jurnall.php'), 'Jurnal berhasil diperbarui.', 2);
+// 🔥 log edit
+$record->timemodified = time();
+$record->modifiedby = $USER->id;
+
+$DB->update_record('local_jurnalmengajar', $record);
+
+    redirect(new moodle_url('/local/jurnalmengajar/all_jurnal.php'), 'Jurnal berhasil diperbarui.', 2);
 }
 
 // 🔥 isi data lama ke form

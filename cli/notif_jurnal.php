@@ -8,6 +8,12 @@ require_once(__DIR__.'/../lib.php'); // fungsi kirim WA
 
 global $DB;
 
+$cohortmap = [];
+$cohorts = $DB->get_records('cohort', null, '', 'id,name');
+foreach ($cohorts as $c) {
+    $cohortmap[$c->id] = $c->name;
+}
+
 $today = date('Y-m-d');
 $hariIndo = jurnalmengajar_get_hari_ini();
 $current = time();
@@ -55,7 +61,7 @@ $starttoday = strtotime("$today 00:00:00");
 $endtoday   = strtotime("$today 23:59:59");
 
 $jurnaltoday = $DB->get_records_sql("
-    SELECT userid, jamke
+    SELECT id, userid, kelas, jamke
     FROM {local_jurnalmengajar}
     WHERE timecreated BETWEEN :starttoday AND :endtoday
 ", [
@@ -67,13 +73,20 @@ $filled = [];
 foreach ($jurnaltoday as $row) {
     foreach (explode(',', $row->jamke) as $j) {
         $j = (int)trim($j);
-        $filled[$row->userid.'-'.$j] = true;
+        $kelasnama = $row->kelas;
+if (isset($cohortmap[$row->kelas])) {
+    $kelasnama = $cohortmap[$row->kelas];
+}
+
+$key = $row->userid . '-' . $kelasnama . '-' . $j;
+$filled[$key] = true;
     }
 }
+//
 
 // ===== Ambil jadwal dari database =====
 $jadwal_db = $DB->get_records_sql("
-    SELECT j.userid, j.kelas, j.jamke, u.lastname
+    SELECT j.id, j.userid, j.kelas, j.jamke, u.lastname
     FROM {local_jurnalmengajar_jadwal} j
     JOIN {user} u ON u.id = j.userid
     WHERE j.hari = :hari
@@ -102,8 +115,9 @@ $pending = [];
 
 foreach ($jadwal as $j) {
 
-    if (!in_array($j['jamke'], $jam_terlewat)) continue;
-    if (isset($filled[$j['userid'].'-'.$j['jamke']])) continue;
+    if (!in_array((int)$j['jamke'], $jam_terlewat)) continue;
+    $key = $j['userid'] . '-' . $j['kelas'] . '-' . (int)$j['jamke'];
+if (isset($filled[$key])) continue;
 
     if (!isset($pending[$j['userid']])) {
         $pending[$j['userid']] = [
@@ -116,7 +130,7 @@ foreach ($jadwal as $j) {
         $pending[$j['userid']]['kelasjam'][$j['kelas']] = [];
     }
 
-    $pending[$j['userid']]['kelasjam'][$j['kelas']][] = $j['jamke'];
+    $pending[$j['userid']]['kelasjam'][$j['kelas']][] = (int)$j['jamke'];
 }
 
 if (empty($pending)) {
@@ -149,6 +163,7 @@ foreach ($pending as $userid => $info) {
 $urut = [];
 
 foreach ($info['kelasjam'] as $kelas => $jamlist) {
+    $jamlist = array_unique($jamlist);
     sort($jamlist);
     $urut[$kelas] = $jamlist;
 }
