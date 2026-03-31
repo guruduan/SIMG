@@ -36,32 +36,27 @@ class jurnal_form extends \moodleform {
             $mform->setType('tanggaldibuat', PARAM_INT);
         }
 
-        // Mata Pelajaran
-        $mform->addElement('select', 'matapelajaran', 'Mata Pelajaran', ['' => '- Pilih Mata Pelajaran -'] + [
-            'Pendidikan Agama Islam dan Budi Pekerti' => 'Pendidikan Agama Islam dan Budi Pekerti',
-            'Pendidikan Agama Kristen dan Budi Pekerti' => 'Pendidikan Agama Kristen dan Budi Pekerti',
-            'Pendidikan Pancasila' => 'Pendidikan Pancasila',
-            'Bahasa Indonesia' => 'Bahasa Indonesia',
-            'Bahasa Inggris' => 'Bahasa Inggris',
-            'Fisika' => 'Fisika',
-            'Kimia' => 'Kimia',
-            'Biologi' => 'Biologi',
-            'Sosiologi' => 'Sosiologi',
-            'Ekonomi' => 'Ekonomi',
-            'Geografi' => 'Geografi',
-            'Pendidikan Jasmani, Olahraga dan Kesehatan' => 'Pendidikan Jasmani, Olahraga dan Kesehatan',
-            'Seni dan Budaya' => 'Seni dan Budaya',
-            'Informatika' => 'Informatika',
-            'Matematika' => 'Matematika',
-            'Matematika Lanjut' => 'Matematika Lanjut',
-            'Sejarah' => 'Sejarah',
-            'Prakarya dan Kewirausahaan' => 'Prakarya dan Kewirausahaan',
-            'Pendidikan Al Quran' => 'Pendidikan Al Quran',
-            'Bimbingan Konseling' => 'Bimbingan Konseling',
-            'Pendalaman AlKitab' => 'Pendalaman AlKitab'
-        ]);
-        $mform->setType('matapelajaran', PARAM_TEXT);
-        $mform->addRule('matapelajaran', null, 'required');
+        // Mata Pelajaran dari setting plugin
+$mapel_setting = get_config('local_jurnalmengajar', 'mapel_list');
+
+$mapel_options = ['' => '- Pilih Mata Pelajaran -'];
+
+if (!empty($mapel_setting)) {
+    $mapel_array = explode(',', $mapel_setting);
+} else {
+    $mapel_array = ['Fisika', 'Matematika', 'Bahasa Indonesia'];
+}
+
+foreach ($mapel_array as $mapel) {
+    $mapel = trim($mapel);
+    if ($mapel !== '') {
+        $mapel_options[$mapel] = $mapel;
+    }
+}
+
+$mform->addElement('select', 'matapelajaran', 'Mata Pelajaran', $mapel_options);
+$mform->setType('matapelajaran', PARAM_TEXT);
+$mform->addRule('matapelajaran', null, 'required');
 
         // Materi
         $mform->addElement('textarea', 'materi', 'Materi', 'rows="3" cols="60"');
