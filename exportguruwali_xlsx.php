@@ -4,6 +4,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/lib.php');
 require_once(__DIR__ . '/vendor/autoload.php');
 require_login();
 
@@ -24,16 +25,6 @@ $tempat      = get_config('local_jurnalmengajar', 'tempat_ttd');
 $namakepsek  = get_config('local_jurnalmengajar', 'nama_kepsek');
 $nipkepsek   = get_config('local_jurnalmengajar', 'nip_kepsek');
 
-// ✅ Fungsi format tanggal Indonesia
-function format_tanggal_indonesia($timestamp) {
-    $hari = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    $bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    $namahari = $hari[date('w', $timestamp)];
-    $tanggal = date('j', $timestamp);
-    $namabulan = $bulan[date('n', $timestamp) - 1];
-    $tahun = date('Y', $timestamp);
-    return "$namahari, $tanggal $namabulan $tahun";
-}
 
 // Ambil parameter bulan & tahun
 $bulan = optional_param('bulan', null, PARAM_TEXT);
@@ -48,15 +39,15 @@ $bulanmap = [
 $namabulan = $bulanmap[$bulan] ?? $bulan;
 $filename = $bulan && $tahun ? "jurnalguruwali_{$namabulan}_{$tahun}.xlsx" : "jurnal_guruwali_semua.xlsx";
 
-// Data guru
-$guru = $DB->get_record_sql("SELECT u.lastname FROM {user} u
-    JOIN {role_assignments} ra ON ra.userid = u.id
-    JOIN {context} c ON c.id = ra.contextid
-    JOIN {role} r ON r.id = ra.roleid
-    WHERE r.shortname = 'gurujurnal' AND u.id = ?
-    LIMIT 1", [$USER->id]);
+// Data guru hapus saja kata chatgpt
+//$guru = $DB->get_record_sql("SELECT u.lastname FROM {user} u
+//    JOIN {role_assignments} ra ON ra.userid = u.id
+//    JOIN {context} c ON c.id = ra.contextid
+//    JOIN {role} r ON r.id = ra.roleid
+//    WHERE r.shortname = 'gurujurnal' AND u.id = ?
+//    LIMIT 1", [$USER->id]);
 
-$namaguru = $guru->lastname ?? 'Tidak ditemukan';
+$namaguru = $USER->lastname;
 $nipguru = $DB->get_field('user_info_data', 'data', [
     'userid' => $USER->id,
     'fieldid' => $DB->get_field('user_info_field', 'id', ['shortname' => 'nip'])
@@ -86,6 +77,13 @@ $sheet->getStyle('A8:G8')->getFont()->setBold(true);
 $sheet->getStyle('A8:G8')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->getStyle('A8:G8')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 $sheet->getStyle('A8:G8')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E0FFFF'); // 💠 warna muda
+$sheet->getColumnDimension('A')->setWidth(5);
+$sheet->getColumnDimension('B')->setWidth(22);
+$sheet->getColumnDimension('C')->setWidth(10);
+$sheet->getColumnDimension('D')->setWidth(25);
+$sheet->getColumnDimension('E')->setWidth(30);
+$sheet->getColumnDimension('F')->setWidth(35);
+$sheet->getColumnDimension('G')->setWidth(30);
 $sheet->getStyle('A8:G8')->getAlignment()->setWrapText(true);
 
 // =========================
@@ -144,33 +142,53 @@ $row = 9;
 $no  = 1;
 
 foreach ($entries as $e) {
-    $tanggal = format_tanggal_indonesia($e->timecreated);
 
     $sheet->fromArray([
         $no++,
-        $tanggal,
-        $e->kelas ?? '-',
-        $e->namamurid ?? '—',
-        $e->topik ?? '',
-        $e->tindaklanjut ?? '',
-        $e->keterangan ?? ''
+        tanggal_indo($e->timecreated, 'judul'),
+        $e->kelas,
+        $e->namamurid,
+        $e->topik,
+        $e->tindaklanjut,
+        $e->keterangan
     ], NULL, "A{$row}");
 
+    // Border saja
     $sheet->getStyle("A{$row}:G{$row}")
-        ->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
-    $sheet->getStyle("A{$row}:G{$row}")
-        ->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
-    $sheet->getStyle("E{$row}:G{$row}")
-        ->getAlignment()->setWrapText(true);
+          ->getBorders()->getAllBorders()
+          ->setBorderStyle(Border::BORDER_THIN);
 
     $row++;
 }
+
+/* Alignment SEKALI saja */
+$lastrow = $row - 1;
+
+// Vertical top semua
+$sheet->getStyle("A9:G{$lastrow}")
+      ->getAlignment()
+      ->setVertical(Alignment::VERTICAL_TOP);
+
+// Center kolom No
+$sheet->getStyle("A9:A{$lastrow}")
+      ->getAlignment()
+      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+// Center kolom Kelas
+$sheet->getStyle("C9:C{$lastrow}")
+      ->getAlignment()
+      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+// Wrap text
+$sheet->getStyle("D9:G{$lastrow}")
+      ->getAlignment()
+      ->setWrapText(true);
 
 // ✅ Tanda tangan
 $row += 2;
 
 $sheet->setCellValue("B{$row}", 'Mengetahui');
-$sheet->setCellValue("F{$row}", $tempat . ', ' . format_tanggal_indonesia(time()));
+$sheet->setCellValue("F{$row}", $tempat . ', ' . tanggal_indo(time(), 'tanggal'));
 
 $row++;
 
@@ -186,11 +204,6 @@ $row++;
 
 $sheet->setCellValue("B{$row}", 'NIP ' . $nipkepsek);
 $sheet->setCellValue("F{$row}", 'NIP ' . $nipguru);
-
-// ✅ Auto width
-foreach (range('A', 'G') as $col) {
-    $sheet->getColumnDimension($col)->setAutoSize(true);
-}
 
 // Output file
 $filename = clean_filename($filename);
