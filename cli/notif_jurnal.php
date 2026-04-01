@@ -73,13 +73,18 @@ $filled = [];
 foreach ($jurnaltoday as $row) {
     foreach (explode(',', $row->jamke) as $j) {
         $j = (int)trim($j);
-        $kelasnama = $row->kelas;
-if (isset($cohortmap[$row->kelas])) {
-    $kelasnama = $cohortmap[$row->kelas];
-}
 
-$key = $row->userid . '-' . $kelasnama . '-' . $j;
-$filled[$key] = true;
+        // Samakan kelas dengan jadwal
+        $kelas = $row->kelas;
+        if (isset($cohortmap[$kelas])) {
+            $kelas = $cohortmap[$kelas];
+        }
+
+        $key = $row->userid . '-' . $kelas . '-' . $j;
+        $filled[$key] = true;
+
+        // Debug
+        mtrace("FILLED: " . $key);
     }
 }
 //
@@ -108,6 +113,11 @@ foreach ($jadwal_db as $j) {
 if (empty($jadwal)) {
     mtrace("Tidak ada jadwal di database untuk hari $hariIndo");
     exit(0);
+}
+mtrace("=== JADWAL ===");
+foreach ($jadwal as $j) {
+    $k = $j['userid'].'-'.$j['kelas'].'-'.$j['jamke'];
+    mtrace("JADWAL: " . $k);
 }
 
 // ===== Group jurnal yang belum diisi =====
