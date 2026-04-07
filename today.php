@@ -16,11 +16,15 @@ echo $OUTPUT->heading('Jurnal Hari Ini (Urut Waktu)');
 
 // 🔁 TAB SWITCH di today.php
 echo html_writer::start_div('mb-3');
+
+echo html_writer::link(new moodle_url('/my/'), 'Kembali 🏠 ', ['class' => 'btn btn-warning']);
+echo ' ';
 echo html_writer::link(new moodle_url('/local/jurnalmengajar/today.php'), '⏰ Urut Waktu', ['class' => 'btn btn-primary']);
 echo ' ';
 echo html_writer::link(new moodle_url('/local/jurnalmengajar/today_perguru.php'), '🧑‍🏫 Per Guru', ['class' => 'btn btn-outline-secondary']);
 echo ' ';
 echo html_writer::link(new moodle_url('/local/jurnalmengajar/bydate.php'), '📅 Ke Tanggal', ['class' => 'btn btn-outline-secondary']);
+
 echo html_writer::end_div();
 
 global $DB;

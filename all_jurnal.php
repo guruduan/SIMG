@@ -18,6 +18,10 @@ $guru  = optional_param('guru', '', PARAM_TEXT);
 $kelas = optional_param('kelas', '', PARAM_TEXT);
 $mapel = optional_param('mapel', '', PARAM_TEXT);
 $page  = optional_param('page', 0, PARAM_INT);
+$tanggal = optional_param('tanggal', '', PARAM_TEXT);
+if (!$tanggal) {
+    $tanggal = date('Y-m-d');
+}
 
 $perpage = 20;
 $offset  = $page * $perpage;
@@ -69,6 +73,13 @@ echo html_writer::select($opsikelas, 'kelas', $kelas);
 echo ' Mapel: ';
 echo html_writer::select($opsimapel, 'mapel', $mapel);
 
+echo ' Tanggal: ';
+echo html_writer::empty_tag('input', [
+    'type' => 'date',
+    'name' => 'tanggal',
+    'value' => $tanggal
+]); 
+
 echo ' ';
 echo html_writer::empty_tag('input', [
     'type' => 'submit',
@@ -95,6 +106,14 @@ if ($kelas) {
 if ($mapel) {
     $where[] = "j.matapelajaran = :mapel";
     $params['mapel'] = $mapel;
+}
+if ($tanggal) {
+    $awal  = strtotime($tanggal . ' 00:00:00');
+    $akhir = strtotime($tanggal . ' 23:59:59');
+
+    $where[] = "j.timecreated BETWEEN :awal AND :akhir";
+    $params['awal']  = $awal;
+    $params['akhir'] = $akhir;
 }
 
 $where_sql = '';
@@ -207,7 +226,8 @@ if ($e->timemodified > 0) {
         new moodle_url('/local/jurnalmengajar/all_jurnal.php', [
             'guru' => $guru,
             'kelas' => $kelas,
-            'mapel' => $mapel
+            'mapel' => $mapel,
+            'tanggal' => $tanggal
         ])
     );
 
