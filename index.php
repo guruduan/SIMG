@@ -183,7 +183,7 @@ if (!empty($nowawali)) {
 
     redirect(
         new moodle_url('/local/jurnalmengajar/index.php'),
-        '✅ Jurnal berhasil disimpan.',
+        '✅ Jurnal berhasil disimpan. Cek Riwayat Jurnal di bawah.',
         2
     );
 }
