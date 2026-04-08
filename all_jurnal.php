@@ -19,9 +19,8 @@ $kelas = optional_param('kelas', '', PARAM_TEXT);
 $mapel = optional_param('mapel', '', PARAM_TEXT);
 $page  = optional_param('page', 0, PARAM_INT);
 $tanggal = optional_param('tanggal', '', PARAM_TEXT);
-if (!$tanggal) {
-    $tanggal = date('Y-m-d');
-}
+$bulan = optional_param('bulan', '', PARAM_INT);
+$tahun = optional_param('tahun', date('Y'), PARAM_INT);
 
 $perpage = 20;
 $offset  = $page * $perpage;
@@ -79,6 +78,21 @@ echo html_writer::empty_tag('input', [
     'name' => 'tanggal',
     'value' => $tanggal
 ]); 
+echo ' Bulan: ';
+$opsibulan = [
+    '' => 'Semua Bulan',
+    '01'=>'Jan','02'=>'Feb','03'=>'Mar','04'=>'Apr',
+    '05'=>'Mei','06'=>'Jun','07'=>'Jul','08'=>'Agu',
+    '09'=>'Sep','10'=>'Okt','11'=>'Nov','12'=>'Des'
+];
+echo html_writer::select($opsibulan, 'bulan', $bulan);
+
+echo ' Tahun: ';
+$opsitahun = [];
+for ($t = date('Y'); $t >= 2020; $t--) {
+    $opsitahun[$t] = $t;
+}
+echo html_writer::select($opsitahun, 'tahun', $tahun);
 
 echo ' ';
 echo html_writer::empty_tag('input', [
@@ -88,6 +102,20 @@ echo html_writer::empty_tag('input', [
 
 echo html_writer::end_tag('form');
 echo html_writer::empty_tag('hr');
+list($awal, $akhir) = jurnalmengajar_get_range($tanggal, $bulan, $tahun);
+
+echo '<div style="margin:10px 0; padding:8px; background:#f5f5f5; border-left:4px solid orange;">';
+
+if ($tanggal && $awal) {
+    echo '<b>Mode:</b> Harian | ' . tanggal_indo(strtotime($tanggal), 'tanggal');
+} elseif ($bulan && $awal) {
+$ts = strtotime("$tahun-$bulan-01");
+echo '<b>Mode:</b> Bulan ' . tanggal_indo($ts, 'tanggal');
+} else {
+    echo '<b>Mode:</b> Semua Data';
+}
+
+echo '</div>';
 
 // ===== WHERE =====
 $where = [];
@@ -107,10 +135,8 @@ if ($mapel) {
     $where[] = "j.matapelajaran = :mapel";
     $params['mapel'] = $mapel;
 }
-if ($tanggal) {
-    $awal  = strtotime($tanggal . ' 00:00:00');
-    $akhir = strtotime($tanggal . ' 23:59:59');
 
+if ($awal && $akhir) {
     $where[] = "j.timecreated BETWEEN :awal AND :akhir";
     $params['awal']  = $awal;
     $params['akhir'] = $akhir;
@@ -227,7 +253,9 @@ if ($e->timemodified > 0) {
             'guru' => $guru,
             'kelas' => $kelas,
             'mapel' => $mapel,
-            'tanggal' => $tanggal
+            'tanggal' => $tanggal,
+            'bulan' => $bulan,
+            'tahun' => $tahun
         ])
     );
 

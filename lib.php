@@ -20,6 +20,10 @@ function tanggal_indo($timestamp = null, $mode = 'full') {
                $bulan[date('n',$timestamp)] . ' ' .
                date('Y',$timestamp);
     }
+   if ($mode == 'bulan') {
+    return $bulan[date('n',$timestamp)] . ' ' . date('Y',$timestamp);
+}
+
 if ($mode == 'tanggal') {
     return date('j',$timestamp) . ' ' .
            $bulan[date('n',$timestamp)] . ' ' .
@@ -197,8 +201,13 @@ function jurnalmengajar_boleh_kirim_wa() {
         4=>'Kamis',5=>'Jumat',6=>'Sabtu',7=>'Minggu'
     ];
 
-    $hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
-    $hariSekolah = array_map('trim', explode(',', $hariSekolah));
+$hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
+
+if (empty($hariSekolah)) {
+    $hariSekolah = 'Senin,Selasa,Rabu,Kamis,Jumat';
+}
+
+$hariSekolah = array_map('trim', explode(',', $hariSekolah));
 
     if (!in_array($hariIndoList[(int)date('N')], $hariSekolah)) {
         return false;
@@ -336,7 +345,7 @@ function jurnalmengajar_get_beban_jam_guru() {
     }
 
     return $beban;
-}//
+}
 // ===============================
 // Ambil semua kelas (cohort)
 // ===============================
@@ -404,6 +413,38 @@ function jurnalmengajar_get_nis_user($userid) {
         JOIN {user_info_field} f ON f.id = d.fieldid
         WHERE f.shortname = 'nis' AND d.userid = ?
     ", [$userid]);
+}
+// ===============================
+// Ambil range timestamp 1 bulan
+// ===============================
+function jurnalmengajar_get_range_bulan($bulan, $tahun) {
+    if (empty($bulan) || empty($tahun)) {
+        return [null, null];
+    }
+    
+    $bulan = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+
+    $awal  = strtotime("$tahun-$bulan-01 00:00:00");
+    $akhir = strtotime(date("Y-m-t 23:59:59", $awal));
+
+    return [$awal, $akhir];
+}
+function jurnalmengajar_get_range($tanggal = null, $bulan = null, $tahun = null) {
+
+    // PRIORITAS 1: tanggal spesifik
+    if (!empty($tanggal) && strtotime($tanggal)) {
+        return [
+            strtotime("$tanggal 00:00:00"),
+            strtotime("$tanggal 23:59:59")
+        ];
+    }
+
+    // PRIORITAS 2: bulan
+    if (!empty($bulan) && !empty($tahun)) {
+        return jurnalmengajar_get_range_bulan($bulan, $tahun);
+    }
+
+    return [null, null];
 }
 // =================================
 // Ambil ttd tandatangan kepsek
