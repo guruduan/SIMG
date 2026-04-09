@@ -66,11 +66,19 @@ if ($sampai) {
 }
 
 // Ambil semua siswa peserta ekstra
-$sql = "SELECT DISTINCT u.id, u.firstname, u.lastname
+$sql = "SELECT 
+            u.id, 
+            u.firstname, 
+            u.lastname,
+            e.namaekstra,
+            GROUP_CONCAT(DISTINCT g.lastname SEPARATOR ', ') AS nama_guru
         FROM {local_jm_ekstra_absen} a
         JOIN {user} u ON u.id = a.userid
         JOIN {local_jm_ekstra_jurnal} j ON j.id = a.jurnalid
+        JOIN {local_jm_ekstra} e ON e.id = j.ekstraid
+        JOIN {user} g ON g.id = j.pembinaid
         $where
+        GROUP BY u.id, u.firstname, u.lastname, e.namaekstra
         ORDER BY u.lastname ASC";
 
 $siswa = $DB->get_records_sql($sql, $params);
@@ -78,29 +86,35 @@ $siswa = $DB->get_records_sql($sql, $params);
 // ================= TABEL =================
 if ($siswa) {
 
-    echo html_writer::start_div('table-wrapper');
-    echo html_writer::start_tag('table', ['class' => 'generaltable']);
+    echo html_writer::start_tag('table', [
+    'class' => 'generaltable',
+    'style' => 'width:100%;'
+]);
+
+    // ===== HEADER =====
     echo html_writer::start_tag('thead');
-
-    echo html_writer::tag('tr',
-        html_writer::tag('th', 'No') .
-        html_writer::tag('th', 'Nama Murid') .
-        html_writer::tag('th', 'Hadir') .
-        html_writer::tag('th', 'Sakit') .
-        html_writer::tag('th', 'Ijin') .
-        html_writer::tag('th', 'Alpa') .
-        html_writer::tag('th', 'Dispensasi') .
-        html_writer::tag('th', 'Persentase')
-    );
-
+echo html_writer::tag('tr', implode('', [
+    html_writer::tag('th', 'No'),
+    html_writer::tag('th', 'Nama Murid', ['style'=>'min-width:200px']),
+    html_writer::tag('th', 'Ekstra', ['style'=>'min-width:200px']),
+    html_writer::tag('th', 'Hadir'),
+    html_writer::tag('th', 'Sakit'),
+    html_writer::tag('th', 'Ijin'),
+    html_writer::tag('th', 'Alpa'),
+    html_writer::tag('th', 'Dispensasi'),
+    html_writer::tag('th', 'Persentase'),
+    html_writer::tag('th', 'Guru', ['style'=>'min-width:200px']),
+]));
     echo html_writer::end_tag('thead');
+
+
+    // ===== BODY =====
     echo html_writer::start_tag('tbody');
 
     $no = 1;
 
     foreach ($siswa as $s) {
 
-        // Hitung kehadiran per siswa
         $sql2 = "SELECT a.status, COUNT(a.id) as jumlah
                  FROM {local_jm_ekstra_absen} a
                  JOIN {local_jm_ekstra_jurnal} j ON j.id = a.jurnalid
@@ -122,23 +136,22 @@ if ($siswa) {
         $total = $hadir + $sakit + $izin + $alpa + $disp;
         $persen = $total ? round(($hadir / $total) * 100) : 0;
 
-        echo html_writer::start_tag('tr');
-
-        echo html_writer::tag('td', $no++);
-        echo html_writer::tag('td', $s->firstname.' '.$s->lastname);
-        echo html_writer::tag('td', $hadir);
-        echo html_writer::tag('td', $sakit);
-        echo html_writer::tag('td', $izin);
-        echo html_writer::tag('td', $alpa);
-        echo html_writer::tag('td', $disp);
-        echo html_writer::tag('td', $persen.' %');
-
-        echo html_writer::end_tag('tr');
+        echo html_writer::tag('tr', implode('', [
+            html_writer::tag('td', $no++),
+            html_writer::tag('td', $s->firstname.' '.$s->lastname),
+            html_writer::tag('td', $s->namaekstra),
+            html_writer::tag('td', $hadir),
+            html_writer::tag('td', $sakit),
+            html_writer::tag('td', $izin),
+            html_writer::tag('td', $alpa),
+            html_writer::tag('td', $disp),
+            html_writer::tag('td', $persen.' %'),
+            html_writer::tag('td', $s->nama_guru),
+        ]));
     }
 
     echo html_writer::end_tag('tbody');
     echo html_writer::end_tag('table');
-    echo html_writer::end_div();
 
 } else {
     echo 'Tidak ada data.';
