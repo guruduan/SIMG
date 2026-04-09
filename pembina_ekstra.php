@@ -42,10 +42,19 @@ if (isset($_POST['ekstraid'])) {
 
 echo $OUTPUT->header();
 echo '<div style="margin-bottom:15px;">';
+
+// tombol lihat pembina
 echo '<a href="'.$CFG->wwwroot.'/local/jurnalmengajar/pembina_ekstra_view.php"
-        style="padding:8px 12px; background:#28a745; color:white; text-decoration:none; border-radius:5px;">
+        style="padding:8px 12px; background:#28a745; color:white; text-decoration:none; border-radius:5px; margin-right:10px;">
         Lihat Data Pembina Ekstrakurikuler
       </a>';
+
+// tombol peserta ekstra
+echo '<a href="'.$CFG->wwwroot.'/local/jurnalmengajar/peserta_ekstra.php"
+        style="padding:8px 12px; background:#007bff; color:white; text-decoration:none; border-radius:5px;">
+        Kelola Peserta Ekstrakurikuler
+      </a>';
+
 echo '</div>';
 // =======================
 // AMBIL DATA EKSTRA

@@ -27,6 +27,11 @@ if (isset($_POST['namaekstra'])) {
 // TAMPILKAN HALAMAN
 // =======================
 echo $OUTPUT->header();
+echo html_writer::link(
+    new moodle_url('/local/jurnalmengajar/pembina_ekstra.php'),
+    'Kelola Pembina Ekstra',
+    ['class' => 'btn btn-primary', 'style' => 'margin-bottom:10px; display:inline-block;']
+);
 
 echo '<h3>Tambah Ekstrakurikuler</h3>';
 echo '<form method="post">';
