@@ -67,13 +67,18 @@ Guru BK dapat meninput layanan yang sudah dilakukan, baik layanan individu, kelo
 ### 19. Pembinaan Guru BK
 Guru BK dapat meninput pembinaan yang sudah dilakukan untuk murid tertentu. **Ketika tombol simpan ditekan, data pembinaan tersimpan di database sistem dan notif wa terkirim ke wali kelas dari murid yang diberikan pembinaan**. Tersedia ekspor ke xlsx untuk data pembinaan bulan yang dipilih.
 
-### 20. Pengawas Harian
-### 21. Pengawas Harian
+### 20. Jurnal Ektrakurikuler
+Guru sebagai pembina ektstrakurikuler mengisi jurnal kegiatannya mencakup: materi, kegiatan, dan catatan. Juga dilengkapi absensi murid untuk kegiatan ekstrakurikuler masing-masing. Terdapat riwayat kegiatan ekstrakurikuler, daftar guru sebagai pembinanya, dan rekap kehadiran murid.
+
+### 21. Surat Izin Guru/Pegawai
+Menu ini hanya bisa dibuka dan diisi oleh TU sekolah. TU memilih nama guru atau pegawai yang mau izin keluar sekolah, menginput alasannya lalu menekan tombol simpan dan cetak. **Data akan disimpan pada database sistem dan notif wa terkirim ke Kepala Sekolah sebagai laporan izin**.
 
 
-* Notifikasi otomatis saat jurnal diinput
-* Dikirim ke wali kelas
-* Menggunakan API WhatsApp (Wablas / sejenis)
+Semua Jurnal dan Surat Izin:
+* Notifikasi otomatis disimpan atau dicetak
+* Notifikasi Dikirim ke wali kelas untuk Jurnal KBM, Jurnal Guru Wali, Layanan Pembinaan BK dan surat izin murid
+* Notifikasi Dikirim ke Kepala Sekolah untuk surat izin guru/pegawai
+* Menggunakan API WhatsApp Wablas
 
 ---
 
@@ -115,24 +120,10 @@ local/jurnalmengajar/
 
 ## Kebutuhan Sistem
 
-* Moodle 4
+* Moodle 4.5
 * PHP 8.2
 * MariaDB / MySQL
 * Web server Nginx
-
----
-
-## Penggunaan
-
-Plugin digunakan untuk administrasi sekolah tanpa menggunakan Course Moodle, sehingga Moodle dapat digunakan sebagai Sistem Informasi Sekolah seperti:
-
-* Jurnal Mengajar
-* Absensi Siswa
-* Surat Izin
-* Rekap Guru
-* Layanan BK
-* Pembinaan Siswa
-
 ---
 
 ## Author
