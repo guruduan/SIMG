@@ -1,4 +1,4 @@
-# Jurnal Mengajar - Moodle Local Plugin
+# Sistem Informasi Murid Guru - Moodle Local Plugin
 
 Plugin Moodle untuk administrasi sekolah.
 
@@ -52,7 +52,20 @@ Guru yang bersangkutan pilih mata pelajaran, pilih kelas, tentukan tanggal, isi 
 ### 14. Rekap Nilai Harian Murid
 Menampilkan data nilai yang diberikan pada murid kelas yang sudah diisi nilai hariannya, ada nilai rata-rata. 
 
-### 7. Rekap Kehadiran Murid
+### 15. Input Izin Murid (Masuk, Keluar atau Pulang)
+Guru piket dapat input Surat Izin untuk murid: Murid datang terlambat mau masuk kelas harus ada surat izin masuk; Murid mau keluar sekolah untuk suatu keperluan misalnya ke puskesmas harus ada surat izin keluar, atau murid mau pulang untuk suatu keperluan harus ada surat izin pulang. Setelah Guru piket menekan tombol cetak surat atau simpan, data tersimpan di database sistem dan notif wa terkirim ke wali kelas dari murid yang bersangkutan.
+
+### 16. Rekap Surat Izin Murid
+Semua surat izin murid ada rekapitulasinya, bisa dipilih kelas, bisa dipilih murid tertentu, dari tanggal tertentu sampai tanggal tertentu.
+
+### 17. Cetak Banyak Surat Izin
+Kadangkala banyak murid meminta surat izin, Guru Piket input dan simpan dahulu lalu bisa melakukan pencetakan surat izin banyak sekaligus, bukan satu satu surat dicetak.
+
+### 17. Pengawas Harian
+### 17. Pengawas Harian
+### 17. Pengawas Harian
+### 17. Pengawas Harian
+
 
 * Notifikasi otomatis saat jurnal diinput
 * Dikirim ke wali kelas
