@@ -1,55 +1,58 @@
 # Jurnal Mengajar - Moodle Local Plugin
 
-Plugin Moodle untuk administrasi sekolah yang digunakan untuk mencatat aktivitas guru dan administrasi siswa seperti jurnal mengajar, jurnal guru wali, surat izin murid, rekap kehadiran, layanan BK, kegiatan pramuka dan notifikasi WhatsApp.
+Plugin Moodle untuk administrasi sekolah.
 
 ## Fitur Utama
 
-Plugin ini menyediakan beberapa fitur administrasi sekolah:
+### 1. Input E-Jurnal KBM
+Guru pilih kelas, input jam pelajaran ke (sesuai jam masuk), pilih mata pelajaran, input materi pembelajaran, input aktivitas KBM, pilih Murid tidak hadir - dan beri pilihan sakit, ijin, alpa atau dispensasi dan input keterangan tambahan (misal murid A tidur atau apapun kejadian di kelas). Guru klik Simpan Jurnal: Jurnal tersimpan di database sistem dan notif wa terkirim ke Wali Kelasnya dan guru sendiri.
 
-### 1. Jurnal Mengajar Guru
+Jurnal mengajar tersimpan di sistem bisa diakses melalui tombol Riwayat Jurnal. Setiap bulan, riwayat jurnal mengajar ini bisa diekspor ke format xlsx, untuk ditandatangi kepsek sebagai laporan.
 
-* Input jurnal setiap mengajar
-* Materi pembelajaran
-* Kegiatan pembelajaran
-* Jam pelajaran
-* Siswa tidak hadir
-* Keterangan
-* Ekspor ke xlsx
+Notif wa terkirim ke wali kelas, berfungsi ganda; sebagai laporan bahwa Guru mata pelajaran sudah mengajar di kelasnya. Isi pesan wa sesuai yang diinput Guru, sebagai informasi aktivitas pembelajaran yang dilaksanakan dan bagaimana keadaan kelas atau muridnya. Notif wa ini bisa diteruskan ke wa orangtua/wali murid. Misal murid B tidak hadir alpa, padahal dari rumah berangkat sekolah, orangtua/wali muridnya cepat dapat informasi dari kelas langsung; akan memudahkan pembinaan murid dari guru, wali murid dan orangtua sendiri.
 
-### 2. Jurnal Guru Wali
+### 2. Jadwal Mengajar
+Saat dibuka menampilkan jadwal mengajar guru yang bersangkutan. Juga terdapat tombol filter nama guru untuk menampilkan jadwal mengajar dari guru lain.
 
-* Jurnal Guru wali
-* expor ke xlsx
+### 3. Guru Mengajar hari ini
+Menu ini menampilkan daftar guru yang mengajar hari ini dan sudah mengisi E-jurnal KBM, data ditampilkan dari E-jurnal KBM yang diinput para guru pada hari ini urut berdasarkan waktu input E-Jurnal KBM. Terdapat fitur Ke Tanggal; yang akan memudahkan guru melihat data tanggal berapa yang diinginkan (bukan tanggal hari ini)
 
-### 3. Surat Izin Siswa
+### 4. Jam Pelajaran
+Menampilkan waktu tiap jam pelajaran dari jam pelajaran pertama sampai terakhir. Juga ditampilkan waktu istirahat
 
-* Surat izin keluar
-* Surat izin masuk
-* Surat izin pulang
-* Cetak PDF
-* Rekap surat izin
+### 5. Jadwal Per Kelas
+Menampilkan jadwal guru mengajar dari kelas yang dipilih, mulai hari pertama sampai hari terakhir sekolah setiap minggunya. Dilengkapi jam pelajaran dan waktu awal sampai akhir jadwal mata pelajarannya.
 
-### 4. Rekap Kehadiran Siswa
+### 6. Murid Tidak Hadir hari ini
+Menampilkan data seluruh Murid yang tidak hadir hari ini dari semua kelas yang sudah diisi E-Jurnal KBM nya oleh para guru. Ada keterangan jam pelajaran ke berapa tidak hadirnya dan waktu inputnya. Juga terdapat fitur Ke Tanggal; yang akan memudahkan guru melihat data tanggal berapa yang diinginkan (bukan tanggal hari ini)
 
-* Rekap per kelas
-* Rekap per siswa
-* Filter tanggal / bulan / minggu
+### 7. Rekap Kehadiran Murid
+Menampilkan data rekap kehadiran murid per kelas yang dipilih. Ada filter dari tanggal sampai tanggal tertentu. Ada dua mode hitung: rekap per hari dan rekap per jam . Ada filter untuk Guru yang bersangkutan saja dan ada untuk semua guru. Sangat memudahkan proses rekapitulasi kehadiran murid sesuai kepentingan bagi guru sendiri, wali kelas atau orangtua/wali murid.
 
-### 5. Rekap Jam Mengajar Guru
+### 8. Rekap Mengajar Mingguan Guru
+Menampilkan data semua guru yang mengajar pada minggu ini (atau pada minggu tertentu yang dipilih), nama guru diurut sesuai abjad, ditampilkan jumlah jam mengajar, beban jam mengajar, dan persentasi pelaksanaan mengajarnya (% mingguan). Dilengkapi dengan tombol detail untuk melihat aktivitas mengajar guru pada minggu itu.
 
-* Jumlah jam mengajar
-* Jam terlaksana
-* Persentase KBM tiap pekan
-* 
+### 9. Rekap KBM di Kelas perminggu
+Menampilkan data aktivitas semua guru yang mengajar pada kelas yang dipilih, mulai hari pertama sekolah sampai hari terakhir sekolah setiap minggunya.
 
-### 6. Layanan BK / Pembinaan Siswa
+### 10. Jurnal Guru wali
+Guru memilih siapa murid yang dibina sesuai pembagian murid binaan. Guru sebagai guru wali input jurnal guru wali, terdiri dari isian topik pembinaan/pertemuan, tindaklanjutnya dan keterangan. Ketika jurnal disimpan, notif wa terkirim ke wali kelas murid yang bersangkutan.
 
-* Jurnal layanan BK
-* Jurnal pembinaan murid
-* Riwayat layanan bK
-* Riwayat pembinaan
 
-### 7. Notifikasi WhatsApp
+### 11. Data Murid Binaan Guru Wali
+Menampilkan daftar nama murid binaan dari guru wali berdasarkan nama Guru yang dipilih. Sebagai informasi dari guru lain.
+
+
+### 12. Rekap Kehadiran Murid Binaan Guru Wali
+Menampilkan data rekap kehadiran murid binaan masing-masing guru. Ada filter dari tanggal sampai tanggal tertentu. Ada dua mode hitung: rekap per hari dan rekap per jam.
+
+### 13. Input Nilai Harian
+Guru yang bersangkutan pilih mata pelajaran, pilih kelas, tentukan tanggal, isi nilai harian per siswa, simpan Nilai. Ada notif wa ke guru yang bersangkutan berisi hanya murid yang diisi nilainya, untuk diteruskan ke grup kelas yang dinilai.
+
+### 14. Rekap Nilai Harian Murid
+Menampilkan data nilai yang diberikan pada murid kelas yang sudah diisi nilai hariannya, ada nilai rata-rata. 
+
+### 7. Rekap Kehadiran Murid
 
 * Notifikasi otomatis saat jurnal diinput
 * Dikirim ke wali kelas
