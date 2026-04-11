@@ -12,10 +12,10 @@ $PAGE->set_title('Daftar murid tidak hadir hari ini');
 $PAGE->set_heading('Daftar murid tidak hadir hari ini');
 
 // ==========================
-// Rentang "hari ini" (WITA)
+// // Rentang "hari ini" (server time)
 // ==========================
-$start = strtotime('today 00:00:00');
-$end   = strtotime('today 23:59:59');
+$start = strtotime(date('Y-m-d 00:00:00'));
+$end   = strtotime(date('Y-m-d 23:59:59'));
 
 global $DB;
 
@@ -229,7 +229,7 @@ foreach ($rows as $r) {
     $table->data[] = [
         $no++,
         format_string($r->kelas),
-        format_string($r->lastname),
+        ucwords(strtolower($r->lastname)),
         format_string($r->absen),
         format_string($r->jamke === '' ? '-' : $r->jamke),
         format_string(tanggal_indo($r->timeinput, 'jam')),
