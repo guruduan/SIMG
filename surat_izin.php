@@ -109,14 +109,7 @@ if (optional_param('submit', false, PARAM_BOOL) && confirm_sesskey()) {
     $nomorwa = get_nomor_wali_kelas($kelas);
 
     if ($nomorwa) {
-        // Format tanggal WITA
-        date_default_timezone_set('Asia/Makassar');
-        $hari  = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-        $bulan = [1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'];
-        $ts = $record->timecreated;
-        $tanggal_format = sprintf('%s, %d %s %d %s WITA',
-            $hari[date('w',$ts)], date('j',$ts), $bulan[date('n',$ts)], date('Y',$ts), date('H:i',$ts)
-        );
+        $tanggal_format = tanggal_indo($record->timecreated);
 
         $gurunama = $DB->get_field('user', 'lastname', ['id' => $guru_pengajar]);
 
@@ -236,32 +229,22 @@ $table->align = [
     // , 'center'
 ];
 
-    // sekali set TZ, tidak di dalam loop
-    date_default_timezone_set('Asia/Makassar');
-    $hari  = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    $bulan = [1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'];
+$no = 1;
+foreach ($riwayatsurat as $s) {
+    $kelasnama = get_nama_kelas($s->kelasid);
+    $tgl_display = tanggal_indo($s->timecreated);
 
-    $no = 1;
-    foreach ($riwayatsurat as $s) {
-        $kelasnama  = get_nama_kelas($s->kelasid);
-        $ts         = $s->timecreated;
-        $tgl_display = sprintf('%s, %d %s %d %s WITA',
-            $hari[date('w',$ts)], date('j',$ts), $bulan[date('n',$ts)], date('Y',$ts), date('H:i',$ts)
-        );
-
-$table->data[] = [
-    $no++,
-    $tgl_display,
-    ucwords(strtolower($s->siswa_nama)),
-    $kelasnama,
-    $s->guru_nama,
-    $s->alasan,
-    $s->keperluan,
-    $s->pengawas_nama
-    // , $s->id
-];
-
-    }
+    $table->data[] = [
+        $no++,
+        $tgl_display,
+        ucwords(strtolower($s->siswa_nama)),
+        $kelasnama,
+        $s->guru_nama,
+        $s->alasan,
+        $s->keperluan,
+        $s->pengawas_nama
+    ];
+}
 
     echo html_writer::table($table);
 } else {

@@ -1,6 +1,5 @@
 <?php
 defined('MOODLE_INTERNAL') || die();
-date_default_timezone_set('Asia/Makassar');
 
 /**
  * Format tanggal Indonesia
@@ -14,30 +13,32 @@ function tanggal_indo($timestamp = null, $mode = 'full') {
         7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'
     ];
 
-    if ($mode == 'judul') {
-        return $hari[date('w',$timestamp)] . ' ' .
-               date('j',$timestamp) . ' ' .
-               $bulan[date('n',$timestamp)] . ' ' .
-               date('Y',$timestamp);
-    }
-   if ($mode == 'bulan') {
-    return $bulan[date('n',$timestamp)] . ' ' . date('Y',$timestamp);
-}
+$hariIndex = (int) date('w', $timestamp);
+$tgl       = (int) date('d', $timestamp);
+$bulanIdx  = (int) date('m', $timestamp);
+$tahun     = date('Y', $timestamp);
 
-if ($mode == 'tanggal') {
-    return date('j',$timestamp) . ' ' .
-           $bulan[date('n',$timestamp)] . ' ' .
-           date('Y',$timestamp);
-}
+    if ($mode == 'judul') {
+        return $hari[$hariIndex] . ' ' . $tgl . ' ' . $bulan[$bulanIdx] . ' ' . $tahun;
+    }
+
+    if ($mode == 'bulan') {
+        return $bulan[$bulanIdx] . ' ' . $tahun;
+    }
+
+    if ($mode == 'tanggal') {
+        return $tgl . ' ' . $bulan[$bulanIdx] . ' ' . $tahun;
+    }
+
     if ($mode == 'jam') {
         return date('H:i', $timestamp);
     }
 
-    return $hari[date('w',$timestamp)] . ', ' .
-           date('j',$timestamp) . ' ' .
-           $bulan[date('n',$timestamp)] . ' ' .
-           date('Y',$timestamp) .
-           ' Pukul ' . date('H:i',$timestamp) . ' WITA';
+    return $hari[$hariIndex] . ', ' .
+           $tgl . ' ' .
+           $bulan[$bulanIdx] . ' ' .
+           $tahun .
+           ' Pukul ' . date('H:i', $timestamp);
 }
 
 // nama murid
@@ -157,7 +158,8 @@ function jurnalmengajar_get_hari_ini() {
         'Sunday' => 'Minggu'
     ];
 
-    return $map[date('l')] ?? '';
+    $hari = date('l');
+return $map[$hari] ?? '';
 }
 /**
  * Cek tanggal libur
@@ -264,7 +266,7 @@ function jurnalmengajar_kirim_wa($tujuan, $pesan) {
     // Siapkan log
     $logdir = $CFG->dataroot . '/logs';
     if (!file_exists($logdir)) {
-        mkdir($logdir, 0777, true);
+        mkdir($logdir, 0755, true);
     }
 
     $logfile = $logdir . '/wa_debug.log';
@@ -361,23 +363,39 @@ function jurnalmengajar_get_beban_jam_guru_by_date($timestamp) {
     $jadwal = jurnalmengajar_get_jadwal_acuan();
     $beban = [];
 
+    // Validasi timestamp
+    if (empty($timestamp) || !is_numeric($timestamp)) {
+        $timestamp = time();
+    }
+
+    // Ambil cutoff XII
     $cutoff = jurnalmengajar_get_cutoff_xii($timestamp);
 
     foreach ($jadwal as $j) {
-        $userid = $j['userid'];
-        $kelas  = trim($j['kelas'] ?? '');
 
-        // 🔥 FIX UTAMA DI SINI
-        if ($cutoff && strtotime(date('Y-m-d', $timestamp)) >= strtotime(date('Y-m-d', $cutoff))) {
-            if (preg_match('/\bXII\b/i', $kelas)) {
+        // Validasi userid
+        if (empty($j['userid'])) {
+            continue;
+        }
+
+        $userid = $j['userid'];
+
+        // Ambil & amankan kelas
+        $kelas = isset($j['kelas']) ? trim($j['kelas']) : '';
+
+        // 🔥 Filter kelas XII setelah cutoff
+        if (!empty($cutoff) && $timestamp >= $cutoff) {
+            if (!empty($kelas) && preg_match('/\bXII\b/i', $kelas)) {
                 continue;
             }
         }
 
+        // Inisialisasi beban
         if (!isset($beban[$userid])) {
             $beban[$userid] = 0;
         }
 
+        // Tambah beban
         $beban[$userid]++;
     }
 
@@ -462,7 +480,7 @@ function jurnalmengajar_get_range_bulan($bulan, $tahun) {
     $bulan = str_pad($bulan, 2, '0', STR_PAD_LEFT);
 
     $awal  = strtotime("$tahun-$bulan-01 00:00:00");
-    $akhir = strtotime(date("Y-m-t 23:59:59", $awal));
+    $akhir = strtotime(date("Y-m-t", $awal) . ' 23:59:59');
 
     return [$awal, $akhir];
 }

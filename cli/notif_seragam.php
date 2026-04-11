@@ -3,7 +3,8 @@
 define('CLI_SCRIPT', true);
 
 require(__DIR__ . '/../../../config.php'); // tetap load Moodle (untuk mtrace)
-date_default_timezone_set('Asia/Makassar'); // WITA
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
+
 
 
 /* ============================ CLI args ================================== */
@@ -30,9 +31,9 @@ $WABLAS_URL    = $config->wablas_url;
 $GROUP_ID      = $groupOverride ?: $config->wablas_group;
 
 /* ======================= Tentukan target (H) ============================ */
-$now = new DateTime('now');
+$now = new DateTime('now', core_date::get_user_timezone_object());
 if ($targetOverride) {
-    $target = DateTime::createFromFormat('Y-m-d', $targetOverride, new DateTimeZone('Asia/Makassar'));
+    $target = DateTime::createFromFormat('Y-m-d', $targetOverride, core_date::get_user_timezone_object());
     if (!$target) { mtrace("[ERR] Format --target harus YYYY-MM-DD"); exit(1); }
 } else {
     if     ($mode === 'before') $target = (clone $now)->modify('+1 day'); // besok
@@ -41,14 +42,7 @@ if ($targetOverride) {
 }
 
 /* ============================ Helpers =================================== */
-function indo_tanggal(DateTime $dt): string {
-    $hari  = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    $bulan = [1=>'Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    return $hari[(int)$dt->format('w')].", ".$dt->format('j')." ".$bulan[(int)$dt->format('n')]." ".$dt->format('Y');
-}
-function week_of_month(DateTime $dt): int {
-    return intdiv(((int)$dt->format('j')) - 1, 7) + 1; // 1..5
-}
+
 function label_waktu(DateTime $now, DateTime $target): string {
     $diffDays = (int)$now->diff($target)->format('%a');
     if ($diffDays === 1) return 'besok';
@@ -56,43 +50,17 @@ function label_waktu(DateTime $now, DateTime $target): string {
     return 'pada';
 }
 
+function week_of_month(DateTime $dt): int {
+    return intdiv(((int)$dt->format('j')) - 1, 7) + 1;
+}
+
 /* ===================== Komponen tanggal & aturan ======================== */
 $dowN    = (int)$target->format('N');  // 1=Sen..7=Ming
 $dayNum  = (int)$target->format('j');  // 1..31
-$wom     = week_of_month($target);     // 1..5
-$tanggal = indo_tanggal($target);
+$wom = week_of_month($target);
+$tanggal = tanggal_indo($target->getTimestamp(), 'judul');
 $label   = label_waktu($now, $target);
 
-function jurnalmengajar_cek_libur($tanggal) {
-    $tanggallibur = get_config('local_jurnalmengajar', 'tanggallibur');
-
-    if (empty($tanggallibur)) return false;
-
-    $lines = explode("\n", $tanggallibur);
-
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if ($line == '') continue;
-
-        // Rentang tanggal
-        if (stripos($line, 's/d') !== false) {
-            list($start, $end) = explode('s/d', $line);
-            $start = trim($start);
-            $end   = trim($end);
-
-            if ($tanggal >= $start && $tanggal <= $end) {
-                return true;
-            }
-        } else {
-            // Satu tanggal
-            if ($tanggal == $line) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
 
 /* ====================== Cek Hari Sekolah ====================== */
 $hariIndoList = [
@@ -107,10 +75,9 @@ $hariIndoList = [
 
 $hariIndo = $hariIndoList[(int)$target->format('N')];
 
-$hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
-$hariSekolah = array_map('trim', explode(',', $hariSekolah));
+$hariSekolah = jurnalmengajar_get_hari_sekolah();
 
-if (!in_array($hariIndo, $hariSekolah)) {
+if (!isset($hariSekolah[$hariIndo])) {
     mtrace("Hari $hariIndo bukan hari sekolah.");
     exit(0);
 }
@@ -118,13 +85,13 @@ if (!in_array($hariIndo, $hariSekolah)) {
 /* ====================== Cek Tanggal Libur ====================== */
 $targetDate = $target->format('Y-m-d');
 
-if (function_exists('jurnalmengajar_cek_libur') && jurnalmengajar_cek_libur($targetDate)) {
+if (jurnalmengajar_cek_libur($targetDate)) {
     mtrace("Tanggal $targetDate adalah hari libur.");
     exit(0);
 }
 
 if ($debug) {
-    mtrace("DEBUG now     : ".$now->format('Y-m-d H:i:s').' WITA');
+    mtrace("DEBUG now     : ".$now->format('Y-m-d H:i:s'));
     mtrace("DEBUG target  : ".$target->format('Y-m-d').' ('.$target->format('l').')');
     mtrace("DEBUG week    : $wom  dayNum=$dayNum  dowN=$dowN");
     mtrace("DEBUG label   : $label");

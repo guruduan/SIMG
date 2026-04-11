@@ -1,17 +1,20 @@
 <?php
 // File: local/jurnalmengajar/rekapnilai.php
 require_once(__DIR__ . '/../../config.php');
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
 require_login();
 
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);
 
-date_default_timezone_set('Asia/Makassar');
-
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/rekapnilai.php'));
 $PAGE->set_title('Rekap Nilai Harian');
 $PAGE->set_heading('Rekap Nilai Harian');
+
+$config = get_config('local_jurnalmengajar');
+$tahunajaran = $config->tahun_ajaran ?? '-';
+$namasekolah = $config->nama_sekolah ?? '-';
 
 global $DB, $USER, $OUTPUT;
 
@@ -102,18 +105,25 @@ if (!empty($cohortid)) {
     $entries = $DB->get_records_select('local_jm_nilaiharian', $where, $params, 'tanggal ASC, timecreated ASC');
 
     // Build attempts
-    $idx = 0;
-    foreach ($entries as $rec) {
-        $attempts[$idx] = [
-            'idx'     => $idx + 1,
-            'mapel'   => $rec->mapel,
-            'kelas'   => $rec->kelas,
-            'tanggal' => $rec->tanggal,
-            'guru'    => $rec->userid
-        ];
-        $idx++;
-    }
-    $N = count($attempts);
+$idx = 0;
+foreach ($entries as $rec) {
+
+    // Validasi timestamp (anti error 1970)
+    $ts = !empty($rec->tanggal) ? strtotime($rec->tanggal) : false;
+
+    $attempts[$idx] = [
+        'idx'     => $idx + 1,
+        'mapel'   => $rec->mapel,
+        'kelas'   => $rec->kelas,
+        'tanggal' => ($ts !== false)
+            ? tanggal_indo($ts, 'tanggal')
+            : '-',
+        'guru'    => $rec->userid
+    ];
+
+    $idx++;
+}
+$N = count($attempts);
 
     // Inisialisasi matrix 0
     foreach ($students as $uid => $name) {
@@ -141,7 +151,7 @@ if (!empty($cohortid)) {
 // ====== EXPORT CSV (harus dieksekusi sebelum output HTML) ======
 // ====== EXPORT CSV ======
 if ($export === 'csv' && !empty($cohortid)) {
-    $filename = 'rekap_nilai_per_murid_' . date('Ymd_His') . '.csv';
+    $filename = 'rekap_nilai_per_murid_' . userdate(time(), '%Y%m%d_%H%M%S') . '.csv';
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="'.$filename.'"');
     $out = fopen('php://output', 'w');
@@ -153,9 +163,9 @@ if ($export === 'csv' && !empty($cohortid)) {
     // Ambil label mapel & kelas untuk dicetak
     $mapellabel  = $mapel ?: '- Semua Mapel -';
     $kelaslabel  = isset($cohortopts[$cohortid]) ? $cohortopts[$cohortid] : '';
-    $tahunajaran = '2025/2026';
 
     fputcsv($out, ['Mata Pelajaran :', $mapellabel]);
+    fputcsv($out, [$namasekolah]);
     fputcsv($out, ['Kelas :', $kelaslabel]);
     fputcsv($out, ['Tahun :', $tahunajaran]);
     fputcsv($out, []); // baris kosong sebelum tabel

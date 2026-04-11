@@ -8,17 +8,12 @@ use local_jurnalmengajar\form\nilai_form; // letakkan BEFORE output
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);
 
-// Timezone WITA
-date_default_timezone_set('Asia/Makassar');
-
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/nilaiharian.php'));
 $PAGE->set_title('Input Nilai Harian');
 $PAGE->set_heading('Input Nilai Harian');
 
 require_once(__DIR__ . '/classes/form/nilai_form.php');
-
-echo $OUTPUT->header();
 
 /** Helper: normalisasi nomor WA ke format 62 */
 function jm_normalize_phone($s) {
@@ -53,7 +48,7 @@ else if ($data = $mform->get_data()) {
     $mapel    = trim($data->mapel);
     $cohortid = (int)$data->cohortid;
     // Simpan tanggal sebagai YYYY-MM-DD (pakai timezone yang sudah diset)
-    $tanggal  = userdate($data->tanggal, '%Y-%m-%d');
+    $tanggal = date('Y-m-d', $data->tanggal);
     $kelas    = jm_get_cohort_label($cohortid)['kelas'];
 
     // ====== Ambil anggota cohort ======
@@ -66,13 +61,15 @@ else if ($data = $mform->get_data()) {
     ", ['cid' => $cohortid]);
 
     // ====== Ambil nilai dari POST (bukan dari $data) ======
-    $nilai = optional_param_array('nilai', [], PARAM_RAW);
+    $nilai = optional_param_array('nilai', [], PARAM_INT);
 
     // ====== Susun baris nilai ======
     $rows = [];
     $no = 1;
     foreach ($members as $u) {
-        $val = (isset($nilai[$u->id]) && $nilai[$u->id] !== '') ? (int)$nilai[$u->id] : null;
+$val = (isset($nilai[$u->id]) && $nilai[$u->id] !== '') 
+    ? max(0, min(100, (int)$nilai[$u->id])) 
+    : null;
         if ($val === null) {
             continue; // hanya simpan yang diisi
         }
@@ -86,6 +83,8 @@ else if ($data = $mform->get_data()) {
 
     if (empty($rows)) {
         \core\notification::warning('Tidak ada nilai yang diisi.');
+        echo $OUTPUT->header();
+        
         $mform->display();
         echo $OUTPUT->footer();
         exit;
@@ -100,9 +99,11 @@ else if ($data = $mform->get_data()) {
         'cohortid'     => $cohortid,
         'kelas'        => $kelas,
         'tanggal'      => $tanggal,
-        'nilaijson'    => json_encode(array_values($rows), JSON_UNESCAPED_UNICODE)
+        'nilaijson'    => json_encode(array_values($rows), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
     ];
     $id = $DB->insert_record('local_jm_nilaiharian', $rec);
+
+
 
     // ====== Susun pesan WA ======
     $hariindo = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
@@ -119,6 +120,7 @@ else if ($data = $mform->get_data()) {
         $lines[] = "{$r->no}. {$r->name} - {$r->nilai}";
     }
     $pesan = implode("\n", $lines);
+
 
     // ====== Kirim WA ke guru penginput ======
     $nomor = jm_normalize_phone($USER->phone1 ?: $USER->phone2);
@@ -141,7 +143,7 @@ else if ($data = $mform->get_data()) {
     echo $OUTPUT->footer();
     exit;
 }
-
+echo $OUTPUT->header(); // ✅ WAJIB
 // ====== Tampilkan form (awal/validasi) ======
 $mform->display();
 echo html_writer::link(
