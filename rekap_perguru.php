@@ -37,7 +37,7 @@ $tanggal_akhir = clone $tanggal_awal;
 $tanggal_akhir->modify('+6 days');
 
 $timestart = $tanggal_awal->getTimestamp();
-$timeend = $tanggal_akhir->getTimestamp() + (60 * 60 * 24);
+$timeend = $tanggal_akhir->getTimestamp() + 86399;
 
 // Ambil entri jurnal guru untuk minggu ini
 global $DB;
@@ -81,6 +81,15 @@ echo html_writer::end_tag('thead');
 echo html_writer::start_tag('tbody');
 
 $no = 1;
+if (empty($entries)) {
+    echo html_writer::start_tag('tr');
+    echo html_writer::tag(
+        'td',
+        'Tidak ada data jurnal mengajar pada minggu ini',
+        ['colspan' => 8, 'style' => 'text-align:center; font-style:italic;']
+    );
+    echo html_writer::end_tag('tr');
+}
 foreach ($entries as $entry) {
 //    $tanggal = date('l, d-m-Y', $entry->timecreated);
     $tanggal = format_tanggal_indonesia($entry->timecreated);

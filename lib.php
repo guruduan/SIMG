@@ -14,7 +14,7 @@ function tanggal_indo($timestamp = null, $mode = 'full') {
     ];
 
 $hariIndex = (int) date('w', $timestamp);
-$tgl       = (int) date('d', $timestamp);
+$tgl = date('d', $timestamp);
 $bulanIdx  = (int) date('m', $timestamp);
 $tahun     = date('Y', $timestamp);
 
@@ -32,8 +32,11 @@ $tahun     = date('Y', $timestamp);
 
     if ($mode == 'jam') {
         return date('H:i', $timestamp);
-    }
+}
 
+if ($mode == 'tglbulan') {
+    return $tgl . ' ' . $bulan[$bulanIdx];
+}
     return $hari[$hariIndex] . ', ' .
            $tgl . ' ' .
            $bulan[$bulanIdx] . ' ' .
@@ -180,7 +183,7 @@ function jurnalmengajar_cek_libur($tanggal) {
             $start = trim($start);
             $end   = trim($end);
 
-            if ($tanggal >= $start && $tanggal <= $end) {
+            if (strtotime($tanggal) >= strtotime($start) && strtotime($tanggal) <= strtotime($end)) {
                 return true;
             }
         } else {
