@@ -33,7 +33,7 @@ function get_logo_plugin_path() {
 
     foreach ($files as $file) {
         if ($file->get_filename() !== '.') {
-            $tempfile = $CFG->tempdir . '/logo_jurnal.png';
+            $tempfile = $CFG->tempdir . '/logo_jurnal_' . time() . '_' . rand(1000,9999) . '.png';
             $file->copy_content_to($tempfile);
             return $tempfile;
         }
@@ -48,7 +48,7 @@ $allcohorts = $DB->get_records('cohort', null, 'name ASC');
 $action = optional_param('action', '', PARAM_ALPHA);
 
 // ===== fungsi build plan (sama) =====
-function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari) {
+function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari, $mode_urut = 'normal') {
     global $DB;
     $students_by_cohort = [];
     $maxcount = 0;
@@ -66,79 +66,176 @@ function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari) {
         if ($cnt > $maxcount) $maxcount = $cnt;
     }
 
-  // --- mulai penggantian: build ordered_students sesuai pola XA, XI-A, XII-A, XB, ... ---
+  // ===== versi universal lintas jenjang (I–XII) =====
 $ordered_students = [];
 $seen = [];
 
-// buat map cohort id->name dan normalized name -> id
+// fungsi bantu: ambil level romawi dari nama cohort
+function extract_level($name) {
+    if (preg_match('/\b(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\b/i', $name, $m)) {
+        return strtoupper($m[1]);
+    }
+    return null;
+}
+
+// urutan level (penting!)
+$level_order = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+
+// mapping: level → suffix → daftar siswa
+$map = [];
+
 $cohortnames_by_id = [];
-$norm_to_id = [];
 foreach ($allcohorts as $c) {
     $cohortnames_by_id[$c->id] = $c->name;
-    // normalisasi: huruf besar, hilangkan spasi, ganti underscore dan multiple dash tetap
-    $norm = strtoupper(preg_replace('/[^A-Z0-9\-]/', '', str_replace('_', '', str_replace(' ', '', $c->name))));
-    $norm_to_id[$norm] = $c->id;
 }
 
-// bangun students_by_cohort_name (normalized => array students)
-$students_by_cohort_name = [];
 foreach ($students_by_cohort as $cid => $arr) {
-    $cname = isset($cohortnames_by_id[$cid]) ? $cohortnames_by_id[$cid] : '';
-    $norm = strtoupper(preg_replace('/[^A-Z0-9\-]/', '', str_replace('_', '', str_replace(' ', '', $cname))));
-    $students_by_cohort_name[$norm] = array_values($arr);
+    $cname = $cohortnames_by_id[$cid] ?? '';
+    $level = extract_level($cname);
+
+    // ambil suffix (A, B, IPA1, dll)
+    $suffix = '';
+    if (preg_match('/([A-Z0-9]+)$/i', $cname, $m)) {
+        $suffix = strtoupper($m[1]);
+    }
+
+    if (!$level) {
+        $level = 'OTHER';
+    }
+
+    if (!isset($map[$level])) $map[$level] = [];
+    if (!isset($map[$level][$suffix])) $map[$level][$suffix] = [];
+
+    $map[$level][$suffix] = array_values($arr);
 }
 
-// urutan huruf yang Anda pakai (A..G)
-$letters = ['A','B','C','D','E','F','G'];
-
-// build groups per letter: X{L}, XI-{L}, XII-{L}
-$sequence_groups = [];
-foreach ($letters as $L) {
-    $g = [];
-    $g[] = strtoupper('X' . $L);       // contoh: XA
-    $g[] = strtoupper('XI-' . $L);     // contoh: XI-A
-    $g[] = strtoupper('XII-' . $L);    // contoh: XII-A (mungkin tidak ada untuk F/G)
-    $sequence_groups[] = $g;
+// kumpulkan semua suffix unik
+$all_suffixes = [];
+foreach ($map as $lv => $groups) {
+    foreach ($groups as $suf => $arr) {
+        if (!in_array($suf, $all_suffixes)) {
+            $all_suffixes[] = $suf;
+        }
+    }
 }
+sort($all_suffixes);
 
-// cari panjang maksimal di antara cohort yang ada (untuk indeks iterasi)
+// cari maxcount global
 $maxcount = 0;
-foreach ($sequence_groups as $grp) {
-    foreach ($grp as $cohnorm) {
-        $cnt = isset($students_by_cohort_name[$cohnorm]) ? count($students_by_cohort_name[$cohnorm]) : 0;
+foreach ($map as $lv => $groups) {
+    foreach ($groups as $arr) {
+        $cnt = count($arr);
         if ($cnt > $maxcount) $maxcount = $cnt;
     }
 }
+function zigzag_outer_in($arr) {
+    $result = [];
+    $left = 0;
+    $right = count($arr) - 1;
 
-// interleave per indeks: untuk i = 0..maxcount-1, ambil X?, XI-?, XII-? (jika ada)
-for ($i = 0; $i < $maxcount; $i++) {
-    foreach ($sequence_groups as $grp) {
-        foreach ($grp as $cohnorm) {
-            if (!empty($students_by_cohort_name[$cohnorm]) && isset($students_by_cohort_name[$cohnorm][$i])) {
-                $stu = $students_by_cohort_name[$cohnorm][$i];
-                if (!isset($seen[$stu->id])) {
-                    $ordered_students[] = $stu;
-                    $seen[$stu->id] = true;
+    while ($left <= $right) {
+        if ($left == $right) {
+            $result[] = $arr[$left];
+        } else {
+            $result[] = $arr[$left];
+            $result[] = $arr[$right];
+        }
+        $left++;
+        $right--;
+    }
+    return $result;
+}
+
+// interleave: suffix → level → index
+if ($mode_urut === 'normal') {
+
+    // MODE NORMAL
+    foreach ($level_order as $lv) {
+        foreach ($all_suffixes as $suf) {
+            if (!empty($map[$lv][$suf])) {
+                foreach ($map[$lv][$suf] as $stu) {
+                    if (!isset($seen[$stu->id])) {
+                        $ordered_students[] = $stu;
+                        $seen[$stu->id] = true;
+                    }
                 }
             }
         }
     }
-}
 
-// jika ada siswa dari cohort lain yang tidak tercakup, tambahkan di akhir (preserve order by cohort id)
-foreach ($students_by_cohort as $cid => $arr) {
-    $cname = isset($cohortnames_by_id[$cid]) ? $cohortnames_by_id[$cid] : '';
-    $norm = strtoupper(preg_replace('/[^A-Z0-9\-]/', '', str_replace('_', '', str_replace(' ', '', $cname))));
-    // cek apakah norm sudah tercakup dalam sequence_groups
-    $inSequence = false;
-    foreach ($sequence_groups as $g) {
-        if (in_array($norm, $g, true)) { $inSequence = true; break; }
+} elseif ($mode_urut === 'selang') {
+
+    // MODE SELANG (FIXED)
+    for ($i = 0; $i < $maxcount; $i++) {
+        foreach ($level_order as $lv) {
+            foreach ($all_suffixes as $suf) {
+                if (!empty($map[$lv][$suf]) && isset($map[$lv][$suf][$i])) {
+                    $stu = $map[$lv][$suf][$i];
+                    if (!isset($seen[$stu->id])) {
+                        $ordered_students[] = $stu;
+                        $seen[$stu->id] = true;
+                    }
+                }
+            }
+        }
     }
-    if ($inSequence) continue;
-    foreach ($arr as $stu) {
-        if (!isset($seen[$stu->id])) {
-            $ordered_students[] = $stu;
-            $seen[$stu->id] = true;
+
+} elseif ($mode_urut === 'random') {
+
+    // 🔥 RANDOM DINAMIS (FIX TOTAL, TANPA HARDCODE)
+
+    $levels_target = array_keys($map);
+
+    $suffix_forward = $all_suffixes;
+    $suffix_reverse = array_reverse($all_suffixes);
+    $suffix_zigzag  = zigzag_outer_in($all_suffixes);
+
+    // arah tiap level (default forward)
+    $direction = [];
+    foreach ($levels_target as $lv) {
+        if ($lv === 'XI') {
+            $direction[$lv] = 'reverse';
+        } elseif ($lv === 'XII') {
+            $direction[$lv] = 'zigzag';
+        } else {
+            $direction[$lv] = 'forward';
+        }
+    }
+
+    // index siswa per kelas
+    $index_map = [];
+    foreach ($levels_target as $lv) {
+        foreach ($all_suffixes as $suf) {
+            $index_map[$lv][$suf] = 0;
+        }
+    }
+
+    // 🔥 LOOP UTAMA (SEMUA SEKALIGUS)
+    for ($round = 0; $round < $maxcount; $round++) {
+
+        for ($i = 0; $i < count($all_suffixes); $i++) {
+
+            foreach ($levels_target as $lv) {
+
+                // tentukan suffix sesuai arah
+                if ($direction[$lv] === 'reverse') {
+                    $suf = $suffix_reverse[$i] ?? null;
+                } elseif ($direction[$lv] === 'zigzag') {
+                    $suf = $suffix_zigzag[$i] ?? null;
+                } else {
+                    $suf = $suffix_forward[$i] ?? null;
+                }
+
+                if ($suf && !empty($map[$lv][$suf])) {
+                    $idx = $index_map[$lv][$suf];
+
+                    if (isset($map[$lv][$suf][$idx])) {
+                        $ordered_students[] = $map[$lv][$suf][$idx];
+                        $index_map[$lv][$suf]++;
+                    }
+                }
+            }
+
         }
     }
 }
@@ -206,10 +303,11 @@ if (($action === 'generate' || $action === 'attendance') && confirm_sesskey()) {
     $resolved_logo_path = get_logo_plugin_path();
 
 $selected_cohorts = optional_param_array('cohorts', [], PARAM_INT);
+$mode_urut = optional_param('mode_urut', 'normal', PARAM_ALPHA);
 
 if (empty($selected_cohorts)) {
     echo $OUTPUT->header();
-    echo $OUTPUT->notification('Pilih minimal satu cohort.', 'notifyproblem');
+    echo $OUTPUT->notification('Pilih minimal satu kelas.', 'notifyproblem');
     echo $OUTPUT->footer();
     exit;
 }
@@ -232,7 +330,7 @@ foreach ($selected_cohorts as $cid) {
         $filtered_cohorts[$cid] = $allcohorts[$cid];
     }
 }
-$plan = build_plan($filtered_cohorts, $rooms, $tanggal_mulai, $jumlah_hari);
+$plan = build_plan($filtered_cohorts, $rooms, $tanggal_mulai, $jumlah_hari, $mode_urut);
 }
 
 // ---------------- ACTION: GENERATE KARTU (fix tombol previously) ----------------
@@ -344,11 +442,23 @@ $rightX = $x + ($cardw/2);
         $pdf->SetX($rightX);
         $pdf->Cell(($cardw/2)-$padx, 4, 'Username : ' . $stu->username, 0, 1, 'L');
 
-        $password = get_student_plain_password($stu);
         $pdf->SetX($leftX);
         $pdf->Cell(($cardw/2)-$padx, 4, 'Nomor Meja : ' . $meja, 0, 0, 'L');
-        $pdf->SetX($rightX);
-        $pdf->Cell(($cardw/2)-$padx, 4, 'Password : ' . $password, 0, 1, 'L');
+        $password = get_student_plain_password($stu);
+
+$pdf->SetX($rightX);
+
+// jika belum diset → merah
+if ($password === 'BELUM DISET') {
+    $pdf->SetTextColor(255, 0, 0);
+} else {
+    $pdf->SetTextColor(0, 0, 0);
+}
+
+$pdf->Cell(($cardw/2)-$padx, 4, 'Password : ' . $password, 0, 1, 'L');
+
+// kembalikan ke hitam
+$pdf->SetTextColor(0, 0, 0);
 
         // sesi table (Hari / Tanggal / Sesi) -- gunakan s_on_day relatif ke sno
         $pdf->Ln(1);
@@ -801,37 +911,143 @@ echo html_writer::start_tag('form', [
 
 echo html_writer::empty_tag('br');
 
-// input basic
-echo html_writer::label('Nama Ujian','nama_ujian');
-echo html_writer::empty_tag('input',['type'=>'text','name'=>'nama_ujian','id'=>'nama_ujian','value'=>'ASESMEN AKHIR SEMESTER','size'=>60,'required'=>'required']);
-echo html_writer::empty_tag('br');
+// ================== DATA UJIAN ==================
+echo html_writer::tag('h4', 'Data Ujian');
 
-echo html_writer::label('Nama Sekolah','nama_sekolah');
-echo html_writer::empty_tag('input',['type'=>'text','name'=>'nama_sekolah','id'=>'nama_sekolah','value'=>'SMA NEGERI 2 KANDANGAN','size'=>60,'required'=>'required']);
-echo html_writer::empty_tag('br');
+echo html_writer::start_tag('div', ['style'=>'margin-bottom:10px;']);
 
-echo html_writer::label('Tahun Ajaran','tahun_ajaran');
-echo html_writer::empty_tag('input',['type'=>'text','name'=>'tahun_ajaran','id'=>'tahun_ajaran','value'=>'2025/2026','size'=>20,'required'=>'required']);
-echo html_writer::empty_tag('br');
-
-echo html_writer::label('Tanggal Mulai Ujian','tanggal_mulai');
-echo html_writer::empty_tag('input',['type'=>'date','name'=>'tanggal_mulai','id'=>'tanggal_mulai','required'=>'required']);
-echo html_writer::empty_tag('br');
-
-echo html_writer::label('Jumlah Hari Ujian','jumlah_hari');
-echo html_writer::empty_tag('input',['type'=>'number','name'=>'jumlah_hari','id'=>'jumlah_hari','value'=>1,'min'=>1,'required'=>'required']);
-echo html_writer::empty_tag('br');
-
-echo html_writer::label('Jumlah ruang','jumlah_ruang');
-echo html_writer::empty_tag('input',[
-    'type'=>'number','name'=>'jumlah_ruang','id'=>'jumlah_ruang',
-    'value'=>1,'min'=>1,'required'=>'required','oninput'=>'renderRuangInputs()'
+echo html_writer::label('Nama Ujian', 'nama_ujian');
+echo html_writer::empty_tag('input', [
+    'type'=>'text',
+    'name'=>'nama_ujian',
+    'id'=>'nama_ujian',
+    'value'=>'ASESMEN AKHIR SEMESTER',
+    'size'=>60,
+    'required'=>'required'
 ]);
-echo html_writer::empty_tag('br');
 
 echo html_writer::empty_tag('br');
 
-echo html_writer::tag('b', 'Pilih Cohort yang diikutkan:');
+echo html_writer::label('Nama Sekolah', 'nama_sekolah');
+echo html_writer::empty_tag('input', [
+    'type'=>'text',
+    'name'=>'nama_sekolah',
+    'id'=>'nama_sekolah',
+    'value'=>'SMA NEGERI 2 KANDANGAN',
+    'size'=>60,
+    'required'=>'required'
+]);
+
+echo html_writer::empty_tag('br');
+
+echo html_writer::label('Tahun Ajaran', 'tahun_ajaran');
+echo html_writer::empty_tag('input', [
+    'type'=>'text',
+    'name'=>'tahun_ajaran',
+    'id'=>'tahun_ajaran',
+    'value'=>'2025/2026',
+    'size'=>20,
+    'required'=>'required'
+]);
+
+echo html_writer::empty_tag('br');
+
+echo html_writer::label('Tanggal Mulai Ujian', 'tanggal_mulai');
+echo html_writer::empty_tag('input', [
+    'type'=>'date',
+    'name'=>'tanggal_mulai',
+    'id'=>'tanggal_mulai',
+    'required'=>'required'
+]);
+
+echo html_writer::empty_tag('br');
+
+echo html_writer::label('Jumlah Hari Ujian', 'jumlah_hari');
+echo html_writer::empty_tag('input', [
+    'type'=>'number',
+    'name'=>'jumlah_hari',
+    'id'=>'jumlah_hari',
+    'value'=>1,
+    'min'=>1,
+    'required'=>'required'
+]);
+
+echo html_writer::empty_tag('br');
+
+echo html_writer::label('Jumlah Ruang', 'jumlah_ruang');
+echo html_writer::empty_tag('input', [
+    'type'=>'number',
+    'name'=>'jumlah_ruang',
+    'id'=>'jumlah_ruang',
+    'value'=>1,
+    'min'=>1,
+    'required'=>'required',
+    'oninput'=>'renderRuangInputs()'
+]);
+
+echo html_writer::end_tag('div');
+
+
+// ================== MODE PENGURUTAN ==================
+echo html_writer::tag('h4', 'Mode Pengurutan');
+
+echo html_writer::start_tag('div', ['style'=>'margin-bottom:10px;']);
+
+echo html_writer::empty_tag('input', [
+    'type' => 'radio',
+    'name' => 'mode_urut',
+    'value' => 'normal',
+    'id' => 'mode_normal',
+    'checked' => 'checked'
+]);
+echo html_writer::label(' Normal', 'mode_normal');
+
+echo html_writer::empty_tag('br');
+
+echo html_writer::empty_tag('input', [
+    'type' => 'radio',
+    'name' => 'mode_urut',
+    'value' => 'selang',
+    'id' => 'mode_selang'
+]);
+echo html_writer::label(' Selang-seling rombel kelas', 'mode_selang');
+
+echo html_writer::empty_tag('br');
+
+echo html_writer::empty_tag('input', [
+    'type' => 'radio',
+    'name' => 'mode_urut',
+    'value' => 'random',
+    'id' => 'mode_random'
+]);
+echo html_writer::label(' Selang-seling kelas beda', 'mode_random');
+
+echo html_writer::end_tag('div');
+
+
+// ================== PILIH KELAS ==================
+echo html_writer::tag('h4', 'Pilih Kelas');
+
+// tombol aksi
+echo html_writer::start_tag('div', ['style'=>'margin-bottom:6px;']);
+
+echo html_writer::tag('button','✔️ Pilih semua',[
+    'type'=>'button',
+    'onclick'=>'checkAllCohorts(true)',
+    'class'=>'btn btn-success btn-sm'
+]);
+
+echo ' ';
+
+echo html_writer::tag('button','❌ Kosongkan',[
+    'type'=>'button',
+    'onclick'=>"if(confirm('Kosongkan semua pilihan?')) checkAllCohorts(false)",
+    'class'=>'btn btn-danger btn-sm'
+]);
+
+echo html_writer::end_tag('div');
+
+echo html_writer::empty_tag('br');
 
 // container grid
 echo html_writer::start_tag('div', [
@@ -883,6 +1099,10 @@ function renderRuangInputs(){
         container.appendChild(wrap);
     }
 }
+function checkAllCohorts(state){
+    const checkboxes = document.querySelectorAll('input[name="cohorts[]"]');
+    checkboxes.forEach(cb => cb.checked = state);
+}
 renderRuangInputs();
 </script>
 <?php
@@ -891,23 +1111,21 @@ echo $OUTPUT->footer();
 // ===== helper functions =====
 function get_student_plain_password(stdClass $user): string {
     global $DB;
-    // pastikan 'pwexam' ada paling depan sehingga diambil dulu
-    $fieldshort = ['pwexam','passwordujian','password_ujian','exam_password','password'];
-    foreach ($fieldshort as $short) {
-        $field = $DB->get_record('user_info_field', ['shortname' => $short], 'id', IGNORE_MISSING);
-        if ($field) {
-            $rec = $DB->get_record('user_info_data', ['fieldid' => $field->id, 'userid' => $user->id], 'data', IGNORE_MISSING);
-            if ($rec && trim($rec->data) !== '') return trim($rec->data);
+
+    $field = $DB->get_record('user_info_field', ['shortname' => 'pwexam'], 'id', IGNORE_MISSING);
+
+    if ($field) {
+        $rec = $DB->get_record('user_info_data', [
+            'fieldid' => $field->id,
+            'userid' => $user->id
+        ], 'data', IGNORE_MISSING);
+
+        if ($rec && trim($rec->data) !== '') {
+            return trim($rec->data);
         }
     }
-    // fallback ke idnumber jika masuk akal
-    if (!empty($user->idnumber) && strlen(trim($user->idnumber)) >= 3) return trim($user->idnumber);
-    // jika password belum di-hash (kasus langka), tampilkan; jika hash, tidak bisa ditampilkan
-    if (!empty($user->password)) {
-        $pw = trim($user->password);
-        if (strpos($pw, '$') === false && strlen($pw) <= 60 && strlen($pw) >= 4) return $pw;
-    }
-    return '******';
+
+    return 'BELUM DISET';
 }
 
 

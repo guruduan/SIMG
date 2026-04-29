@@ -7,41 +7,65 @@ require_login();
 $context = context_system::instance();
 $PAGE->set_context($context);
 
-$PAGE->set_url('/local/jurnalmengajar/jam_pelajaran_view.php');
+$PAGE->set_url(new moodle_url('/local/jurnalmengajar/jam_pelajaran_view.php'));
 $PAGE->set_pagelayout('standard');
 $PAGE->set_title('Jam Pelajaran');
-$PAGE->set_heading('Jam Pelajaran');
-
-$jam = jurnalmengajar_generate_jam();
+$PAGE->set_heading('Alokasi Waktu Jam Pelajaran');
 
 echo $OUTPUT->header();
 
-echo "<h3>Jam Pelajaran</h3>";
-echo "<table class='generaltable'>";
-echo "<tr><th>Jam</th><th>Mulai</th><th>Selesai</th></tr>";
+// Ambil data
+$jam = jurnalmengajar_generate_jam();
+
+// Table
+$table = new html_table();
+$table->head = ['Jam', 'Mulai', 'Selesai'];
+$table->attributes['class'] = 'generaltable';
+$table->align = ['center', 'center', 'center'];
+$table->data = [];
+
+$now = date('H:i');
 
 foreach ($jam as $j => $w) {
-    echo "<tr>";
-    echo "<td>$j</td>";
-    echo "<td>{$w['mulai']}</td>";
-    echo "<td>{$w['selesai']}</td>";
-    echo "</tr>";
 
+    $mulai   = $w['mulai'];
+    $selesai = $w['selesai'];
+
+    $label_jam = $j;
+
+    if ($now >= $mulai && $now <= $selesai) {
+        $label_jam = $j . '*';
+    }
+
+    $table->data[] = [
+        $label_jam, // ❗ jangan pakai format_string biar bisa custom
+        format_string($mulai),
+        format_string($selesai)
+    ];
+
+    // Baris istirahat
     if (!empty($w['istirahat_setelah'])) {
-        echo "<tr style='background:#fff3cd; text-align:center; font-weight:bold;'>";
-        echo "<td colspan='3'>ISTIRAHAT {$w['istirahat_setelah']} MENIT</td>";
-        echo "</tr>";
+        $cell = new html_table_cell(
+            'ISTIRAHAT ' . (int)$w['istirahat_setelah'] . ' MENIT'
+        );
+        $cell->colspan = 3;
+        $cell->attributes['class'] = 'text-center';
+        $cell->attributes['style'] = 'background:#ffeeba; font-weight:bold;';
+
+        $table->data[] = [$cell];
     }
 }
 
-echo "</table>";
-echo html_writer::link(
-    '#',
-    '⬅ Kembali',
-    [
-        'class' => 'btn btn-secondary',
-        'onclick' => 'history.back(); return false;',
-        'title' => 'Kembali ke halaman sebelumnya'
-    ]
+echo html_writer::table($table);
+
+// Tombol kembali
+echo html_writer::div(
+    html_writer::link(
+        new moodle_url('/my/'),
+        '⬅ Kembali ke Dashboard',
+        ['class' => 'btn btn-primary']
+    ),
+    'mt-3'
 );
+
 echo $OUTPUT->footer();

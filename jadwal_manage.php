@@ -27,6 +27,8 @@ $hari   = optional_param('hari', '', PARAM_TEXT);
 $kelas  = optional_param('kelas', '', PARAM_TEXT);
 
 if ($userid && $hari && $kelas) {
+    require_sesskey(); // 🔐 WAJIB
+
     $DB->delete_records('local_jurnalmengajar_jadwal', [
         'userid' => $userid,
         'hari' => $hari,
@@ -131,25 +133,22 @@ echo "<br><br>";
 // ============================
 echo html_writer::start_tag('form', [
     'method' => 'get',
+    'action' => new moodle_url('/local/jurnalmengajar/jadwal_manage.php'),
     'style' => 'margin-bottom:15px;'
 ]);
 
 echo "Filter Guru: ";
-echo html_writer::select($listguru, 'guru', $filterguru);
-
-echo html_writer::empty_tag('input', [
-    'type' => 'submit',
-    'value' => 'Tampilkan',
-    'class' => 'btn btn-secondary',
-    'style' => 'margin-left:5px'
+echo html_writer::select($listguru, 'guru', $filterguru, null, [
+    'onchange' => 'this.form.submit(); this.disabled=true;'
 ]);
+
 
 echo html_writer::end_tag('form');
 $namaguru = $listguru[$filterguru] ?? '-';
 echo "<h4>Jadwal Guru: $namaguru</h4>";
 $totaljam = 0;
 foreach ($grouped as $g) {
-    $totaljam += count($g['jamke']);
+    $totaljam += count(array_unique($g['jamke']));
 }
 echo "<p>Total Jam Mengajar: <b>$totaljam</b></p>";
 if (!empty($grouped)) {
@@ -167,18 +166,26 @@ if (!empty($grouped)) {
 
     $no = 1;
     $hari_sebelumnya = '';
+    $warna = [
+    'Senin' => '#e3f2fd',
+    'Selasa' => '#f1f8e9',
+    'Rabu' => '#fff3e0',
+    'Kamis' => '#fce4ec',
+    'Jumat' => '#e8f5e9'
+];
 
     foreach ($grouped as $g) {
 
         sort($g['jamke']);
-        $jamgabung = implode(',', $g['jamke']);
+        $jamgabung = implode(',', array_unique($g['jamke']));
 
-        $hapusurl = new moodle_url('/local/jurnalmengajar/jadwal_manage.php', [
-            'userid' => $g['userid'],
-            'hari' => $g['hari'],
-            'kelas' => $g['kelas'],
-            'guru' => $filterguru
-        ]);
+$hapusurl = new moodle_url('/local/jurnalmengajar/jadwal_manage.php', [
+    'userid' => $g['userid'],
+    'hari' => $g['hari'],
+    'kelas' => $g['kelas'],
+    'guru' => $filterguru,
+    'sesskey' => sesskey() // 🔐 ini juga WAJIB
+]);
 
         $editurl = new moodle_url('/local/jurnalmengajar/jadwal_edit.php', [
             'userid' => $g['userid'],
@@ -187,7 +194,7 @@ if (!empty($grouped)) {
             'guru' => $filterguru
         ]);
 
-        echo "<tr>";
+        echo "<tr style='background:" . ($warna[$g['hari']] ?? '#fff') . "'>";
 
         if ($hari_sebelumnya != $g['hari']) {
             echo "<td>$no</td>";
@@ -209,6 +216,9 @@ if (!empty($grouped)) {
     }
 
     echo "</table>";
+    
+} else {
+    echo "<p><i>Tidak ada jadwal</i></p>";
 }
 
 echo $OUTPUT->footer();
