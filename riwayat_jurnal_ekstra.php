@@ -28,7 +28,10 @@ $awalbulan  = strtotime(date('Y-m-01 00:00:00'));
 $akhirbulan = strtotime(date('Y-m-01 00:00:00', strtotime('+1 month')));
 
 $sql = "SELECT j.*, e.namaekstra, u.firstname, u.lastname,
-               GROUP_CONCAT(CONCAT(us.firstname, ' ', us.lastname, ' (', a.status, ')') SEPARATOR ', ') AS absensi
+               COALESCE(
+    GROUP_CONCAT(CONCAT(us.firstname, ' ', us.lastname, ' (', a.status, ')') SEPARATOR ', '),
+    ''
+) AS absensi
           FROM {local_jm_ekstra_jurnal} j
           JOIN {local_jm_ekstra} e ON e.id = j.ekstraid
           JOIN {user} u ON u.id = j.pembinaid
@@ -61,7 +64,8 @@ if ($entries) {
         html_writer::tag('th', 'Kegiatan') .
         html_writer::tag('th', 'Catatan') .
         html_writer::tag('th', 'Absen') .
-        html_writer::tag('th', 'Waktu Input')
+        html_writer::tag('th', 'Waktu Input') .
+        html_writer::tag('th', 'Aksi') // 🔥 TAMBAHAN
     );
 
     echo html_writer::end_tag('thead');
@@ -74,14 +78,37 @@ if ($entries) {
         echo html_writer::start_tag('tr');
 
         echo html_writer::tag('td', $no++);
-        echo html_writer::tag('td', tanggal_indo($e->tanggal));
+        echo html_writer::tag('td', tanggal_indo($e->tanggal, 'tanggal'));
         echo html_writer::tag('td', $e->namaekstra);
-        echo html_writer::tag('td', shorten_text($e->materi, 40));
-        echo html_writer::tag('td', shorten_text($e->kegiatan, 40));
-        echo html_writer::tag('td', shorten_text($e->catatan, 40));
-        echo html_writer::tag('td', shorten_text($e->absensi, 40));
+       echo html_writer::tag('td', shorten_text($e->materi ?? '', 40));
+echo html_writer::tag('td', $e->kegiatan ? shorten_text($e->kegiatan, 40) : '-');
+echo html_writer::tag('td', shorten_text($e->catatan ?? '', 40));
+echo html_writer::tag('td', shorten_text($e->absensi ?? '', 40));
         echo html_writer::tag('td', tanggal_indo($e->timecreated));
+// =======================
+// AKSI (HANYA ADMIN)
+// =======================
+$aksi = '&nbsp;';
 
+if (has_capability('moodle/site:config', $context)) {
+
+    $url = new moodle_url('/local/jurnalmengajar/delete_jurnal_ekstra.php', [
+        'id' => $e->id,
+        'sesskey' => sesskey()
+    ]);
+
+    $aksi = html_writer::link(
+        $url,
+        '🗑️',
+        [
+            'title' => 'Hapus',
+            'onclick' => "return confirm('Yakin hapus jurnal ini?')",
+            'style' => 'color:red;font-size:18px;'
+        ]
+    );
+}
+
+echo html_writer::tag('td', $aksi);
         echo html_writer::end_tag('tr');
     }
 

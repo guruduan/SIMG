@@ -99,42 +99,86 @@ $html .= "</p>";
 if ($mode === 'hari') {
     // --------- MODE PER HARI (1 baris per tanggal) ---------
     // Kumpulkan status dominan per tanggal + rincian (jamke-mapel-guru)
-    $per_tanggal = []; // 'Y-m-d' => ['status'=>..., 'rincian'=>[[jamke,mapel,guru], ...]]
-    foreach ($jurnals as $j) {
-        $tglKey = date('Y-m-d', $j->timecreated);
-        $absen = json_decode($j->absen, true);
-if (!is_array($absen)) $absen = [];
-        $statusJurnal = null;
-        foreach ($absen as $nama => $als) {
-            if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
-                $statusJurnal = normalize_status($als);
-                break;
-            }
-        }
+$per_tanggal = []; // 'Y-m-d' => ['status_count'=>[], 'rincian'=>[]]
 
-        if (!isset($per_tanggal[$tglKey])) {
-            $per_tanggal[$tglKey] = [
-                'status'  => 'hadir',
-                'rincian' => []
-            ];
-        }
+foreach ($jurnals as $j) {
+    $tglKey = date('Y-m-d', $j->timecreated);
+    $absen = json_decode($j->absen, true);
+    if (!is_array($absen)) $absen = [];
 
-        $guru = $DB->get_record('user', ['id' => $j->userid], 'firstname, lastname');
-        $per_tanggal[$tglKey]['rincian'][] = [
-            'jamke' => $j->jamke ?? '-',
-            'mapel' => $j->matapelajaran ?? '-',
-            'guru'  => $guru ? ucwords(strtolower($guru->lastname)) : '(tidak diketahui)'
-        ];
-
-        if ($statusJurnal && isset($priority[$statusJurnal])) {
-            $old = $per_tanggal[$tglKey]['status'] ?? 'hadir';
-            if ($priority[$statusJurnal] > ($priority[$old] ?? 0)) {
-                $per_tanggal[$tglKey]['status'] = $statusJurnal;
-            }
+    $statusJurnal = null;
+    foreach ($absen as $nama => $als) {
+        if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
+            $statusJurnal = normalize_status($als);
+            break;
         }
     }
 
-    ksort($per_tanggal);
+    if (!isset($per_tanggal[$tglKey])) {
+        $per_tanggal[$tglKey] = [
+            'status_count' => [],
+            'rincian' => []
+        ];
+    }
+
+    // rincian
+    $guru = $DB->get_record('user', ['id' => $j->userid], 'firstname, lastname');
+    $per_tanggal[$tglKey]['rincian'][] = [
+        'jamke' => $j->jamke ?? '-',
+        'mapel' => $j->matapelajaran ?? '-',
+        'guru'  => $guru ? ucwords(strtolower($guru->lastname)) : '(tidak diketahui)'
+    ];
+
+    // hitung jumlah jam
+    $jamlist = array_filter(array_map('trim', explode(',', $j->jamke ?? '')));
+    $jumlahjam = count($jamlist) ?: 1;
+
+    if ($statusJurnal && isset($priority[$statusJurnal])) {
+        if (!isset($per_tanggal[$tglKey]['status_count'][$statusJurnal])) {
+            $per_tanggal[$tglKey]['status_count'][$statusJurnal] = 0;
+        }
+        $per_tanggal[$tglKey]['status_count'][$statusJurnal] += $jumlahjam;
+    } else {
+        // default hadir
+        if (!isset($per_tanggal[$tglKey]['status_count']['hadir'])) {
+            $per_tanggal[$tglKey]['status_count']['hadir'] = 0;
+        }
+        $per_tanggal[$tglKey]['status_count']['hadir'] += $jumlahjam;
+    }
+}
+
+// === Tentukan status akhir per hari ===
+foreach ($per_tanggal as $tgl => &$info) {
+    if (empty($info['status_count'])) {
+        $info['status'] = 'hadir';
+        continue;
+    }
+
+    $hadir = $info['status_count']['hadir'] ?? 0;
+    $total = array_sum($info['status_count']);
+
+    if ($total == 0) {
+        $info['status'] = 'hadir';
+    } else if ($hadir == $total) {
+        $info['status'] = 'hadir';
+    } else if ($hadir == 0) {
+        $statusDominan = 'hadir';
+        $maxprio = -1;
+        foreach (['dispensasi','sakit','ijin','alpa'] as $st) {
+            if (!empty($info['status_count'][$st])) {
+                $p = $priority[$st] ?? 0;
+                if ($p > $maxprio) {
+                    $maxprio = $p;
+                    $statusDominan = $st;
+                }
+            }
+        }
+        $info['status'] = $statusDominan;
+    } else {
+        $info['status'] = 'hadir';
+    }
+}
+unset($info);
 
     $html .= '<table border="1" cellpadding="4" cellspacing="0" width="100%">';
     $html .= '<thead>

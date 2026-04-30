@@ -1,3 +1,4 @@
+
 <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
@@ -20,7 +21,7 @@ $sql = "SELECT e.id, e.namaekstra
         WHERE p.userid = ?";
 $ekstra_saya = $DB->get_records_sql($sql, [$USER->id]);
 
-$selected_ekstra = $_GET['ekstraid'] ?? 0;
+$selected_ekstra = optional_param('ekstraid', 0, PARAM_INT);
 
 echo $OUTPUT->header();
 
@@ -77,6 +78,7 @@ if ($selected_ekstra) {
     echo '<h3>Form Jurnal</h3>';
 
     echo '<form method="post" action="simpan_jurnal_ekstra.php">';
+    echo '<input type="hidden" name="sesskey" value="'.sesskey().'">'; // 🔥 WAJIB
 echo '<input type="hidden" name="ekstraid" value="'.$selected_ekstra.'">';
 
 echo 'Tanggal:<br>';

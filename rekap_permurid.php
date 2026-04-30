@@ -171,8 +171,9 @@ if (!is_array($absen)) $absen = [];
             'guru'   => $guru ? $guru->lastname : '(tidak diketahui)'
         ];
 
-        // Status dominan per hari
-        if ($statusJurnal && isset($priority[$statusJurnal])) {
+// Status dominan per hari
+if ($statusJurnal && isset($priority[$statusJurnal])) {
+
     $jamlist = array_filter(array_map('trim', explode(',', $j->jamke ?? '')));
     $jumlahjam = count($jamlist) ?: 1;
 
@@ -180,6 +181,17 @@ if (!is_array($absen)) $absen = [];
         $per_tanggal[$tglKey]['status_count'][$statusJurnal] = 0;
     }
     $per_tanggal[$tglKey]['status_count'][$statusJurnal] += $jumlahjam;
+
+} else {
+
+    // ✅ default hadir jika tidak ada di JSON
+    $jamlist = array_filter(array_map('trim', explode(',', $j->jamke ?? '')));
+    $jumlahjam = count($jamlist) ?: 1;
+
+    if (!isset($per_tanggal[$tglKey]['status_count']['hadir'])) {
+        $per_tanggal[$tglKey]['status_count']['hadir'] = 0;
+    }
+    $per_tanggal[$tglKey]['status_count']['hadir'] += $jumlahjam;
 }
 
     }
@@ -190,24 +202,31 @@ foreach ($per_tanggal as $tgl => &$info) {
         continue;
     }
 
-    $statusDominan = 'hadir';
-    $maxJam = -1;
+    $hadir = $info['status_count']['hadir'] ?? 0;
+    $total = array_sum($info['status_count']);
 
-    foreach ($info['status_count'] as $status => $jumlah) {
-        if (
-            $jumlah > $maxJam ||
-            ($jumlah === $maxJam && $priority[$status] > $priority[$statusDominan])
-        ) {
-            $statusDominan = $status;
-            $maxJam = $jumlah;
+    if ($total == 0) {
+        $info['status'] = 'hadir';
+    } else if ($hadir == $total) {
+        $info['status'] = 'hadir';
+    } else if ($hadir == 0) {
+        $statusDominan = 'hadir';
+        $maxprio = -1;
+        foreach (['dispensasi','sakit','ijin','alpa'] as $st) {
+            if (!empty($info['status_count'][$st])) {
+                $p = $priority[$st] ?? 0;
+                if ($p > $maxprio) {
+                    $maxprio = $p;
+                    $statusDominan = $st;
+                }
+            }
         }
+        $info['status'] = $statusDominan;
+    } else {
+        $info['status'] = 'hadir';
     }
-
-    $info['status'] = $statusDominan;
 }
-unset($info);
-
-
+unset($info); // ✅ TARUH DI SINI (di luar loop)
     // Render tabel: satu baris per tanggal (urut naik)
     ksort($per_tanggal);
 
