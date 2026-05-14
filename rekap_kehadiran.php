@@ -28,6 +28,14 @@ echo html_writer::div(
     'mb-3'
 );
 echo $OUTPUT->heading('Rekap Kehadiran Murid Per Kelas');
+echo html_writer::div(
+    html_writer::link(
+        new moodle_url('/local/jurnalmengajar/rekap_kehadiran_bulanan.php'),
+        '📅 Rekap Kehadiran Bulanan',
+        ['class' => 'btn btn-info']
+    ),
+    'mb-3'
+);
 
 // Ambil daftar kelas
 $kelaslist = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
