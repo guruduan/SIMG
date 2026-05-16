@@ -15,27 +15,27 @@ $PAGE->requires->jquery();
 //$PAGE->requires->css('/local/jurnalmengajar/css/stickyheader.css');
 
 echo $OUTPUT->header();
-// Tombol kembali
-echo html_writer::div(
-    html_writer::link(
-        '#',
-        '⬅ Kembali',
-        [
-            'class' => 'btn btn-secondary',
-            'onclick' => 'history.back(); return false;'
-        ]
-    ),
-    'mb-3'
+
+// Tombol kembali dan Rekap Bulanan (Dipisah atau digabung dengan benar)
+$tombol_kembali = html_writer::link(
+    '#',
+    '⬅ Kembali',
+    [
+        'class' => 'btn btn-secondary mr-2', // Menambahkan mr-2 agar ada jarak antar tombol
+        'onclick' => 'history.back(); return false;'
+    ]
 );
+
+$tombol_bulanan = html_writer::link(
+    new moodle_url('/local/jurnalmengajar/rekap_kehadiran_bulanan.php'),
+    '📅 Rekap Kehadiran Bulanan',
+    ['class' => 'btn btn-info']
+);
+
+// Bungkus kedua tombol di dalam satu div container
+echo html_writer::div($tombol_kembali . $tombol_bulanan, 'mb-3');
+
 echo $OUTPUT->heading('Rekap Kehadiran Murid Per Kelas');
-echo html_writer::div(
-    html_writer::link(
-        new moodle_url('/local/jurnalmengajar/rekap_kehadiran_bulanan.php'),
-        '📅 Rekap Kehadiran Bulanan',
-        ['class' => 'btn btn-info']
-    ),
-    'mb-3'
-);
 
 // Ambil daftar kelas
 $kelaslist = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
@@ -50,19 +50,6 @@ $matpel      = optional_param('matpel', '', PARAM_TEXT);
 
 $dari   = $dari_raw   ? strtotime($dari_raw . ' 00:00:00') : 0;
 $sampai = $sampai_raw ? strtotime($sampai_raw . ' 23:59:59') : 0;
-
-// Normalisasi status
-function normalize_status($s) {
-    $s = strtolower(trim($s));
-    $map = [
-        'ijin' => 'ijin', 'izin' => 'ijin',
-        'sakit' => 'sakit', 'skt' => 'sakit',
-        'alpha' => 'alpa', 'alpa' => 'alpa', 'absen' => 'alpa',
-        'disp' => 'dispensasi', 'dispen' => 'dispensasi', 'dispensasi' => 'dispensasi',
-        'hadir' => 'hadir'
-    ];
-    return $map[$s] ?? $s;
-}
 
 // Prioritas status untuk mode "hari" (semakin besar => makin dominan)
 $priority = [
@@ -263,7 +250,7 @@ if ($kelasid && $dari && $sampai) {
         $lookup = [];
         foreach ($absen as $nama => $alasan) {
             $namajson = trim($nama);
-            $lookup[mb_strtolower($namajson, 'UTF-8')] = normalize_status($alasan);
+            $lookup[mb_strtolower($namajson, 'UTF-8')] = strtolower(trim($alasan));
         }
 
         // Isi per hari per siswa
@@ -362,7 +349,7 @@ if ($kelasid && $dari && $sampai) {
                     $alasan = strtolower(trim($alasan));
 
                     if (strcasecmp($namajson, $namasiswa) == 0) {
-                        $alasan = normalize_status($alasan);
+                        $alasan = strtolower(trim($alasan));
                         if (isset($data[$uid][$alasan])) {
                             $data[$uid][$alasan] += $jmljam;
                         }

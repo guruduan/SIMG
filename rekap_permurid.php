@@ -29,18 +29,6 @@ $namakelas = $kelas ? $kelas->name : '(kelas tidak ditemukan)';
 $PAGE->set_title("Rekap Kehadiran Murid [$namakelas]");
 $PAGE->set_heading("Rekap Kehadiran Murid [$namakelas]");
 
-// ==== Util: normalisasi & prioritas status (konsisten dengan rekap_kehadiran.php) ====
-function normalize_status($s) {
-    $s = strtolower(trim($s));
-    $map = [
-        'ijin' => 'ijin', 'izin' => 'ijin',
-        'sakit' => 'sakit', 'skt' => 'sakit',
-        'alpha' => 'alpa', 'alpa' => 'alpa', 'absen' => 'alpa',
-        'disp' => 'dispensasi', 'dispen' => 'dispensasi', 'dispensasi' => 'dispensasi',
-        'hadir' => 'hadir'
-    ];
-    return $map[$s] ?? $s;
-}
 // Semakin besar nilainya -> semakin dominan jika bentrok dalam satu hari
 $priority = [
     'hadir'       => 0,
@@ -134,7 +122,7 @@ if ($matpel !== '') {
 
 $select  = implode(' AND ', $wheres);
 $jurnals = $DB->get_records_select('local_jurnalmengajar', $select, $params, 'timecreated ASC');
-
+$gurucache = [];
 // ==============================
 // TABEL (beda sesuai mode)
 // ==============================
@@ -145,12 +133,14 @@ if ($mode === 'hari') {
     foreach ($jurnals as $j) {
         $tglKey = date('Y-m-d', $j->timecreated);
         $absen = json_decode($j->absen, true);
-if (!is_array($absen)) $absen = [];
+if (!is_array($absen)) {
+    $absen = [];
+}
         $statusJurnal = null;
 
         foreach ($absen as $nama => $als) {
             if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
-                $statusJurnal = normalize_status($als);
+                $statusJurnal = strtolower(trim($als));
                 break;
             }
         }
@@ -164,7 +154,15 @@ if (!is_array($absen)) $absen = [];
         }
 
         // Rincian
-        $guru = $DB->get_record('user', ['id' => $j->userid], 'firstname, lastname');
+        if (!isset($gurucache[$j->userid])) {
+    $gurucache[$j->userid] = $DB->get_record(
+        'user',
+        ['id' => $j->userid],
+        'firstname, lastname'
+    );
+}
+
+$guru = $gurucache[$j->userid];
         $per_tanggal[$tglKey]['rincian'][] = [
             'jamke'  => $j->jamke ?? '-',
             'mapel'  => $j->matapelajaran ?? '-',
@@ -172,31 +170,31 @@ if (!is_array($absen)) $absen = [];
         ];
 
 // Status dominan per hari
-if ($statusJurnal && isset($priority[$statusJurnal])) {
+$jamlist = array_filter(array_map('trim', explode(',', $j->jamke ?? '')));
+$jumlahjam = count($jamlist) ?: 1;
 
-    $jamlist = array_filter(array_map('trim', explode(',', $j->jamke ?? '')));
-    $jumlahjam = count($jamlist) ?: 1;
+if ($statusJurnal && isset($priority[$statusJurnal])) {
 
     if (!isset($per_tanggal[$tglKey]['status_count'][$statusJurnal])) {
         $per_tanggal[$tglKey]['status_count'][$statusJurnal] = 0;
     }
+
     $per_tanggal[$tglKey]['status_count'][$statusJurnal] += $jumlahjam;
 
 } else {
 
-    // ✅ default hadir jika tidak ada di JSON
-    $jamlist = array_filter(array_map('trim', explode(',', $j->jamke ?? '')));
-    $jumlahjam = count($jamlist) ?: 1;
-
+    // default hadir jika tidak ada di JSON
     if (!isset($per_tanggal[$tglKey]['status_count']['hadir'])) {
         $per_tanggal[$tglKey]['status_count']['hadir'] = 0;
     }
+
     $per_tanggal[$tglKey]['status_count']['hadir'] += $jumlahjam;
 }
 
-    }
+}
 
 foreach ($per_tanggal as $tgl => &$info) {
+
     if (empty($info['status_count'])) {
         $info['status'] = 'hadir';
         continue;
@@ -233,7 +231,7 @@ unset($info); // ✅ TARUH DI SINI (di luar loop)
     echo html_writer::start_tag('table', ['class' => 'generaltable']);
     echo html_writer::tag('tr',
         html_writer::tag('th', 'No') .
-        html_writer::tag('th', 'Tanggal') .
+        html_writer::tag('th', 'Hari, tanggal') .
         html_writer::tag('th', 'Absensi (dominan)') .
         html_writer::tag('th', 'Rincian perhari')
     );
@@ -268,49 +266,129 @@ unset($info); // ✅ TARUH DI SINI (di luar loop)
     echo html_writer::start_tag('table', ['class' => 'generaltable']);
     echo html_writer::tag('tr',
         html_writer::tag('th', 'No') .
-        html_writer::tag('th', 'Tanggal') .
+        html_writer::tag('th', 'Hari, tanggal') .
         html_writer::tag('th', 'Jam ke') .
         html_writer::tag('th', 'Mata Pelajaran') .
         html_writer::tag('th', 'Pengajar') .
-        html_writer::tag('th', 'Absen')
+        html_writer::tag('th', 'Absensi')
     );
 
     $no = 1;
     $totaljam = 0;
 
-    foreach ($jurnals as $jurnal) {
-        $tanggal = tanggal_indo($jurnal->timecreated, 'judul');
-        $absen = json_decode($jurnal->absen, true);
-if (!is_array($absen)) $absen = [];
-        $jamke = $jurnal->jamke ?? '-';
-        $matpelj = $jurnal->matapelajaran ?? '-';
+$data_perhari = [];
 
-        $alasan = null;
-        foreach ($absen as $nama => $als) {
-            if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
-                $alasan = normalize_status($als);
-                break;
-            }
-        }
+foreach ($jurnals as $jurnal) {
 
-        // Tampilkan hanya jika siswa tercatat tidak 'hadir' pada jurnal tsb
-        if ($alasan && $alasan !== 'hadir') {
-            $jamlist = array_filter(array_map('trim', explode(',', $jamke)));
-            $totaljam += count($jamlist);
+    $tanggalkey = date('Y-m-d', $jurnal->timecreated);
+    $tanggal = tanggal_indo($jurnal->timecreated, 'judul');
 
-            $guru = $DB->get_record('user', ['id' => $jurnal->userid], 'firstname, lastname');
-            $namaguru = $guru ? $guru->lastname : '(tidak diketahui)';
+    $absen = json_decode($jurnal->absen, true);
 
-            echo html_writer::tag('tr',
-                html_writer::tag('td', $no++) .
-                html_writer::tag('td', $tanggal) .
-                html_writer::tag('td', $jamke) .
-                html_writer::tag('td', $matpelj) .
-                html_writer::tag('td', $namaguru) .
-                html_writer::tag('td', ucfirst($alasan))
-            );
+    if (!is_array($absen)) {
+        $absen = [];
+    }
+
+    $jamke = $jurnal->jamke ?? '-';
+    $matpelj = $jurnal->matapelajaran ?? '-';
+
+    $alasan = null;
+
+    foreach ($absen as $nama => $als) {
+        if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
+            $alasan = strtolower(trim($als));
+            break;
         }
     }
+
+    // tampilkan absensi
+    if (!$alasan) {
+    $alasan = 'hadir';
+    }
+
+$jamlist = array_filter(array_map('trim', explode(',', $jamke)));
+
+if ($alasan !== 'hadir') {
+    $totaljam += count($jamlist);
+}
+
+        if (!isset($gurucache[$jurnal->userid])) {
+            $gurucache[$jurnal->userid] = $DB->get_record(
+                'user',
+                ['id' => $jurnal->userid],
+                'firstname, lastname'
+            );
+        }
+
+        $guru = $gurucache[$jurnal->userid];
+        $namaguru = $guru ? $guru->lastname : '(tidak diketahui)';
+
+        $data_perhari[$tanggalkey]['tanggal'] = $tanggal;
+
+        $data_perhari[$tanggalkey]['rows'][] = [
+            'jamke' => $jamke,
+            'mapel' => $matpelj,
+            'guru'  => $namaguru,
+            'absen' => ucfirst($alasan)
+        ];
+    
+}
+
+$no = 1;
+ksort($data_perhari);
+foreach ($data_perhari as $hari) {
+
+    $first = true;
+
+    foreach ($hari['rows'] as $row) {
+$statuslower = strtolower($row['absen']);
+
+switch ($statuslower) {
+    case 'hadir':
+        $badgeclass = 'success';
+        break;
+
+    case 'sakit':
+        $badgeclass = 'warning';
+        break;
+
+    case 'ijin':
+        $badgeclass = 'info';
+        break;
+
+    case 'alpa':
+        $badgeclass = 'danger';
+        break;
+
+    case 'dispensasi':
+        $badgeclass = 'secondary';
+        break;
+
+    default:
+        $badgeclass = 'light';
+        break;
+}
+
+$badge = html_writer::tag(
+    'span',
+    $row['absen'],
+    ['class' => 'badge bg-' . $badgeclass]
+);
+$rowhtml =
+    html_writer::tag('td', $first ? $no : '') .
+    html_writer::tag('td', $first ? $hari['tanggal'] : '') .
+    html_writer::tag('td', $row['jamke']) .
+    html_writer::tag('td', $row['mapel']) .
+    html_writer::tag('td', $row['guru']) .
+    html_writer::tag('td', $badge);
+
+echo html_writer::tag('tr', $rowhtml);
+
+        $first = false;
+    }
+
+    $no++;
+}
 
     echo html_writer::end_tag('table');
 

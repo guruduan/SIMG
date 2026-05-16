@@ -1,3 +1,4 @@
+cetak_permurid.php
 <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
@@ -29,18 +30,6 @@ if (!$kelas || !$siswa) {
 $namakelas = $kelas->name;
 $namasiswa  = ucwords(strtolower($siswa->lastname));
 
-// ===== Util: normalisasi & prioritas (selaras halaman) =====
-function normalize_status($s) {
-    $s = strtolower(trim($s));
-    $map = [
-        'ijin' => 'ijin', 'izin' => 'ijin',
-        'sakit' => 'sakit', 'skt' => 'sakit',
-        'alpha' => 'alpa', 'alpa' => 'alpa', 'absen' => 'alpa',
-        'disp' => 'dispensasi', 'dispen' => 'dispensasi', 'dispensasi' => 'dispensasi',
-        'hadir' => 'hadir'
-    ];
-    return $map[$s] ?? $s;
-}
 // semakin besar => lebih dominan pada bentrok di hari yang sama
 $priority = [
     'hadir'       => 0,
@@ -72,13 +61,16 @@ $select = implode(' AND ', $wheres);
 $jurnals = $DB->get_records_select('local_jurnalmengajar', $select, $params, 'timecreated ASC');
 
 // ===== Siapkan PDF =====
+while (ob_get_level()) {
+    ob_end_clean();
+}
 $pdf = new pdf();
 $pdf->SetTitle("Rekap Kehadiran - $namasiswa");
 $pdf->AddPage();
 $pdf->SetFont('helvetica', '', 10);
 
 // ===== Header =====
-$html  = "<h3>Rekap Ketidakhadiran Murid</h3>";
+$html  = "<h3>Rekap Kehadiran Murid</h3>";
 $html .= "<p><strong>Nama:</strong> {$namasiswa}<br>";
 $html .= "<strong>Kelas:</strong> {$namakelas}<br>";
 $html .= "<strong>Rentang:</strong> " 
@@ -109,7 +101,7 @@ foreach ($jurnals as $j) {
     $statusJurnal = null;
     foreach ($absen as $nama => $als) {
         if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
-            $statusJurnal = normalize_status($als);
+            $statusJurnal = strtolower(trim($als));
             break;
         }
     }
@@ -220,7 +212,7 @@ unset($info);
     $html .= '<p><strong>Jumlah Hari Murid tidak hadir: ' . $hari_tidak_hadir . ' hari</strong></p>';
 
 } else {
-    // --------- MODE PER JAM (baris per jurnal; hanya jika ≠ hadir) ---------
+    // --------- MODE PER JAM (baris per jurnal) ---------
     $html .= '<table border="1" cellpadding="4" cellspacing="0" width="100%">';
     $html .= '<thead>
 <tr style="font-weight:bold; background-color:#f0f0f0;">
@@ -237,24 +229,35 @@ unset($info);
     $totaljam = 0;
 
     foreach ($jurnals as $j) {
-        $absen = json_decode($j->absen, true);
-if (!is_array($absen)) $absen = [];
-        $alasan = null;
-        foreach ($absen as $nama => $als) {
-            if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
-                $alasan = normalize_status($als);
-                break;
-            }
+                $absen = json_decode($j->absen, true);
+
+        if (!is_array($absen)) {
+            $absen = [];
         }
 
-        // tampilkan hanya jika tidak 'hadir'
-        if ($alasan && $alasan !== 'hadir') {
+        $alasan = null;
+
+        foreach ($absen as $nama => $als) {
+    if (strcasecmp(trim($nama), trim($siswa->lastname)) == 0) {
+        $alasan = strtolower(trim($als));
+        break;
+    }
+}
+
+if (!$alasan) {
+    $alasan = 'hadir';
+}
+
+        // tampilkan semua absensi
+     
             $tanggal = tanggal_indo($j->timecreated, 'judul');
             $jamke   = $j->jamke ?? '-';
             $matpelj = $j->matapelajaran ?? '-';
 
             $jamlist  = array_filter(array_map('trim', explode(',', $jamke)));
-            $totaljam += count($jamlist);
+            if ($alasan !== 'hadir') {
+                $totaljam += count($jamlist);
+            }
 
             $guru = $DB->get_record('user', ['id' => $j->userid], 'firstname, lastname');
             $namaguru = $guru ? ucwords(strtolower($guru->lastname)) : '(tidak diketahui)';
@@ -268,7 +271,6 @@ if (!is_array($absen)) $absen = [];
     <td width=\"12%\">".ucfirst($alasan)."</td>
 </tr>";
             $no++;
-        }
     }
 
     if ($no === 1) {
@@ -282,3 +284,4 @@ if (!is_array($absen)) $absen = [];
 // ===== Output PDF =====
 $pdf->writeHTML($html, true, false, true, false, '');
 $pdf->Output("Rekap_{$namasiswa}.pdf", 'I');
+exit;
