@@ -100,30 +100,30 @@ if (($do_submit || $do_save) && confirm_sesskey()) {
         $id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
     }
 
-// ================= KIRIM WA =================
-$siswa = $DB->get_record('user', ['id' => $record->userid]);
-if ($siswa) {
-    $kelas = get_nama_kelas($record->kelasid);
-    $nama  = ucwords(strtolower($siswa->lastname));
-    $gurunama = $DB->get_field('user', 'lastname', ['id' => $record->guru_pengajar]);
-    $waktu_full = tanggal_indo($record->timecreated);
+    // ================= KIRIM WA =================
+    $siswa = $DB->get_record('user', ['id' => $record->userid]);
+    if ($siswa) {
+        $kelas = get_nama_kelas($record->kelasid);
+        $nama  = ucwords(strtolower($siswa->lastname));
+        $gurunama = $DB->get_field('user', 'lastname', ['id' => $record->guru_pengajar]);
+        $waktu_full = tanggal_indo($record->timecreated);
 
-    $pesan = "*📄 Surat Izin Murid*\n\n"
-           . "📅 Waktu: $waktu_full\n"
-           . "👤 Nama: $nama\n"
-           . "🏫 Kelas: $kelas\n"
-           . "🎓 Guru Pengajar: $gurunama\n"
-           . "📝 Alasan: {$record->alasan}\n"
-           . "📌 Keperluan: {$record->keperluan}\n"
-           . "✍️ Pengawas Hari ini: $pengawas\n\n"
-           . "_Dikirim kepada Wali kelas sebagai laporan_";
+        $pesan = "*📄 Surat Izin Murid*\n\n"
+               . "📅 Waktu: $waktu_full\n"
+               . "👤 Nama: $nama\n"
+               . "🏫 Kelas: $kelas\n"
+               . "🎓 Guru Pengajar: $gurunama\n"
+               . "📝 Alasan: {$record->alasan}\n"
+               . "📌 Keperluan: {$record->keperluan}\n"
+               . "✍️ Pengawas Hari ini: $pengawas\n\n"
+               . "_Dikirim kepada Wali kelas sebagai laporan_";
 
-$tujuan = [
-    get_nomor_wali_kelas($record->kelasid)
-];
+        $tujuan = [
+            get_nomor_wali_kelas($record->kelasid)
+        ];
 
-jurnalmengajar_kirim_wa($tujuan, $pesan);
-}
+        jurnalmengajar_kirim_wa($tujuan, $pesan);
+    }
 
     // ================= REDIRECT =================
     if ($do_save) {
@@ -139,125 +139,114 @@ jurnalmengajar_kirim_wa($tujuan, $pesan);
     }
 }
 
-// ================= TAMPILAN =================
+// ================= TAMPILAN MCOODLE =================
 echo $OUTPUT->header();
-echo $OUTPUT->heading('Input Surat Izin Murid');
+echo $OUTPUT->heading('Input Surat Izin Murid', 2, 'mb-4');
 
-// Filter kelas
-echo html_writer::start_tag('form', ['method' => 'get']);
-echo html_writer::label('Kelas ', 'kelasid');
-echo html_writer::select($cohorts, 'kelasid', $kelasid, ['' => 'Pilih kelas'], ['onchange' => 'this.form.submit()']);
+// STEP 1: Pilih Kelas (Dibuat menyerupai mini dashboard card)
+echo html_writer::start_div('card bg-light mb-4 shadow-sm');
+echo html_writer::start_div('card-body py-3 form-inline gap-3');
+echo html_writer::start_tag('form', ['method' => 'get', 'class' => 'd-flex align-items-center w-100 gap-2']);
+echo html_writer::tag('label', 'Langkah 1: Pilih Kelas Terlebih Dahulu', ['class' => 'font-weight-bold mr-3 text-secondary', 'for' => 'kelasid']);
+echo html_writer::select($cohorts, 'kelasid', $kelasid, ['' => 'Pilih kelas...'], ['onchange' => 'this.form.submit()', 'class' => 'form-control custom-select bg-white', 'id' => 'kelasid']);
 echo html_writer::end_tag('form');
+echo html_writer::end_div();
+echo html_writer::end_div();
 
-// ================= FORM =================
+// ================= FORM UTAMA =================
 if ($kelasid) {
+    echo html_writer::start_div('card mb-5 shadow-sm border-primary');
+    echo html_writer::div('📋 Formulir Detail Perizinan Murid', 'card-header bg-primary text-white font-weight-bold');
+    echo html_writer::start_div('card-body');
 
     echo html_writer::start_tag('form', [
         'method' => 'post',
         'action' => (new moodle_url('/local/jurnalmengajar/izin_murid.php'))->out(false)
     ]);
 
-    echo html_writer::empty_tag('input', [
-        'type' => 'hidden',
-        'name' => 'sesskey',
-        'value' => sesskey()
-    ]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'kelasid', 'value' => $kelasid]);
 
-    echo html_writer::empty_tag('input', [
-        'type' => 'hidden',
-        'name' => 'kelasid',
-        'value' => $kelasid
-    ]);
+    // Row 1: Baris Nama Murid & Guru Pengajar sejajar (Dua Kolom)
+    echo html_writer::start_div('row mb-3');
+    
+    echo html_writer::start_div('col-md-6 col-sm-12');
+    echo html_writer::tag('label', 'Nama Murid <span class="text-danger">*</span>', ['class' => 'font-weight-bold', 'for' => 'siswaid']);
+    echo html_writer::select($siswaoptions, 'siswaid', '', ['' => 'Pilih Murid...'], ['required' => 'required', 'class' => 'form-control custom-select', 'id' => 'siswaid']);
+    echo html_writer::end_div();
 
-    echo html_writer::label('Nama Murid 🔴', 'siswaid');
-    echo html_writer::select($siswaoptions, 'siswaid', '', ['' => 'Pilih Murid'], ['required' => 'required']);
-    echo html_writer::empty_tag('br');
+    echo html_writer::start_div('col-md-6 col-sm-12 mt-3 mt-md-0');
+    echo html_writer::tag('label', 'Guru Pengajar Saat Ini <span class="text-danger">*</span>', ['class' => 'font-weight-bold', 'for' => 'guru_pengajar']);
+    echo html_writer::select($guruoptions, 'guru_pengajar', '', ['' => 'Pilih Guru...'], ['required' => 'required', 'class' => 'form-control custom-select', 'id' => 'guru_pengajar']);
+    echo html_writer::end_div();
 
-    echo html_writer::label('Guru Pengajar 🔴', 'guru_pengajar');
-    echo html_writer::select($guruoptions, 'guru_pengajar', '', ['' => 'Pilih Guru'], ['required' => 'required']);
-    echo html_writer::empty_tag('br');
+    echo html_writer::end_div(); // End Row 1
 
-    echo html_writer::label('Alasan 🔴', 'alasan');
-    echo html_writer::tag('textarea', '', [
-        'name' => 'alasan',
-        'rows' => 3,
-        'cols' => 50,
-        'required' => 'required',
-        'placeholder' => 'Isi alasan'
-    ]);
-    echo html_writer::empty_tag('br');
-
-    echo html_writer::label('Keperluan 🔴', 'keperluan');
+    // Row 2: Keperluan
+    echo html_writer::start_div('form-group mb-3');
+    echo html_writer::tag('label', 'Jenis Keperluan <span class="text-danger">*</span>', ['class' => 'font-weight-bold', 'for' => 'keperluan']);
     echo html_writer::select([
         'Izin Masuk' => 'Izin Masuk',
         'Izin Keluar' => 'Izin Keluar',
         'Izin Pulang' => 'Izin Pulang'
-    ], 'keperluan', '', ['' => 'Pilih Keperluan'], ['required' => 'required']);
+    ], 'keperluan', '', ['' => 'Pilih Jenis Keperluan...'], ['required' => 'required', 'class' => 'form-control custom-select', 'id' => 'keperluan']);
+    echo html_writer::end_div();
 
-    echo html_writer::empty_tag('br');
-    echo html_writer::empty_tag('br');
+    // Row 3: Alasan
+    echo html_writer::start_div('form-group mb-4');
+    echo html_writer::tag('label', 'Alasan / Keterangan Detail <span class="text-danger">*</span>', ['class' => 'font-weight-bold', 'for' => 'alasan']);
+    echo html_writer::tag('textarea', '', [
+        'name' => 'alasan',
+        'id' => 'alasan',
+        'rows' => 3,
+        'class' => 'form-control',
+        'required' => 'required',
+        'placeholder' => 'Contoh: Sakit kepala perlu ke UKS, Orang tua menjemput karena acara keluarga, dll...'
+    ]);
+    echo html_writer::end_div();
 
-    echo html_writer::tag('button', '🖨️ Cetak Surat', [
+    // Baris Tombol Submit Aksi
+    echo html_writer::start_div('d-flex gap-2');
+    echo html_writer::tag('button', '<i class="fa fa-print"></i> Simpan & Cetak Surat', [
         'type' => 'submit',
         'name' => 'action',
         'value' => 'print',
-        'class' => 'btn btn-success'
+        'class' => 'btn btn-success shadow-sm px-4'
     ]);
 
-    echo html_writer::tag('button', '💾 Simpan', [
+    echo html_writer::tag('button', '<i class="fa fa-save"></i> Hanya Simpan Ke Sistem', [
         'type' => 'submit',
         'name' => 'action',
         'value' => 'save',
-        'class' => 'btn btn-secondary'
+        'class' => 'btn btn-outline-secondary px-4'
     ]);
+    echo html_writer::end_div();
 
     echo html_writer::end_tag('form');
+    echo html_writer::end_div(); // close card-body
+    echo html_writer::end_div(); // close card
 }
 
-// ================= RIWAYAT SURAT IZIN =================
-
-// Header + tombol rekap
-echo html_writer::start_div('d-flex justify-content-between align-items-center', [
-    'style' => 'margin-top: 40px;'
-]);
-
-echo html_writer::tag('h3', 'Riwayat Surat Izin');
+// ================= SECTION RIWAYAT SURAT IZIN =================
+echo html_writer::start_div('d-flex justify-content-between align-items-center mt-5 mb-3 border-bottom pb-2');
+echo html_writer::tag('h3', '📋 Log Riwayat Surat Izin', ['class' => 'text-secondary m-0']);
 
 $rekapurl = new moodle_url('/local/jurnalmengajar/rekap_surat_izin.php');
-
-echo html_writer::link($rekapurl, '📄 Rekap Surat Izin', [
-    'class' => 'btn btn-primary',
-    'style' => 'margin-bottom: 5px;'
+echo html_writer::link($rekapurl, '<i class="fa fa-book"></i> Buka Rekap Surat Izin', [
+    'class' => 'btn btn-primary shadow-sm'
 ]);
-
 echo html_writer::end_div();
 
-// Judul
-echo $OUTPUT->heading('Riwayat Surat Izin', 3);
-
-// ================= FILTER =================
+// ================= FILTER TABEL RIWAYAT =================
 $riwayatkelasid = optional_param('riwayat_kelasid', 0, PARAM_INT);
 
-echo html_writer::start_tag('form', ['method' => 'get']);
-
-echo html_writer::label('Filter Kelas: ', 'riwayat_kelasid');
-
-echo html_writer::select(
-    $cohorts,
-    'riwayat_kelasid',
-    $riwayatkelasid,
-    ['' => 'Semua kelas']
-);
-
-echo html_writer::empty_tag('input', [
-    'type' => 'submit',
-    'value' => 'Tampilkan',
-    'class' => 'btn btn-secondary'
-]);
-
+echo html_writer::start_tag('form', ['method' => 'get', 'class' => 'form-inline bg-light p-3 rounded mb-3 gap-2 border shadow-sm']);
+echo html_writer::tag('label', 'Saring Berdasarkan Kelas: ', ['class' => 'font-weight-bold mr-2', 'for' => 'riwayat_kelasid']);
+echo html_writer::select($cohorts, 'riwayat_kelasid', $riwayatkelasid, ['' => 'Semua Kelas...'], ['class' => 'form-control custom-select bg-white mr-2', 'id' => 'riwayat_kelasid']);
+echo html_writer::tag('button', '<i class="fa fa-filter"></i> Filter', ['type' => 'submit', 'class' => 'btn btn-secondary']);
 echo html_writer::end_tag('form');
 
-// ================= QUERY =================
+// ================= QUERY RIWAYAT =================
 $params = [];
 $where = '';
 
@@ -280,61 +269,47 @@ $sql = "SELECT s.*,
 
 $riwayatsurat = $DB->get_records_sql($sql, $params);
 
-// ================= TABEL =================
+// ================= PROSES GENERATE TABEL =================
 if ($riwayatsurat) {
-
     $table = new html_table();
+    
+    // Memberikan style class Bootstrap modern ke komponen table Moodle core
+    $table->attributes['class'] = 'table table-striped table-hover generaltable mb-0';
 
-    $table->head = [
-        'No',
-        'Tanggal',
-        'Nama Murid',
-        'Kelas',
-        'Guru Pengajar',
-        'Alasan',
-        'Keperluan',
-        'Pengawas'
-    ];
-
-    $table->align = [
-        'center',
-        'center',
-        'left',
-        'center',
-        'left',
-        'left',
-        'left',
-        'left'
-    ];
+    $table->head = ['#', 'Tanggal & Waktu', 'Nama Murid', 'Kelas', 'Guru Pengajar', 'Alasan', 'Keperluan', 'Guru Pengawas'];
+    $table->align = ['center', 'left', 'left', 'center', 'left', 'left', 'left', 'left'];
 
     $no = 1;
-
     foreach ($riwayatsurat as $s) {
-
         $kelasnama = get_nama_kelas($s->kelasid);
-
         $tgl_display = tanggal_indo($s->timecreated);
+
+        // Memberikan badge warna dinamis sesuai jenis izin murid
+        $badge_class = 'badge badge-info';
+        if ($s->keperluan === 'Izin Keluar') { $badge_class = 'badge badge-warning'; }
+        if ($s->keperluan === 'Izin Pulang') { $badge_class = 'badge badge-danger'; }
+
+        $keperluan_badge = html_writer::tag('span', $s->keperluan, ['class' => $badge_class . ' p-1 px-2']);
 
         $table->data[] = [
             $no++,
-            $tgl_display,
-            ucwords(strtolower($s->siswa_nama)),
+            html_writer::tag('small', $tgl_display, ['class' => 'text-muted']),
+            html_writer::tag('strong', ucwords(strtolower($s->siswa_nama))),
             $kelasnama,
             $s->guru_nama,
-            $s->alasan,
-            $s->keperluan,
+            shorten_text($s->alasan, 40),
+            $keperluan_badge,
             $s->pengawas_nama
         ];
     }
 
+    // Membungkus framework objek tabel Moodle ke div responsif agar aman di HP
+    echo html_writer::start_div('table-responsive shadow-sm rounded border border-secondary');
     echo html_writer::table($table);
+    echo html_writer::end_div();
 
 } else {
-    echo html_writer::tag(
-        'p',
-        'Belum ada surat izin yang dicatat.',
-        ['class' => 'alert alert-info']
-    );
+    echo html_writer::div('Belum ada data riwayat surat izin yang dicatat untuk kriteria filter ini.', 'alert alert-info shadow-sm py-3');
 }
 
-// ================= FOOTER =================
+echo $OUTPUT->footer();

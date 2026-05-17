@@ -14,7 +14,7 @@ $PAGE->set_heading('Jurnal Mengajar');
 
 require_once(__DIR__ . '/lib.php');
 
-// ================= JS =================
+// ================= JS (Tetap dipertahankan, namun disarankan pindah ke AMD) =================
 $PAGE->requires->jquery();
 $PAGE->requires->js_init_code(<<<JS
 $(document).ready(function() {
@@ -118,68 +118,59 @@ if ($mform->is_cancelled()) {
     $DB->insert_record('local_jurnalmengajar', $record);
 
     // ================= KIRIM NOTIF WA =================
-$kelasid = $record->kelas ?? null;
+    $kelasid = $record->kelas ?? null;
 
-if ($kelasid) {
+    if ($kelasid) {
+        $namaguru = !empty($USER->lastname) ? $USER->lastname : $USER->firstname;
+        $kelas = get_nama_kelas($kelasid);
 
-    $namaguru = !empty($USER->lastname) ? $USER->lastname : $USER->firstname;
-    $kelas = get_nama_kelas($kelasid);
+        $jamke = $record->jamke ?? '-';
+        $mapel = $record->matapelajaran ?? '-';
+        $materi = $record->materi ?? '-';
+        $aktivitas = $record->aktivitas ?? '-';
 
-    $jamke = $record->jamke ?? '-';
-    $mapel = $record->matapelajaran ?? '-';
-    $materi = $record->materi ?? '-';
-    $aktivitas = $record->aktivitas ?? '-';
+        $absenjson = $record->absen ?? '{}';
+        $absenarr = json_decode($absenjson, true);
 
-    $absenjson = $record->absen ?? '{}';
-    $absenarr = json_decode($absenjson, true);
-
-    $absen = '-';
-    if (!empty($absenarr)) {
-        $formatted = [];
-        $no = 1;
-        foreach ($absenarr as $nama => $alasan) {
-            $formatted[] = $no++ . ". {$nama}: {$alasan}";
+        $absen = '-';
+        if (!empty($absenarr)) {
+            $formatted = [];
+            $no = 1;
+            foreach ($absenarr as $nama => $alasan) {
+                $formatted[] = $no++ . ". {$nama}: {$alasan}";
+            }
+            $absen = implode("\n", $formatted);
         }
-        $absen = implode("\n", $formatted);
+
+        $keterangan = $record->keterangan ?? '-';
+        $sekolah = get_config('local_jurnalmengajar', 'nama_sekolah') ?: 'Nama Sekolah';
+        $tanggal = tanggal_indo(time(), 'judul');
+        $jam = tanggal_indo(time(), 'jam');
+
+        $pesan = "*📘 Jurnal KBM _{$tanggal}_*\n\n"
+               . "👤 Guru: $namaguru\n"
+               . "🏫 Kelas: $kelas\n"
+               . "⏰ Jam ke: $jamke\n"
+               . "📚 Mata Pelajaran: $mapel\n"
+               . "📒 Materi: $materi\n"
+               . "📝 Aktivitas:\n$aktivitas\n\n"
+               . "🔴 Murid tidak hadir:\n$absen\n\n"
+               . "Keterangan tambahan:\n$keterangan\n\n"
+               . "🕒 Waktu: $jam WITA\n"
+               . "📌 Tercatat di eJurnal KBM $sekolah\n\n"
+               . "_Dikirim ke Wali kelas dan Guru ybs sebagai laporan_";
+
+        // Tujuan
+        $tujuan = [];
+        $nowaguru = get_user_nowa($USER->id);
+        $nowawali = get_nomor_wali_kelas($kelasid);
+
+        if (!empty($nowaguru)) { $tujuan[] = $nowaguru; }
+        if (!empty($nowawali)) { $tujuan[] = $nowawali; }
+
+        // Kirim WA
+        jurnalmengajar_kirim_wa($tujuan, $pesan);
     }
-
-    $keterangan = $record->keterangan ?? '-';
-
-    $sekolah = get_config('local_jurnalmengajar', 'nama_sekolah') ?: 'Nama Sekolah';
-
-    $tanggal = tanggal_indo(time(), 'judul');
-    $jam = tanggal_indo(time(), 'jam');
-
-    $pesan = "*📘 Jurnal KBM _{$tanggal}_*\n\n"
-       . "👤 Guru: $namaguru\n"
-       . "🏫 Kelas: $kelas\n"
-       . "⏰ Jam ke: $jamke\n"
-       . "📚 Mata Pelajaran: $mapel\n"
-       . "📒 Materi: $materi\n"
-       . "📝 Aktivitas:\n$aktivitas\n\n"
-       . "🔴 Murid tidak hadir:\n$absen\n\n"
-       . "Keterangan tambahan:\n$keterangan\n\n"
-       . "🕒 Waktu: $jam WITA\n"
-       . "📌 Tercatat di eJurnal KBM $sekolah\n\n"
-       . "_Dikirim ke Wali kelas dan Guru ybs sebagai laporan_";
-
-    // Tujuan
-    $tujuan = [];
-
-$nowaguru = get_user_nowa($USER->id);
-$nowawali = get_nomor_wali_kelas($kelasid);
-
-if (!empty($nowaguru)) {
-    $tujuan[] = $nowaguru;
-}
-
-if (!empty($nowawali)) {
-    $tujuan[] = $nowawali;
-}
-
-    // Kirim WA
-    jurnalmengajar_kirim_wa($tujuan, $pesan);
-}
 
     redirect(
         new moodle_url('/local/jurnalmengajar/index.php'),
@@ -190,45 +181,44 @@ if (!empty($nowawali)) {
 
 $PAGE->requires->js_call_amd('local_jurnalmengajar/absen', 'init');
 
-// ================= TAMPILAN =================
+// ================= TAMPILAN MCOODLE =================
 echo $OUTPUT->header();
-echo $OUTPUT->heading('Input Jurnal Mengajar');
+echo $OUTPUT->heading('Input Jurnal Mengajar', 2, 'mb-4');
 
+// Form ditaruh di dalam Card Bootstrap agar lebih rapi & fokus
+echo html_writer::start_div('card mb-4 shadow-sm');
+echo html_writer::start_div('card-body');
 $mform->display();
+echo html_writer::end_div();
+echo html_writer::end_div();
 
-// ================= RIWAYAT =================
-echo html_writer::tag('h3', 'Riwayat Jurnal Saya');
+// ================= SECTION RIWAYAT =================
+echo html_writer::tag('h3', 'Riwayat Jurnal Saya', ['class' => 'mt-5 mb-3 text-secondary']);
 
-$sql = "SELECT *
-          FROM {local_jurnalmengajar}
-         WHERE userid = :userid
-      ORDER BY id DESC
-         LIMIT 7";
-
+$sql = "SELECT * FROM {local_jurnalmengajar} WHERE userid = :userid ORDER BY id DESC LIMIT 7";
 $params = ['userid' => $USER->id];
 $entries = $DB->get_records_sql($sql, $params);
 
 if ($entries) {
-
-    echo html_writer::start_tag('table', ['class' => 'generaltable']);
-    echo html_writer::start_tag('thead');
-    echo html_writer::tag('tr',
-        html_writer::tag('th', 'Nomor') .
-        html_writer::tag('th', 'Kelas') .
-        html_writer::tag('th', 'Jam Ke') .
-        html_writer::tag('th', 'Mapel') .
-        html_writer::tag('th', 'Materi') .
-        html_writer::tag('th', 'Absen') .
-        html_writer::tag('th', 'Waktu') .
-        html_writer::tag('th', 'Aksi')
-    );
+    // Penambahan class 'table-responsive' agar aman dibuka di HP
+    echo html_writer::start_div('table-responsive shadow-sm rounded');
+    echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover generaltable mb-0']);
+    echo html_writer::start_tag('thead', ['class' => 'thead-dark']); // Header tabel gelap agar kontras
+    echo html_writer::start_tag('tr');
+    echo html_writer::tag('th', '#', ['scope' => 'col', 'style' => 'width: 5%;']);
+    echo html_writer::tag('th', 'Kelas', ['scope' => 'col']);
+    echo html_writer::tag('th', 'Jam Ke', ['scope' => 'col']);
+    echo html_writer::tag('th', 'Mapel', ['scope' => 'col']);
+    echo html_writer::tag('th', 'Materi', ['scope' => 'col']);
+    echo html_writer::tag('th', 'Absen', ['scope' => 'col']);
+    echo html_writer::tag('th', 'Waktu', ['scope' => 'col']);
+    echo html_writer::tag('th', 'Aksi', ['scope' => 'col', 'class' => 'text-center']);
+    echo html_writer::end_tag('tr');
     echo html_writer::end_tag('thead');
     echo html_writer::start_tag('tbody');
 
     $no = 1;
-
     foreach ($entries as $e) {
-
         $absendata = json_decode($e->absen, true);
         $absentext = '';
 
@@ -242,36 +232,39 @@ if ($entries) {
         }
 
         $namakelas = get_nama_kelas($e->kelas);
-
         $editurl = new moodle_url('/local/jurnalmengajar/edit.php', ['id' => $e->id]);
+        
+        // Tombol edit dengan style Bootstrap primary kecil (btn-sm) + Icon Pensil
+        $editicon = $OUTPUT->pix_icon('t/edit', 'Edit');
+        $editlink = html_writer::link($editurl, $editicon . ' Edit', ['class' => 'btn btn-outline-primary btn-sm']);
 
         echo html_writer::start_tag('tr');
         echo html_writer::tag('td', $no++);
-        echo html_writer::tag('td', $namakelas);
+        echo html_writer::tag('td', html_writer::tag('strong', $namakelas));
         echo html_writer::tag('td', $e->jamke);
         echo html_writer::tag('td', $e->matapelajaran);
         echo html_writer::tag('td', shorten_text($e->materi, 30), ['title' => $e->materi]);
-        echo html_writer::tag('td', shorten_text($absentext, 25), ['title' => $absentext]);
-        echo html_writer::tag('td', tanggal_indo($e->timecreated));
-        echo html_writer::tag('td', html_writer::link($editurl, 'Edit'));
+        echo html_writer::tag('td', $absentext ? shorten_text($absentext, 25) : '-', ['title' => $absentext]);
+        echo html_writer::tag('td', html_writer::tag('small', tanggal_indo($e->timecreated)));
+        echo html_writer::tag('td', $editlink, ['class' => 'text-center']);
         echo html_writer::end_tag('tr');
     }
 
     echo html_writer::end_tag('tbody');
     echo html_writer::end_tag('table');
+    echo html_writer::end_div(); // close table-responsive
 
 } else {
-    echo html_writer::div('Belum ada riwayat jurnal.', 'alert alert-info');
+    echo html_writer::div('Belum ada riwayat jurnal.', 'alert alert-info shadow-sm');
 }
 
-// Tombol bawah
-echo html_writer::start_tag('div', [
-    'style' => 'display:flex; justify-content:flex-end; gap:10px; margin-top:10px;'
-]);
+// ================= TOMBOL NAVIGASI BAWAH =================
+// Menggunakan utilitas flexbox d-flex Bootstrap untuk perataan tombol
+echo html_writer::start_div('d-flex justify-content-between align-items-center mt-4 mb-5');
 
 echo html_writer::link(
     '#',
-    '⬅ Kembali',
+    '<i class="fa fa-arrow-left"></i> Kembali',
     [
         'class' => 'btn btn-secondary',
         'onclick' => 'history.back(); return false;'
@@ -281,9 +274,9 @@ echo html_writer::link(
 echo html_writer::link(
     new moodle_url('/local/jurnalmengajar/riwayat_jurnal.php'),
     '📚 Riwayat Jurnal Bulanan',
-    ['class' => 'btn btn-primary']
+    ['class' => 'btn btn-primary shadow-sm']
 );
 
-echo html_writer::end_tag('div');
+echo html_writer::end_div();
 
 echo $OUTPUT->footer();
