@@ -33,7 +33,7 @@ $tempat      = get_config('local_jurnalmengajar', 'tempat_ttd');
 $namakepsek  = get_config('local_jurnalmengajar', 'nama_kepsek');
 $nipkepsek   = get_config('local_jurnalmengajar', 'nip_kepsek');
 
-$namapembina = trim($USER->firstname . ' ' . $USER->lastname);
+$namapembina = trim($USER->lastname);
 
 $nipguru = $DB->get_field('user_info_data', 'data', [
     'userid' => $USER->id,
@@ -56,7 +56,7 @@ $data = $DB->get_records_sql("
     JOIN {local_jm_ekstra} e
         ON e.id = j.ekstraid
     WHERE j.pembinaid = ?
-    ORDER BY j.tanggal DESC, j.id DESC
+    ORDER BY j.tanggal ASC, j.id ASC
 ", [$USER->id]);
 
 $first = reset($data);
@@ -108,8 +108,8 @@ $sheet->getStyle('A1:G3')
 $sheet->setCellValue('B5', 'Nama Pembina:');
 $sheet->setCellValue('C5', $namapembina);
 
-$sheet->setCellValue('B6', 'Nama Ekstrakurikuler:');
-$sheet->setCellValue('C6', $namaekstra);
+//$sheet->setCellValue('B6', 'Nama Ekstrakurikuler:');
+//$sheet->setCellValue('C6', $namaekstra);
 
 /*
 |--------------------------------------------------------------------------
@@ -119,7 +119,7 @@ $sheet->setCellValue('C6', $namaekstra);
 
 $headers = [
     'No',
-    'Tanggal',
+    'Hari, tanggal',
     'Ekstrakurikuler',
     'Materi',
     'Aktivitas',
@@ -161,7 +161,7 @@ $sheet->getStyle('A8:G8')
 */
 
 $sheet->getColumnDimension('A')->setWidth(5);
-$sheet->getColumnDimension('B')->setWidth(18);
+$sheet->getColumnDimension('B')->setWidth(22);
 $sheet->getColumnDimension('C')->setWidth(25);
 $sheet->getColumnDimension('D')->setWidth(30);
 $sheet->getColumnDimension('E')->setWidth(35);
@@ -219,7 +219,7 @@ $sheet->getStyle("A9:A{$lastrow}")
 
 $sheet->getStyle("B9:B{$lastrow}")
       ->getAlignment()
-      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+      ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
 $sheet->getStyle("D9:G{$lastrow}")
       ->getAlignment()

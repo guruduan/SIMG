@@ -1,3 +1,4 @@
+
 <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
@@ -53,7 +54,7 @@ function tampilkan_siswa_bk($daftar, $offset = 0) {
         $no = $i + 1 + $offset;
         $lastname = ucwords(strtolower(trim($user->lastname))) ?: 'Tanpa Nama';
         echo '<div style="margin-bottom:8px;">';
-        echo '<input type="checkbox" class="siswa-checkbox" data-nama="' . s($lastname) . '" id="bkcb_' . $user->id . '">';
+        echo '<input type="checkbox" class="siswa-checkbox" data-nama="' . s($lastname) . '" data-userid="' . $user->id . '" id="bkcb_' . $user->id . '">';
         echo '<label for="bkcb_' . $user->id . '"> ' . $no . '. ' . format_string($lastname) . '</label>';
         echo '</div>';
     }

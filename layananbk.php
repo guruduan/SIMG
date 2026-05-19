@@ -16,29 +16,81 @@ $PAGE->set_heading('Layanan BK');
 $PAGE->requires->jquery();
 
 // ================= JS =================
+$PAGE->requires->jquery();
+
 $PAGE->requires->js_init_code(<<<JS
-function loadSiswa(kelasid) {
-    if (!kelasid) return;
-    $.get("/local/jurnalmengajar/get_students_bk.php", {kelas: kelasid}, function(html) {
-        $("#siswa-area").html(html);
-        $(".siswa-checkbox").on("change", function() {
-            let hasil = [];
-            $(".siswa-checkbox:checked").each(function() {
-                hasil.push($(this).data("nama"));
-            });
-            $("input[name='peserta']").val(JSON.stringify(hasil));
-        });
-    });
-}
 
 $(document).ready(function() {
-    const awalKelas = $("select[name='kelas']").val();
-    if (awalKelas) loadSiswa(awalKelas);
 
-    $("select[name='kelas']").on("change", function() {
-        loadSiswa($(this).val());
-    });
+    function updatePesertaField() {
+
+        let hasil = [];
+        let hasilid = [];
+
+        $(".siswa-checkbox:checked").each(function() {
+
+            hasil.push(
+                $(this).data("nama")
+            );
+
+            hasilid.push(
+                parseInt(
+                    $(this).data("userid")
+                )
+            );
+        });
+
+        $("#id_peserta")
+            .val(JSON.stringify(hasil));
+
+        $("#id_pesertaid")
+            .val(JSON.stringify(hasilid));
+
+        console.log(
+            $("#id_pesertaid").val()
+        );
+    }
+
+    function loadSiswa(kelasid) {
+
+        if (!kelasid) {
+            return;
+        }
+
+        $.get(
+            "/local/jurnalmengajar/get_students_bk.php",
+            {kelas: kelasid},
+            function(html) {
+
+                $("#siswa-area")
+                    .html(html);
+
+                $(".siswa-checkbox")
+                    .on(
+                        "change",
+                        updatePesertaField
+                    );
+            }
+        );
+    }
+
+    const awalKelas =
+        $("select[name='kelas']").val();
+
+    if (awalKelas) {
+        loadSiswa(awalKelas);
+    }
+
+    $("select[name='kelas']").on(
+        "change",
+        function() {
+
+            loadSiswa($(this).val());
+        }
+    );
+
 });
+
 JS
 );
 
@@ -59,6 +111,7 @@ if ($mform->is_cancelled()) {
     $record->jenislayanan  = $data->jenislayanan;
     $record->topik         = $data->topik;
     $record->peserta       = $data->peserta ?? '[]';
+    $record->pesertaid     = $data->pesertaid ?? '[]';
     $record->tindaklanjut  = $data->tindaklanjut ?: '-';
     $record->catatan       = $data->catatan ?: '-';
     $record->timecreated   = time();

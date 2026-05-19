@@ -14,58 +14,76 @@ $PAGE->set_heading('Alokasi Waktu Jam Pelajaran');
 
 echo $OUTPUT->header();
 
-// Ambil data
+// Judul Halaman Tematik dengan Ikon Penanda Waktu
+echo html_writer::start_div('d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom');
+echo html_writer::tag('h3', '<i class="fa fa-clock-o text-primary"></i> Alokasi Waktu Jam Pelajaran', ['class' => 'm-0 font-weight-bold']);
+echo html_writer::link(new moodle_url('/local/jurnalmengajar/jadwal_view.php'), '<i class="fa fa-calendar"></i> Lihat Jadwal', ['class' => 'btn btn-outline-secondary btn-sm']);
+echo html_writer::end_div();
+
+// Ambil data alokasi jam
 $jam = jurnalmengajar_generate_jam();
 
-// Table
+// Inisialisasi Moodle HTML Table dengan kelas Bootstrap modern
 $table = new html_table();
-$table->head = ['Jam', 'Mulai', 'Selesai'];
-$table->attributes['class'] = 'generaltable';
-$table->align = ['center', 'center', 'center'];
+$table->head = ['Jam Ke', 'Waktu Mulai', 'Waktu Selesai'];
+$table->attributes['class'] = 'table table-bordered table-hover bg-white shadow-sm align-middle text-center';
 $table->data = [];
 
 $now = date('H:i');
 
 foreach ($jam as $j => $w) {
-
     $mulai   = $w['mulai'];
     $selesai = $w['selesai'];
+    
+    // Teks jam pelajaran default berbentuk badge kecil agar terlihat rapi
+    $label_jam = html_writer::tag('span', 'Jam ' . $j, ['class' => 'badge badge-dark p-2', 'style' => 'font-size: 0.9rem; min-width: 70px;']);
 
-    $label_jam = $j;
-
+    // Membuat objek baris (row) baru untuk tabel agar bisa diberi atribut kustom
+    $row = new html_table_row();
+    
+    // LOGIKA HIGHLIGHT: Jika waktu sekarang berada di dalam jam pelajaran aktif
     if ($now >= $mulai && $now <= $selesai) {
-        $label_jam = $j . '*';
+        // Berikan badge penanda khusus aktif pada teks Jam
+        $label_jam = html_writer::tag('span', '<i class="fa fa-play-circle mr-1"></i> Jam ' . $j . ' (Aktif)', ['class' => 'badge badge-success p-2', 'style' => 'font-size: 0.9rem;']);
+        // Warnai latar belakang seluruh baris menjadi hijau/biru tipis penanda aktif
+        $row->attributes['class'] = 'table-success font-weight-bold';
+        $row->attributes['title'] = 'Sesi Jam Pelajaran Sedang Berlangsung Saat Ini';
     }
 
-    $table->data[] = [
-        $label_jam, // ❗ jangan pakai format_string biar bisa custom
-        format_string($mulai),
-        format_string($selesai)
+    // Set data kolom pada baris ini (Warna teks biasa/normal kontras #212529)
+    $row->cells = [
+        $label_jam,
+        html_writer::tag('span', format_string($mulai), ['style' => 'color: #212529; font-size: 1rem;']),
+        html_writer::tag('span', format_string($selesai), ['style' => 'color: #212529; font-size: 1rem;'])
     ];
+    
+    $table->data[] = $row;
 
-    // Baris istirahat
+    // BARIS ISTIRAHAT
     if (!empty($w['istirahat_setelah'])) {
         $cell = new html_table_cell(
-            'ISTIRAHAT ' . (int)$w['istirahat_setelah'] . ' MENIT'
+            '<i class="fa fa-coffee text-warning mr-2"></i> ISTIRAHAT ' . (int)$w['istirahat_setelah'] . ' MENIT'
         );
         $cell->colspan = 3;
-        $cell->attributes['class'] = 'text-center';
-        $cell->attributes['style'] = 'background:#ffeeba; font-weight:bold;';
+        $cell->attributes['class'] = 'text-center align-middle font-weight-bold table-warning';
+        $cell->attributes['style'] = 'color: #856404; font-size: 0.95rem; letter-spacing: 1px;';
 
-        $table->data[] = [$cell];
+        $table->data[] = new html_table_row([$cell]);
     }
 }
 
+// Render tabel ke halaman
+echo '<div class="table-responsive">';
 echo html_writer::table($table);
+echo '</div>';
 
-// Tombol kembali
-echo html_writer::div(
-    html_writer::link(
-        new moodle_url('/my/'),
-        '⬅ Kembali ke Dashboard',
-        ['class' => 'btn btn-primary']
-    ),
-    'mt-3'
+// Tombol kembali dengan gaya yang selaras
+echo html_writer::start_div('mt-4 d-flex justify-content-between');
+echo html_writer::link(
+    new moodle_url('/my/'),
+    '<i class="fa fa-arrow-left"></i> Kembali ke Dashboard',
+    ['class' => 'btn btn-secondary btn-sm']
 );
+echo html_writer::end_div();
 
 echo $OUTPUT->footer();

@@ -48,7 +48,11 @@ function tampilkan_siswa($daftar, $offset = 0) {
         if (!$lastname) $lastname = 'Tanpa Nama';
 
         echo '<div class="absen-item" style="margin-bottom: 8px; display: flex; gap: 10px;">';
-        echo '<input type="checkbox" class="absen-checkbox" data-nama="' . s($lastname) . '" id="cb_' . $user->id . '">';
+        echo '<input type="checkbox"
+    class="absen-checkbox"
+    data-nama="' . s($lastname) . '"
+    data-userid="' . $user->id . '"
+    id="cb_' . $user->id . '">';
         echo '<label for="cb_' . $user->id . '" style="min-width: 150px;">' . $no . '. ' . format_string($lastname) . '</label>';
         echo '<select class="absen-alasan" disabled style="min-width: 130px;">
                 <option value="">-- Alasan --</option>

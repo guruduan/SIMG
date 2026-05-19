@@ -37,7 +37,13 @@ echo html_writer::link(
 
 $rows = $DB->get_recordset_sql("
     SELECT
-        j.*,
+        j.id,
+        j.tanggal,
+        j.materi,
+        j.aktivitas,
+        j.catatan,
+        j.ekstraid,
+        j.pembinaid,
         e.namaekstra,
         u.firstname,
         u.lastname
@@ -98,9 +104,7 @@ foreach ($rows as $r) {
         ]
     );
 
-    $pembina = trim(
-        $r->firstname . ' ' . $r->lastname
-    );
+$pembina = trim($r->lastname);
 
     $table->data[] = [
         $no++,

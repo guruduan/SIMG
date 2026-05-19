@@ -14,30 +14,71 @@ $PAGE->set_title('Laporan Pembinaan Siswa');
 $PAGE->set_heading('Laporan Pembinaan Siswa oleh BK');
 $PAGE->requires->jquery();
 
-// ================= JS =================
 $PAGE->requires->js_init_code(<<<JS
-function loadSiswa(kelasid) {
-    if (!kelasid) return;
-    $.get("/local/jurnalmengajar/get_students_bk.php", {kelas: kelasid}, function(html) {
-        $("#siswa-area").html(html);
-        $(".siswa-checkbox").on("change", function() {
-            let hasil = [];
-            $(".siswa-checkbox:checked").each(function() {
-                hasil.push($(this).data("nama"));
-            });
-            $("input[name='peserta']").val(JSON.stringify(hasil));
-        });
+
+function updatePesertaField() {
+
+    let hasil = [];
+    let hasilid = [];
+
+    $(".siswa-checkbox:checked").each(function() {
+
+        hasil.push($(this).data("nama"));
+
+        hasilid.push(
+            parseInt($(this).data("userid"))
+        );
     });
+
+    $("#id_peserta")
+        .val(JSON.stringify(hasil));
+
+    $("#id_pesertaid")
+        .val(JSON.stringify(hasilid));
+}
+
+function bindPesertaEvent() {
+
+    $(".siswa-checkbox").on(
+        "change",
+        updatePesertaField
+    );
+}
+
+function loadSiswa(kelasid) {
+
+    if (!kelasid) return;
+
+    $.get(
+        "/local/jurnalmengajar/get_students_bk.php",
+        {kelas: kelasid},
+        function(html) {
+
+            $("#siswa-area").html(html);
+
+            bindPesertaEvent();
+        }
+    );
 }
 
 $(document).ready(function() {
-    const awalKelas = $("select[name='kelas']").val();
-    if (awalKelas) loadSiswa(awalKelas);
 
-    $("select[name='kelas']").on("change", function() {
-        loadSiswa($(this).val());
-    });
+    const awalKelas =
+        $("select[name='kelas']").val();
+
+    if (awalKelas) {
+        loadSiswa(awalKelas);
+    }
+
+    $("select[name='kelas']").on(
+        "change",
+        function() {
+
+            loadSiswa($(this).val());
+        }
+    );
 });
+
 JS
 );
 
@@ -56,6 +97,7 @@ if ($mform->is_cancelled()) {
     $record->userid        = $USER->id;
     $record->kelas         = (int)$data->kelas; // ✅ pakai ID
     $record->peserta       = $data->peserta ?? '[]';
+    $record->pesertaid = $data->pesertaid ?? '[]';
     $record->permasalahan  = $data->permasalahan ?: '-';
     $record->tindakan      = $data->tindakan ?: '-';
     $record->tempat        = '-';

@@ -71,53 +71,14 @@ $mform->addRule('matapelajaran', null, 'required');
         // Absen
         $mform->addElement('html', '<div id="absen-area"><em>Silakan pilih kelas...</em></div>');
         $mform->addElement('textarea', 'absen', 'Murid Tidak Hadir', 'wrap="virtual" rows="2" cols="50" readonly');
+        $mform->addElement('hidden', 'absenid');
+        $mform->setType('absenid', PARAM_RAW);
         $mform->setType('absen', PARAM_RAW);
 
         // Keterangan
         $mform->addElement('textarea', 'keterangan', 'Keterangan Tambahan', 'rows="2" cols="60"');
         $mform->setType('keterangan', PARAM_RAW);
 
-        $this->add_action_buttons(true, 'Simpan Jurnal');
-
-        // Script AJAX
-        $mform->addElement('html', <<<HTML
-<script>
-require(['jquery'], function($) {
-    function updateAbsenField() {
-        const data = {};
-        $('.absen-item input[type=checkbox]').each(function() {
-            if (this.checked) {
-                const nama = $(this).data('nama');
-                const alasan = $(this).closest('.absen-item').find('select').val();
-                if (alasan) data[nama] = alasan;
-            }
-        });
-        $('textarea[name=absen]').val(JSON.stringify(data));
-    }
-
-    function loadSiswa(kelas) {
-        if (!kelas) return;
-        $.get('/local/jurnalmengajar/get_students.php', {kelas: kelas}, function(html) {
-            $('#absen-area').html(html);
-
-            $('.absen-checkbox').on('change', function() {
-                const alasan = $(this).closest('.absen-item').find('select');
-                alasan.prop('disabled', !this.checked);
-                updateAbsenField();
-            });
-
-            $('.absen-alasan').on('change', updateAbsenField);
-        });
-    }
-
-    $(document).ready(function() {
-        $('select[name=kelas]').change(function() {
-            loadSiswa($(this).val());
-        });
-        loadSiswa($('select[name=kelas]').val());
-    });
-});
-</script>
-HTML);
-    }
-}
+        $this->add_action_buttons(true, 'Simpan Jurnal');       
+        }
+} 

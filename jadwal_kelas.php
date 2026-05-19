@@ -30,26 +30,44 @@ asort($daftarkelas);
 // Default filter kelas
 $filterkelas = $_GET['kelas'] ?? array_key_first($daftarkelas);
 
-// ===== Filter UI =====
+/*
+=====================================================
+FORM FILTER UI (STRUKTUR HORIZONTAL BOOTSTRAP)
+=====================================================
+*/
 echo html_writer::start_tag('form', [
     'method' => 'get',
-    'style' => 'margin-bottom:15px;'
+    'class'  => 'mb-4 p-3 bg-light rounded border shadow-sm'
 ]);
 
-echo "Filter Kelas: ";
-echo html_writer::select($daftarkelas, 'kelas', $filterkelas);
+echo html_writer::start_div('row align-items-end');
 
+// Dropdown Pilihan Kelas
+echo html_writer::start_div('col-md-5 mb-2 mb-md-0');
+echo html_writer::tag('label', 'Filter Kelas', ['class' => 'font-weight-bold mb-1']);
+echo html_writer::select($daftarkelas, 'kelas', $filterkelas, null, [
+    'class' => 'form-control form-control-sm'
+]);
+echo html_writer::end_div();
+
+// Tombol Tampilkan (Memenuhi kolom sisa)
+echo html_writer::start_div('col-md-2');
 echo html_writer::empty_tag('input', [
     'type' => 'submit',
     'value' => 'Tampilkan',
-    'class' => 'btn btn-secondary',
-    'style' => 'margin-left:5px'
+    'class' => 'btn btn-primary btn-sm btn-block'
 ]);
+echo html_writer::end_div();
 
+echo html_writer::end_div(); // End Row
 echo html_writer::end_tag('form');
 
 
-// ===== GROUPING =====
+/*
+=====================================================
+GROUPING DATA
+=====================================================
+*/
 $grouped = [];
 foreach ($jadwal as $j) {
 
@@ -59,42 +77,46 @@ foreach ($jadwal as $j) {
 
     $key = $j['hari'] . '|' . $j['kelas'] . '|' . $j['userid'];
 
-if (!isset($grouped[$key])) {
-    $grouped[$key] = [
-        'hari' => $j['hari'],
-        'hari_no' => $hariurut[$j['hari']] ?? 9,
-        'kelas' => $j['kelas'],
-        'guru' => $j['lastname'],
-        'jamke' => [],
-        'jam_awal' => $j['jamke'] // ✅ INI WAJIB
-    ];
-}
+    if (!isset($grouped[$key])) {
+        $grouped[$key] = [
+            'hari' => $j['hari'],
+            'hari_no' => $hariurut[$j['hari']] ?? 9,
+            'kelas' => $j['kelas'],
+            'guru' => $j['lastname'],
+            'jamke' => [],
+            'jam_awal' => $j['jamke']
+        ];
+    }
 
     $grouped[$key]['jamke'][] = $j['jamke'];
 }
 
-// Urutkan hari
+// Urutkan hari dan jam awal
 usort($grouped, function($a, $b) {
-
-    // Urutkan hari dulu
     if ($a['hari_no'] != $b['hari_no']) {
         return $a['hari_no'] <=> $b['hari_no'];
     }
-
-    // Kalau hari sama, urut jam awal
     return $a['jam_awal'] <=> $b['jam_awal'];
 });
 
 
-// ===== TABEL =====
-echo "<table class='generaltable'>";
-echo "<tr>
-        <th>No</th>
-        <th>Hari</th>
-        <th>Jamke</th>
-        <th>Guru</th>
-        <th>Pukul</th>
-      </tr>";
+/*
+=====================================================
+TABEL JADWAL KELAS (GAYA BERSIH & TEKS KONTRAS)
+=====================================================
+*/
+echo '<div class="table-responsive">';
+echo '<table class="table table-bordered table-hover bg-white shadow-sm align-middle">';
+echo '<thead class="thead-dark">';
+echo '<tr>';
+echo '<th style="width: 6%;" class="text-center">No</th>';
+echo '<th style="width: 15%;">Hari</th>';
+echo '<th style="width: 20%;" class="text-center">Jam Pelajaran</th>';
+echo '<th>Guru Pengajar</th>';
+echo '<th style="width: 22%;" class="text-center">Pukul</th>';
+echo '</tr>';
+echo '</thead>';
+echo '<tbody>';
 
 $no = 1;
 $hari_sebelumnya = '';
@@ -102,35 +124,46 @@ $hari_sebelumnya = '';
 foreach ($grouped as $g) {
 
     sort($g['jamke']);
-    $jamgabung = implode(',', $g['jamke']);
+    $jamgabung = implode(', ', array_unique($g['jamke'])); // Ditambahkan spasi setelah koma
 
     $jamawal = min($g['jamke']);
     $jamakhir = max($g['jamke']);
 
     $mulai = $jam_pelajaran[$jamawal]['mulai'] ?? '';
     $selesai = $jam_pelajaran[$jamakhir]['selesai'] ?? '';
-
     $pukul = $mulai . ' - ' . $selesai;
 
-    echo "<tr>";
+    echo '<tr>';
 
+    // Logika Pengelompokan Visual Kolom Hari (.table-active)
     if ($hari_sebelumnya != $g['hari']) {
-        echo "<td>$no</td>";
-        echo "<td>{$g['hari']}</td>";
+        echo "<td class='text-center align-middle font-weight-bold table-active'>$no</td>";
+        echo "<td class='align-middle font-weight-bold table-active'>{$g['hari']}</td>";
         $hari_sebelumnya = $g['hari'];
         $no++;
     } else {
-        echo "<td></td>";
-        echo "<td></td>";
+        echo "<td class='table-active'></td>";
+        echo "<td class='table-active'></td>";
     }
 
-    echo "<td>$jamgabung</td>";
-    echo "<td>{$g['guru']}</td>";
-    echo "<td>$pukul</td>";
+    // Kolom Jam Pelajaran (Teks biasa warna info biru)
+    echo "<td class='text-center align-middle text-info' style='font-size: 0.95rem;'>Jam ke-$jamgabung</td>";
+    
+    // Kolom Guru (Teks biasa/normal warna gelap kontras #212529)
+    echo "<td class='align-middle' style='color: #212529;'>{$g['guru']}</td>";
+    
+    // Kolom Pukul (Teks biasa warna gelap kontras dengan ikon jam)
+    echo "<td class='text-center align-middle' style='color: #212529;'><i class='fa fa-clock-o text-muted mr-1'></i> $pukul</td>";
 
-    echo "</tr>";
+    echo '</tr>';
 }
 
-echo "</table>";
+if (empty($grouped)) {
+    echo '<tr><td colspan="5" class="text-center text-muted p-4"><i>Tidak ada data jadwal untuk kelas ini.</i></td></tr>';
+}
+
+echo '</tbody>';
+echo '</table>';
+echo '</div>'; // End table-responsive
 
 echo $OUTPUT->footer();

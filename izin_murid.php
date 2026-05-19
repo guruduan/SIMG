@@ -74,6 +74,7 @@ if (($do_submit || $do_save) && confirm_sesskey()) {
     $record = new stdClass();
     $record->userid        = required_param('siswaid', PARAM_INT);
     $record->kelasid       = required_param('kelasid', PARAM_INT);
+    $record->kelas         = get_nama_kelas($record->kelasid);
     $record->guru_pengajar = required_param('guru_pengajar', PARAM_INT);
     $record->alasan        = required_param('alasan', PARAM_TEXT);
     $record->keperluan     = required_param('keperluan', PARAM_TEXT);
@@ -147,7 +148,7 @@ echo $OUTPUT->heading('Input Surat Izin Murid', 2, 'mb-4');
 echo html_writer::start_div('card bg-light mb-4 shadow-sm');
 echo html_writer::start_div('card-body py-3 form-inline gap-3');
 echo html_writer::start_tag('form', ['method' => 'get', 'class' => 'd-flex align-items-center w-100 gap-2']);
-echo html_writer::tag('label', 'Langkah 1: Pilih Kelas Terlebih Dahulu', ['class' => 'font-weight-bold mr-3 text-secondary', 'for' => 'kelasid']);
+echo html_writer::tag('label', 'Pilih Kelas Terlebih Dahulu', ['class' => 'font-weight-bold mr-3', 'for' => 'kelasid']);
 echo html_writer::select($cohorts, 'kelasid', $kelasid, ['' => 'Pilih kelas...'], ['onchange' => 'this.form.submit()', 'class' => 'form-control custom-select bg-white', 'id' => 'kelasid']);
 echo html_writer::end_tag('form');
 echo html_writer::end_div();
@@ -207,14 +208,14 @@ if ($kelasid) {
 
     // Baris Tombol Submit Aksi
     echo html_writer::start_div('d-flex gap-2');
-    echo html_writer::tag('button', '<i class="fa fa-print"></i> Simpan & Cetak Surat', [
+    echo html_writer::tag('button', '<i class="fa fa-print"></i> Cetak Surat', [
         'type' => 'submit',
         'name' => 'action',
         'value' => 'print',
         'class' => 'btn btn-success shadow-sm px-4'
     ]);
 
-    echo html_writer::tag('button', '<i class="fa fa-save"></i> Hanya Simpan Ke Sistem', [
+    echo html_writer::tag('button', '<i class="fa fa-save"></i> Simpan Surat', [
         'type' => 'submit',
         'name' => 'action',
         'value' => 'save',
@@ -229,7 +230,7 @@ if ($kelasid) {
 
 // ================= SECTION RIWAYAT SURAT IZIN =================
 echo html_writer::start_div('d-flex justify-content-between align-items-center mt-5 mb-3 border-bottom pb-2');
-echo html_writer::tag('h3', '📋 Log Riwayat Surat Izin', ['class' => 'text-secondary m-0']);
+echo html_writer::tag('h3', '📋 Log Riwayat Surat Izin');
 
 $rekapurl = new moodle_url('/local/jurnalmengajar/rekap_surat_izin.php');
 echo html_writer::link($rekapurl, '<i class="fa fa-book"></i> Buka Rekap Surat Izin', [
@@ -276,12 +277,12 @@ if ($riwayatsurat) {
     // Memberikan style class Bootstrap modern ke komponen table Moodle core
     $table->attributes['class'] = 'table table-striped table-hover generaltable mb-0';
 
-    $table->head = ['#', 'Tanggal & Waktu', 'Nama Murid', 'Kelas', 'Guru Pengajar', 'Alasan', 'Keperluan', 'Guru Pengawas'];
+    $table->head = ['No', 'Tanggal & Waktu', 'Nama Murid', 'Kelas', 'Guru Pengajar', 'Alasan', 'Keperluan', 'Guru Pengawas'];
     $table->align = ['center', 'left', 'left', 'center', 'left', 'left', 'left', 'left'];
 
     $no = 1;
     foreach ($riwayatsurat as $s) {
-        $kelasnama = get_nama_kelas($s->kelasid);
+        $kelasnama = $s->kelas;
         $tgl_display = tanggal_indo($s->timecreated);
 
         // Memberikan badge warna dinamis sesuai jenis izin murid
@@ -293,7 +294,7 @@ if ($riwayatsurat) {
 
         $table->data[] = [
             $no++,
-            html_writer::tag('small', $tgl_display, ['class' => 'text-muted']),
+            html_writer::tag('small', $tgl_display),
             html_writer::tag('strong', ucwords(strtolower($s->siswa_nama))),
             $kelasnama,
             $s->guru_nama,

@@ -32,9 +32,31 @@ class pembinaan_form extends \moodleform {
         $mform->setType('tindakan', PARAM_RAW);
         $mform->addRule('tindakan', null, 'required');
 
-        // === Peserta (Hidden) ===
-        $mform->addElement('hidden', 'peserta', '');
-        $mform->setType('peserta', PARAM_RAW);
+        // === Peserta ===
+$mform->addElement(
+    'textarea',
+    'peserta',
+    '',
+    'style="display:none"'
+);
+
+$mform->setType(
+    'peserta',
+    PARAM_RAW
+);
+
+// === Peserta ID ===
+$mform->addElement(
+    'textarea',
+    'pesertaid',
+    '',
+    'style="display:none"'
+);
+
+$mform->setType(
+    'pesertaid',
+    PARAM_RAW
+);
 
         // === Placeholder daftar siswa (AJAX) ===
         $mform->addElement('html', '<div id="siswa-area" style="margin:10px 0;"></div>');

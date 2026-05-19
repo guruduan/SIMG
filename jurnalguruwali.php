@@ -213,10 +213,12 @@ if (empty($muridids)) {
     foreach ($muridids as $muridid) {
 
         $murid = $DB->get_record('user', ['id'=>$muridid], 'lastname');
-
+        $kelas = jw_get_kelas_siswa($muridid);
+        
         $record = new stdClass();
         $record->guruid = $USER->id;
-        $record->muridid = $muridid;
+        $record->userid = $muridid;
+        $record->kelas = $kelas;
         $record->topik = $data->topik;
         $record->tindaklanjut = $data->tindaklanjut;
         $record->keterangan = $data->keterangan;
@@ -225,7 +227,6 @@ if (empty($muridids)) {
         $DB->insert_record('local_jurnalguruwali', $record);
 
         // ===== WA =====
-        $kelas = jw_get_kelas_siswa($muridid);
 
         $pesan = "*📋 Jurnal Guru Wali*\n\n"
                . "📅 Waktu: ".tanggal_indo($now)."\n"
@@ -257,7 +258,7 @@ echo html_writer::tag('h3','Riwayat');
 $rows = $DB->get_records_sql("
     SELECT j.*, u.lastname
     FROM {local_jurnalguruwali} j
-    JOIN {user} u ON u.id=j.muridid
+    JOIN {user} u ON u.id=j.userid
     WHERE j.guruid=?
     ORDER BY j.timecreated DESC
 ", [$USER->id], 0, 10);
@@ -274,7 +275,7 @@ $editurl = new moodle_url('/local/jurnalmengajar/jurnalguruwali.php', [
 ]);
 
 $aksi = html_writer::link($editurl, '✏️ Edit');
-    $kelas = jw_get_kelas_siswa($r->muridid);
+    $kelas = $r->kelas;
 
     $table->data[] = [
         $no++,

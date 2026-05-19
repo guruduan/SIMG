@@ -38,31 +38,59 @@ $(document).ready(function() {
     }
 
     function bindAbsenEvent() {
-        $('.absen-checkbox').on('change', function() {
-            const parent = $(this).closest('.absen-item');
-            const dropdown = parent.find('.absen-alasan');
-            if ($(this).is(':checked')) {
-                dropdown.prop('disabled', false);
-            } else {
-                dropdown.prop('disabled', true).val('');
-            }
-            updateAbsenField();
-        });
 
-        $('.absen-alasan').on('change', updateAbsenField);
-    }
+    $('.absen-checkbox').on('change', function() {
+
+        const parent = $(this).closest('.absen-item');
+        const dropdown = parent.find('.absen-alasan');
+
+        if ($(this).is(':checked')) {
+
+            dropdown.prop('disabled', false);
+
+        } else {
+
+            dropdown.prop('disabled', true).val('');
+        }
+
+        updateAbsenField();
+    });
+
+    $('.absen-alasan').on(
+        'change',
+        updateAbsenField
+    );
+
+}
 
     function updateAbsenField() {
-        const hasil = {};
-        $('.absen-checkbox:checked').each(function() {
-            const nama = $(this).data('nama');
-            const alasan = $(this).closest('.absen-item').find('.absen-alasan').val();
-            if (alasan) {
-                hasil[nama] = alasan;
-            }
-        });
-        $('textarea[name="absen"]').val(JSON.stringify(hasil));
-    }
+
+    const data = {};
+    const dataid = {};
+
+    $('.absen-checkbox:checked').each(function() {
+
+        const nama = $(this).data('nama');
+        const userid = $(this).data('userid');
+
+        const alasan = $(this)
+            .closest('.absen-item')
+            .find('.absen-alasan')
+            .val();
+
+        if (alasan) {
+
+            data[nama] = alasan;
+            dataid[userid] = alasan;
+        }
+    });
+
+    $('textarea[name="absen"]')
+        .val(JSON.stringify(data));
+
+    $('input[name="absenid"]')
+        .val(JSON.stringify(dataid));
+}
 
     $('select[name=kelas]').on('change', function() {
         const kelas = $(this).val();
@@ -111,6 +139,7 @@ if ($mform->is_cancelled()) {
     $record->materi = $data->materi;
     $record->aktivitas = $data->aktivitas;
     $record->absen = $data->absen ?? '{}';
+    $record->absenid = $data->absenid ?? '{}';
     $record->keterangan = $data->keterangan ?: '-';
     $record->timecreated = time();
 
@@ -193,7 +222,7 @@ echo html_writer::end_div();
 echo html_writer::end_div();
 
 // ================= SECTION RIWAYAT =================
-echo html_writer::tag('h3', 'Riwayat Jurnal Saya', ['class' => 'mt-5 mb-3 text-secondary']);
+echo html_writer::tag('h3', 'Riwayat Jurnal Saya');
 
 $sql = "SELECT * FROM {local_jurnalmengajar} WHERE userid = :userid ORDER BY id DESC LIMIT 7";
 $params = ['userid' => $USER->id];

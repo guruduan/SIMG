@@ -32,42 +32,47 @@ asort($daftarguru);
 
 // Default filter guru
 $filterguru = $_GET['guru'] ?? $USER->id;
-// ===== Baris Filter kiri & Tombol kanan =====
+
+/*
+=====================================================
+FORM FILTER & NAVIGASI (RESPONSIF BOOTSTRAP)
+=====================================================
+*/
 echo html_writer::start_tag('form', [
     'method' => 'get',
-    'style' => 'display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;'
+    'class'  => 'mb-4 p-3 bg-light rounded border shadow-sm'
 ]);
 
-// Kiri (Filter)
-echo html_writer::start_tag('div');
-echo "Filter Guru: ";
+echo html_writer::start_div('row align-items-end');
+
+// Sisi Kiri: Filter Dropdown
+echo html_writer::start_div('col-md-5 mb-2 mb-md-0');
+echo html_writer::tag('label', 'Filter Guru', ['class' => 'font-weight-bold mb-1']);
 echo html_writer::select($daftarguru, 'guru', $filterguru, null, [
+    'class'    => 'form-control form-control-sm',
     'onchange' => 'this.form.submit(); this.disabled=true;'
 ]);
+echo html_writer::end_div();
 
-echo html_writer::end_tag('div');
-
-// Kanan (Tombol)
-echo html_writer::start_tag('div', [
-    'style' => 'display:flex; gap:10px;'
-]);
-
+// Sisi Kanan: Tombol Navigasi
+echo html_writer::start_div('col-md-7 d-flex justify-content-md-end gap-2');
 echo html_writer::link(
     '#',
-    '⬅ Kembali',
+    '<i class="fa fa-arrow-left"></i> Kembali',
     [
-        'class' => 'btn btn-secondary',
+        'class' => 'btn btn-secondary btn-sm mr-2',
         'onclick' => 'history.back(); return false;'
     ]
 );
 
 echo html_writer::link(
     new moodle_url('/local/jurnalmengajar/jam_pelajaran_view.php'),
-    'Lihat Alokasi Jam Pelajaran',
-    ['class' => 'btn btn-primary']
+    '<i class="fa fa-clock-o"></i> Lihat Alokasi Jam Pelajaran',
+    ['class' => 'btn btn-primary btn-sm']
 );
+echo html_writer::end_div();
 
-echo html_writer::end_tag('div');
+echo html_writer::end_div(); // End Row
 echo html_writer::end_tag('form');
 
 
@@ -75,21 +80,19 @@ $hariurut = jurnalmengajar_get_urutan_hari();
 
 // GROUPING
 $grouped = [];
-
 foreach ($jadwal as $j) {
     $key = $j['hari'] . '|' . $j['userid'] . '|' . $j['kelas'];
 
     if (!isset($grouped[$key])) {
         $grouped[$key] = [
-    'userid' => $j['userid'],
-    'hari' => $j['hari'],
-    'hari_no' => $hariurut[$j['hari']] ?? 9,
-    'lastname' => $j['lastname'],
-    'kelas' => $j['kelas'],
-    'jamke' => []
-];
+            'userid' => $j['userid'],
+            'hari' => $j['hari'],
+            'hari_no' => $hariurut[$j['hari']] ?? 9,
+            'lastname' => $j['lastname'],
+            'kelas' => $j['kelas'],
+            'jamke' => []
+        ];
     }
-
     $grouped[$key]['jamke'][] = $j['jamke'];
 }
 
@@ -98,33 +101,40 @@ usort($grouped, function($a, $b) {
 });
 
 
-// ===== Tabel Jadwal =====
-echo "<table class='generaltable'>";
-echo "<tr>
-        <th>No</th>
-        <th>Hari</th>
-        <th>Guru</th>
-        <th>Kelas</th>
-        <th>Jam Pelajaran</th>
-        <th>Pukul</th>
-      </tr>";
+/*
+=====================================================
+TABEL JADWAL MENGAJAR (LEBIH BERSIH & JELAS)
+=====================================================
+*/
+echo '<div class="table-responsive">';
+echo '<table class="table table-bordered table-hover bg-white shadow-sm">';
+echo '<thead class="thead-dark">';
+echo '<tr>';
+echo '<th style="width: 5%;" class="text-center">No</th>';
+echo '<th style="width: 12%;">Hari</th>';
+echo '<th>Guru</th>';
+echo '<th style="width: 15%;" class="text-center">Kelas</th>';
+echo '<th style="width: 18%;" class="text-center">Jam Pelajaran</th>';
+echo '<th style="width: 20%;" class="text-center">Pukul</th>';
+echo '</tr>';
+echo '</thead>';
+echo '<tbody>';
 
 $no = 1;
 $hari_sebelumnya = '';
 $totaljam = 0;
 
+// Palet warna teks badge kelas (soft/pastel text on dark background atau badge standar)
 $warna_kelas = [];
 $warna_list = [
-    '#bbdefb', // biru lebih tegas
-    '#c8e6c9', // hijau lebih tegas
-    '#ffe0b2', // orange
-    '#f8bbd0', // pink
-    '#d1c4e9', // ungu
-    '#fff59d', // kuning
-    '#b2ebf2', // cyan
-    '#dcedc8'  // lime
+    'badge-primary',
+    'badge-success',
+    'badge-info',
+    'badge-warning text-dark',
+    'badge-danger',
+    'badge-dark',
+    'badge-secondary'
 ];
-
 $index_warna = 0;
 
 foreach ($grouped as $g) {
@@ -134,56 +144,63 @@ foreach ($grouped as $g) {
     }
 
     sort($g['jamke']);
-    $jamgabung = implode(',', array_unique($g['jamke']));
+    $jamgabung = implode(', ', array_unique($g['jamke'])); // Ditambahkan spasi setelah koma agar rapi
 
     $jamawal = min($g['jamke']);
     $jamakhir = max($g['jamke']);
 
     $mulai = $jam_pelajaran[$jamawal]['mulai'] ?? '';
     $selesai = $jam_pelajaran[$jamakhir]['selesai'] ?? '';
-
     $pukul = $mulai . ' - ' . $selesai;
 
     $jumlahjam = count(array_unique($g['jamke']));
     $totaljam += $jumlahjam;
 
-$kelas = $g['kelas'];
+    $kelas = $g['kelas'];
+    if (!isset($warna_kelas[$kelas])) {
+        $warna_kelas[$kelas] = $warna_list[$index_warna % count($warna_list)];
+        $index_warna++;
+    }
 
-if (!isset($warna_kelas[$kelas])) {
-    $warna_kelas[$kelas] = $warna_list[$index_warna % count($warna_list)];
-    $index_warna++;
-}
+    echo '<tr>';
 
-echo "<tr style='background:" . $warna_kelas[$kelas] . "'>";
-
+    // Logika pengelompokan baris Hari
     if ($hari_sebelumnya != $g['hari']) {
-        echo "<td>$no</td>";
-        echo "<td>{$g['hari']}</td>";
+        echo "<td class='text-center align-middle font-weight-bold table-active'>$no</td>";
+        echo "<td class='align-middle font-weight-bold table-active'>{$g['hari']}</td>";
         $hari_sebelumnya = $g['hari'];
         $no++;
     } else {
-        echo "<td></td>";
-        echo "<td></td>";
+        echo "<td class='table-active'></td>";
+        echo "<td class='table-active'></td>";
     }
 
-    echo "<td>{$g['lastname']}</td>";
-    echo "<td>{$g['kelas']}</td>";
-    echo "<td>$jamgabung</td>";
-    echo "<td>$pukul</td>";
+    // Kolom Guru (Biasa/Normal tidak tebal)
+    echo "<td class='align-middle' style='color: #212529;'>{$g['lastname']}</td>";
+    
+    // Kolom Kelas menggunakan Badge agar kontras teks tetap aman terjaga
+    echo "<td class='text-center align-middle'><span class='badge {$warna_kelas[$kelas]} p-2' style='font-size:0.9rem; min-width:60px;'>$kelas</span></td>";
+    
+    // Jam Pelajaran
+    echo "<td class='text-center align-middle font-weight-bold text-info'>Jam ke-$jamgabung</td>";
+    
+    // Pukul/Waktu (Jelas dan Kontras)
+    echo "<td class='text-center align-middle' style='color: #212529;'><i class='fa fa-clock-o text-muted mr-1'></i> $pukul</td>";
 
-    echo "</tr>";
+    echo '</tr>';
 }
 
-// Total jam
-echo "<tr style='font-weight:bold; background:#f8f9fa;'>";
+// Baris Total Jam Pelajaran
+echo "<tr class='table-warning font-weight-bold' style='color: #212529;'>";
 echo "<td></td>";
 echo "<td></td>";
-echo "<td>Jumlah Jam Pelajaran</td>";
-echo "<td></td>";
-echo "<td>$totaljam Jam</td>";
+echo "<td colspan='2' class='text-right align-middle'>Total Alokasi Mengajar:</td>";
+echo "<td class='text-center align-middle' style='font-size:1.1rem;'><span class='badge badge-dark p-2'>$totaljam Jam</span></td>";
 echo "<td></td>";
 echo "</tr>";
 
-echo "</table>";
+echo '</tbody>';
+echo '</table>';
+echo '</div>'; // End table-responsive
 
 echo $OUTPUT->footer();
