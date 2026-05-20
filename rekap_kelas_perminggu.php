@@ -12,6 +12,7 @@ $PAGE->set_title('Rekap Pekanan KBM Kelas');
 $PAGE->set_heading('Rekap Pekanan KBM Kelas');
 
 global $DB, $OUTPUT;
+
 // === Ambil setting tanggal awal minggu ===
 $tanggalawalminggu = get_config('local_jurnalmengajar', 'tanggalawalminggu'); // format: YYYY-MM-DD
 if (empty($tanggalawalminggu)) {
@@ -23,7 +24,7 @@ $mingguoptions = [];
 for ($i = 0; $i < 20; $i++) {
     $start = strtotime($tanggalawalminggu . " +{$i} week");
     $end   = strtotime("+6 day", $start);
-    $label = 'Minggu ' . ($i+1) . ' (' 
+    $label = 'Minggu Ke-' . ($i+1) . ' (' 
     . tanggal_indo($start, 'tanggal') 
     . ' s/d ' 
     . tanggal_indo($end, 'tanggal') . ')';
@@ -43,7 +44,7 @@ $diff = floor(($hariini - strtotime($tanggalawalminggu)) / (7 * 24 * 60 * 60));
 $minggu_berjalan = ($diff >= 0 && $diff < 20) ? $diff + 1 : 1;
 
 // === Ambil input dengan default kelas pertama & minggu berjalan ===
-$kelas = optional_param('kelas', key($kelasoptions), PARAM_INT); // default kelas pertama
+$kelas = optional_param('kelas', key($kelasoptions), PARAM_INT); 
 $minggu = optional_param('minggu', $minggu_berjalan, PARAM_INT);
 
 // === Hitung tanggal filter ===
@@ -64,32 +65,41 @@ if ($kelas) {
     );
 }
 
-// === Cetak form filter ===
+// === TAMPILAN HALAMAN (HEADER & FILTER) ===
 echo $OUTPUT->header();
-// Tombol kembali
-echo html_writer::div(
-    html_writer::link(
-        '#',
-        '⬅ Kembali',
-        [
-            'class' => 'btn btn-secondary',
-            'onclick' => 'history.back(); return false;'
-        ]
-    ),
-    'mb-3'
-);
-echo $OUTPUT->heading('Rekap KBM di kelas per minggu');
-echo html_writer::start_tag('form', ['method' => 'get']);
-echo html_writer::tag('label', 'Pilih Kelas: ', ['for' => 'kelas']);
-echo html_writer::select($kelasoptions, 'kelas', $kelas);
-echo ' ';
-echo html_writer::tag('label', 'Pilih Minggu: ', ['for' => 'minggu']);
-echo html_writer::select($mingguoptions, 'minggu', $minggu);
-echo ' ';
-echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Tampilkan']);
-echo html_writer::end_tag('form');
 
-// === Tampilkan data per hari (Senin-Jumat) ===
+// Header Halaman & Tombol Kembali
+echo html_writer::start_div('d-flex justify-content-between align-items-center mb-4 flex-wrap');
+    echo html_writer::tag('h3', 'Rekap KBM di Kelas Per Minggu', ['class' => 'mb-0 font-weight-bold text-primary']);
+    echo html_writer::link('#', '⬅ Kembali', [
+        'class' => 'btn btn-outline-secondary shadow-sm mt-2 mt-md-0',
+        'onclick' => 'history.back(); return false;'
+    ]);
+echo html_writer::end_div();
+
+// Card Filter Form
+echo html_writer::start_div('card mb-4 shadow-sm border-0 bg-light');
+echo html_writer::start_div('card-body p-3');
+    echo html_writer::start_tag('form', ['method' => 'get', 'class' => 'form-inline m-0 align-items-center']);
+        
+echo html_writer::start_div('form-group mr-4 mb-2 mb-md-0');
+            echo html_writer::tag('label', 'Kelas:', ['for' => 'kelas', 'class' => 'mr-2 font-weight-bold small text-uppercase']);
+            echo html_writer::select($kelasoptions, 'kelas', $kelas, false, ['class' => 'custom-select custom-select-sm']);
+        echo html_writer::end_div();
+        
+        echo html_writer::start_div('form-group mr-3 mb-2 mb-md-0');
+            echo html_writer::tag('label', 'Periode:', ['for' => 'minggu', 'class' => 'mr-2 font-weight-bold small text-uppercase']);
+            echo html_writer::select($mingguoptions, 'minggu', $minggu, false, ['class' => 'custom-select custom-select-sm']);
+        echo html_writer::end_div();
+        
+        echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Tampilkan Data', 'class' => 'btn btn-primary btn-sm px-4 shadow-sm']);
+    
+    echo html_writer::end_tag('form');
+echo html_writer::end_div();
+echo html_writer::end_div();
+
+
+// === PROSES & TAMPILKAN DATA PER HARI (Senin-Jumat) ===
 $hari = [
     'Monday'    => 'Senin',
     'Tuesday'   => 'Selasa',
@@ -97,6 +107,7 @@ $hari = [
     'Thursday'  => 'Kamis',
     'Friday'    => 'Jumat'
 ];
+
 $userids = array_unique(array_column($jurnalrecords, 'userid'));
 $users = [];
 
@@ -108,39 +119,82 @@ if (!empty($userids)) {
     );
 }
 
+// Loop untuk setiap hari
 foreach ($hari as $eng => $indo) {
     $rows = [];
     $tanggalhari = '';
+    
     foreach ($jurnalrecords as $r) {
         $haridata = date('l', $r->timecreated);
         if ($haridata == $eng) {
             $tanggalhari = tanggal_indo($r->timecreated, 'tanggal');
-
-            // --- Ambil lastname pengajar ---
+            
+            // Ambil lastname pengajar
             $lastname = $users[$r->userid]->lastname ?? '-';
-            $lastname = ucwords(strtolower($lastname));
+            //$lastname = ucwords(strtolower($lastname));
+
+            // Format Jam (Badge)
+            $jam_html = html_writer::tag('span', $r->jamke, ['class' => 'badge badge-info p-1 font-weight-normal']);
+            
+// Waktu Input (Muted Text dihapus)
+            $waktu_input = html_writer::tag('span', tanggal_indo($r->timecreated, 'jam'), ['class' => 'small']);
 
             $rows[] = [
-                $r->jamke,
-                format_string($r->matapelajaran),
+                $jam_html,
+                html_writer::tag('strong', format_string($r->matapelajaran)),
                 $lastname,
-                format_text($r->materi),
-                // format_text($r->keterangan),  // kolom keterangan dihapus
-                tanggal_indo($r->timecreated, 'jam')
+                html_writer::tag('div', format_text($r->materi), ['class' => 'text-justify small', 'style' => 'line-height:1.4']),
+                $waktu_input
             ];
         }
     }
 
-    echo html_writer::tag('h3', $indo . ($tanggalhari ? " (" . $tanggalhari . ")" : ''));
-    if (empty($rows)) {
-        echo html_writer::tag('p', 'Tidak ada data.');
-    } else {
-        $table = new html_table();
-        // $table->head = ['Jamke', 'Mata Pelajaran', 'Pengajar', 'Materi', 'Keterangan', 'Tanggal Input'];
-        $table->head = ['Jamke', 'Mata Pelajaran', 'Pengajar', 'Materi', 'Waktu Input'];
-        $table->data = $rows;
-        echo html_writer::table($table);
-    }
+    // Buat Kotak (Card) per Hari
+    echo html_writer::start_div('card mb-4 shadow-sm border-0');
+        
+        // Header Card (Hari & Tanggal)
+        $judul_hari = html_writer::tag('span', strtoupper($indo), ['class' => 'font-weight-bold text-dark mr-2']);
+$sub_tanggal = $tanggalhari ? html_writer::tag('span', $tanggalhari, ['class' => 'small']) : html_writer::tag('span', '(Belum ada kegiatan)', ['class' => 'small font-italic']);
+        
+        echo html_writer::start_div('card-header bg-white border-bottom-0 pt-3 pb-2');
+            echo html_writer::tag('h5', $judul_hari . $sub_tanggal, ['class' => 'mb-0']);
+        echo html_writer::end_div();
+
+        // Isi Card (Tabel / Pesan Kosong)
+        echo html_writer::start_div('card-body p-0 table-responsive');
+        
+        if (empty($rows)) {
+            echo html_writer::div(
+                'ℹ️ Tidak ada data kegiatan belajar mengajar (KBM) yang tercatat pada hari ini.', 
+                'text-center text-muted py-4 bg-light font-italic border-top'
+            );
+        } else {
+            $table = new html_table();
+            // Terapkan kelas Bootstrap ke tabel Moodle
+            $table->attributes['class'] = 'table table-hover table-striped mb-0 text-nowrap';
+            $table->head = [
+                html_writer::tag('span', 'Jam', ['class' => 'text-uppercase small']), 
+                html_writer::tag('span', 'Mata Pelajaran', ['class' => 'text-uppercase small']), 
+                html_writer::tag('span', 'Guru', ['class' => 'text-uppercase small']), 
+                html_writer::tag('span', 'Materi', ['class' => 'text-uppercase small']), 
+                html_writer::tag('span', 'Waktu Input', ['class' => 'text-uppercase small'])
+            ];
+            
+            // Atur lebar kolom untuk Materi agar leluasa, sisanya menyesuaikan (nowrap)
+            $table->colclasses = ['text-center align-middle', 'align-middle', 'align-middle', 'align-middle text-wrap w-50', 'text-center align-middle'];
+            $table->data = $rows;
+            
+            echo html_writer::table($table);
+        }
+        
+        echo html_writer::end_div(); // End card-body
+    echo html_writer::end_div(); // End card
 }
+
+// Tambahan style untuk text justify
+echo '<style>
+    .text-justify { text-align: justify; }
+    .table-responsive { overflow-x: auto; }
+</style>';
 
 echo $OUTPUT->footer();

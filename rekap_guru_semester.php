@@ -38,15 +38,10 @@ $tanggal_awal = new DateTime($tanggalstring);
 // DETEKSI SEMESTER
 // =====================
 $bulan_awal = (int)$tanggal_awal->format('n');
-
-if ($bulan_awal >= 7) {
-    $semester = 'Ganjil';
-} else {
-    $semester = 'Genap';
-}
+$semester = ($bulan_awal >= 7) ? 'Ganjil' : 'Genap';
 
 // =====================
-// HEADER
+// HEADER MOODLE
 // =====================
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/rekap_guru_semester.php', ['userid' => $userid]));
@@ -55,12 +50,8 @@ $PAGE->set_heading("Rekap Jurnal Mengajar Guru");
 
 echo $OUTPUT->header();
 
-echo html_writer::tag('h3', "Tahun Ajaran: $tahunajaran");
-echo html_writer::tag('h3', "Semester: $semester");
-echo html_writer::tag('h4', "Nama: $nama");
-
 // =====================
-// PROSES REKAP
+// PROSES REKAP DATA
 // =====================
 $rekap_mingguan = [];
 $sekarang = time();
@@ -107,12 +98,12 @@ for ($i = 1; $i <= $minggu_berjalan; $i++) {
         : 0;
 
     // Rentang tanggal
-$awal_ts = $start;
-$akhir_ts = $end;
-$awal_str = tanggal_indo($awal_ts, 'tglbulan');
-$akhir_str = tanggal_indo($akhir_ts, 'tanggal');
+    $awal_ts = $start;
+    $akhir_ts = $end;
+    $awal_str = tanggal_indo($awal_ts, 'tglbulan');
+    $akhir_str = tanggal_indo($akhir_ts, 'tanggal');
 
-$rentang = $awal_str . ' - ' . $akhir_str;
+    $rentang = $awal_str . ' - ' . $akhir_str;
 
     $rekap_mingguan[] = [
         'minggu' => $i,
@@ -123,51 +114,106 @@ $rentang = $awal_str . ' - ' . $akhir_str;
     ];
 }
 
-// =====================
-// INFO CUT OFF (MULTI KELAS)
-// =====================
+// Hitung Ringkasan Statistik
+$totaljam = array_sum(array_column($rekap_mingguan, 'jumlah'));
+$jumlah_minggu = count($rekap_mingguan);
+$avgpersen = $jumlah_minggu > 0 
+    ? round(array_sum(array_column($rekap_mingguan, 'persen')) / $jumlah_minggu)
+    : 0;
+
+
+// --- ATAS: Identitas Guru & Tombol Kembali ---
+echo html_writer::start_div('d-flex justify-content-between align-items-center mb-4 flex-wrap');
+    echo html_writer::start_div();
+        echo html_writer::tag('h3', $nama, ['class' => 'mb-1 font-weight-bold text-primary']);
+        echo html_writer::tag('div', "Tahun Ajaran $tahunajaran • Semester $semester", ['class' => 'text-muted font-weight-bold']);
+    echo html_writer::end_div();
+    
+    echo html_writer::div(
+        html_writer::link(new moodle_url('/local/jurnalmengajar/rekap_perminggu.php'), '⬅ Kembali', [
+            'class' => 'btn btn-outline-secondary shadow-sm mt-2 mt-md-0'
+        ])
+    );
+echo html_writer::end_div();
+
+
+// --- INFO CUT OFF (MULTI KELAS) ---
 $daftar_kelas = ['VI', 'IX', 'XII'];
-
 foreach ($daftar_kelas as $kelas_level) {
-
     $cutoff = jurnalmengajar_get_cutoff_by_kelas($kelas_level);
-
     if ($cutoff) {
         echo html_writer::div(
-            "Kelas $kelas_level tidak ada KBM sejak: " . tanggal_indo($cutoff, 'tanggal') .
-            " (beban jam mengajar sudah disesuaikan)",
-            'alert alert-info'
+            "ℹ️ <strong>Kelas $kelas_level</strong> tidak ada KBM sejak " . tanggal_indo($cutoff, 'tanggal') . ". Beban jam mengajar telah disesuaikan otomatis.",
+            'alert alert-info mb-4 shadow-sm'
         );
     }
 }
 
-// =====================
-// TABEL
-// =====================
-echo html_writer::start_tag('table', ['class' => 'generaltable']);
 
-echo html_writer::tag('tr',
-    html_writer::tag('th', 'No') .
-    html_writer::tag('th', 'Minggu ke') .
-    html_writer::tag('th', 'Rentang Tanggal') .
-    html_writer::tag('th', 'Jumlah Mengajar') .
-    html_writer::tag('th', 'Beban Jam') .
-    html_writer::tag('th', '% Mingguan') .
-    html_writer::tag('th', 'Aksi')
-);
+// --- STATISTIK RINGKASAN (CARDS) ---
+echo html_writer::start_div('row mb-4');
+    // Card 1: Total Mengajar
+    echo html_writer::start_div('col-md-6 mb-3 mb-md-0');
+        echo html_writer::start_div('card border-0 shadow-sm bg-light');
+            echo html_writer::start_div('card-body p-3 text-center');
+                echo html_writer::tag('span', 'Total Realisasi Mengajar', ['class' => 'text-muted small text-uppercase font-weight-bold d-block mb-1']);
+                echo html_writer::tag('h2', $totaljam . ' <span class="h5 text-muted">JP</span>', ['class' => 'mb-0 font-weight-bold text-dark']);
+            echo html_writer::end_div();
+        echo html_writer::end_div();
+    echo html_writer::end_div();
+
+    // Card 2: Rata-rata Kinerja
+    echo html_writer::start_div('col-md-6');
+        echo html_writer::start_div('card border-0 shadow-sm bg-light');
+            echo html_writer::start_div('card-body p-3 text-center');
+                echo html_writer::tag('span', 'Rata-rata Capaian Kinerja', ['class' => 'text-muted small text-uppercase font-weight-bold d-block mb-1']);
+                
+                // Tentukan warna teks rata-rata
+                $avg_color = 'text-danger';
+                if ($avgpersen >= 80) $avg_color = 'text-success';
+                elseif ($avgpersen >= 50) $avg_color = 'text-info';
+
+                echo html_writer::tag('h2', $avgpersen . '%', ['class' => 'mb-0 font-weight-bold ' . $avg_color]);
+            echo html_writer::end_div();
+        echo html_writer::end_div();
+    echo html_writer::end_div();
+echo html_writer::end_div();
+
+
+// =====================
+// TABEL DATA SEMESTER
+// =====================
+echo html_writer::start_div('table-responsive shadow-sm rounded border');
+echo html_writer::start_tag('table', ['class' => 'table table-hover table-striped mb-0 text-nowrap']);
+echo html_writer::start_tag('thead', ['class' => 'thead-dark text-uppercase small']);
+echo html_writer::start_tag('tr');
+    echo html_writer::tag('th', 'No', ['class' => 'text-center align-middle', 'style' => 'width: 5%']);
+    echo html_writer::tag('th', 'Minggu', ['class' => 'text-center align-middle', 'style' => 'width: 10%']);
+    echo html_writer::tag('th', 'Rentang Tanggal', ['class' => 'align-middle']);
+    echo html_writer::tag('th', 'Realisasi Mengajar', ['class' => 'text-center align-middle']);
+    echo html_writer::tag('th', 'Beban Target', ['class' => 'text-center align-middle']);
+    echo html_writer::tag('th', 'Persentase', ['class' => 'text-center align-middle', 'style' => 'width: 15%']);
+    echo html_writer::tag('th', 'Aksi', ['class' => 'text-center align-middle', 'style' => 'width: 10%']);
+echo html_writer::end_tag('tr');
+echo html_writer::end_tag('thead');
+
+echo html_writer::start_tag('tbody');
 
 $no = 1;
-
 foreach ($rekap_mingguan as $r) {
 
-    // WARNA
-    $style = '';
+    // Penentuan Badge Warna & Efek Baris Semu
+    $tr_class = '';
     if ($r['persen'] >= 80) {
-        $style = 'color:green;font-weight:bold';
+        $badge_class = 'badge-success';
     } elseif ($r['jumlah'] == 0 && $r['beban'] > 0) {
-        $style = 'color:red;font-weight:bold';
+        $badge_class = 'badge-danger';
+        $tr_class = 'table-danger-light';
     } elseif ($r['persen'] < 50) {
-        $style = 'color:orange;font-weight:bold';
+        $badge_class = 'badge-warning text-dark';
+        $tr_class = 'table-warning-light';
+    } else {
+        $badge_class = 'badge-info';
     }
 
     $url = new moodle_url('/local/jurnalmengajar/rekap_perguru.php', [
@@ -175,40 +221,43 @@ foreach ($rekap_mingguan as $r) {
         'mingguke' => $r['minggu']
     ]);
 
-    echo html_writer::tag('tr',
-        html_writer::tag('td', $no++) .
-        html_writer::tag('td', $r['minggu']) .
-        html_writer::tag('td', $r['rentang']) .
-        html_writer::tag('td', $r['jumlah']) .
-        html_writer::tag('td', $r['beban']) .
-        html_writer::tag('td', $r['persen'] . '%', ['style' => $style]) .
-        html_writer::tag('td', html_writer::link($url, '🔍 Detail'))
-    );
+    echo html_writer::start_tag('tr', ['class' => $tr_class]);
+        echo html_writer::tag('td', $no++, ['class' => 'text-center align-middle font-weight-bold text-muted']);
+        echo html_writer::tag('td', 'Ke-' . $r['minggu'], ['class' => 'text-center align-middle font-weight-bold']);
+        echo html_writer::tag('td', $r['rentang'], ['class' => 'align-middle']);
+        echo html_writer::tag('td', $r['jumlah'] . ' JP', ['class' => 'text-center align-middle']);
+        echo html_writer::tag('td', $r['beban'] . ' JP', ['class' => 'text-center align-middle text-muted']);
+        
+        // Badge Persentase Kerja
+        $badge = html_writer::tag('span', $r['persen'] . '%', ['class' => 'badge ' . $badge_class . ' p-2 w-100', 'style' => 'font-size: 85%']);
+        echo html_writer::tag('td', $badge, ['class' => 'text-center align-middle']);
+        
+        // Tombol Detail
+        $btn_detail = html_writer::link($url, '🔍 Detail', ['class' => 'btn btn-xs btn-outline-primary btn-sm block shadow-sm']);
+        echo html_writer::tag('td', $btn_detail, ['class' => 'text-center align-middle']);
+    echo html_writer::end_tag('tr');
 }
 
+echo html_writer::end_tag('tbody');
 echo html_writer::end_tag('table');
+echo html_writer::end_div();
 
-// =====================
-// RINGKASAN
-// =====================
-$totaljam = array_sum(array_column($rekap_mingguan, 'jumlah'));
-$jumlah_minggu = count($rekap_mingguan);
-$avgpersen = $jumlah_minggu > 0 
-    ? round(array_sum(array_column($rekap_mingguan, 'persen')) / $jumlah_minggu)
-    : 0;
 
-#echo html_writer::div("<b>Total Jam Mengajar: $totaljam</b>", 'mt-3');
-#echo html_writer::div("<b>Rata-rata Kinerja: $avgpersen%</b>");
-
-// =====================
-// KEMBALI
-// =====================
-echo html_writer::div(
-    html_writer::link(
+// --- BAWAH: Tombol Kembali Tambahan ---
+echo html_writer::start_div('mt-4 mb-2');
+    echo html_writer::link(
         new moodle_url('/local/jurnalmengajar/rekap_perminggu.php'),
-        '⬅ Kembali ke Rekap Mingguan'
-    ),
-    'mt-3'
-);
+        '⬅ Kembali ke Rekap Mingguan',
+        ['class' => 'btn btn-secondary shadow-sm']
+    );
+echo html_writer::end_div();
+
+
+// CSS Kustom Segar untuk highlight baris bermasalah tanpa kontras berlebih
+echo '<style>
+    .table-danger-light { background-color: rgba(220, 53, 69, 0.05) !important; }
+    .table-warning-light { background-color: rgba(255, 193, 7, 0.05) !important; }
+    .table th, .table td { vertical-align: middle !important; }
+</style>';
 
 echo $OUTPUT->footer();
