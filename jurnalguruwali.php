@@ -13,7 +13,10 @@ $PAGE->set_url(new moodle_url('/local/jurnalmengajar/jurnalguruwali.php'));
 $PAGE->set_title('Jurnal Guru Wali');
 $PAGE->set_heading('Jurnal Guru Wali');
 
-global $DB, $USER;
+global $DB, $USER, $OUTPUT, $PAGE;
+
+// Tangkap parameter edit jika ada
+$editid = optional_param('editid', 0, PARAM_INT);
 
 /* ======================= HELPERS ======================= */
 
@@ -42,6 +45,7 @@ function jw_load_binaan_csv(): array {
     $rows = [];
     foreach ($lines as $line) {
         $r = str_getcsv($line, $delimiter);
+        if (count($r) < max($idx)) continue;
         $rows[] = [
             'guruid' => (int)$r[$idx['userid']],
             'nis'    => $r[$idx['nis']],
@@ -105,155 +109,161 @@ function jw_get_kelas_siswa($userid) {
 
 class jw_form extends moodleform {
     public function definition() {
-        global $USER;
-
         $m = $this->_form;
+
+        // Kirim ID edit lewat form jika sedang mode edit
+        $m->addElement('hidden', 'editid', 0);
+        $m->setType('editid', PARAM_INT);
 
         $now = time();
         $m->addElement('static', 'waktu', 'Waktu', tanggal_indo($now));
 
-        $muridopts = jw_get_murid_options_from_csv($USER->id);
+        // Dapatkan data pilihan murid
+        $muridopts = $this->_customdata['murid_options'];
 
-// Bagi jadi 2 kolom
-$col1 = array_slice($muridopts, 0, ceil(count($muridopts)/2), true);
-$col2 = array_slice($muridopts, ceil(count($muridopts)/2), null, true);
+        if (!empty($muridopts)) {
+            $m->addElement('html', '<div class="form-group row">');
+            $m->addElement('html', '<div class="col-md-3 text-md-right font-weight-bold"><label>Pilih Murid</label></div>');
+            $m->addElement('html', '<div class="col-md-9">');
+            $m->addElement('html', '<div class="row">');
 
-$html = '<div class="jw-grid">';
+            // Bagi menjadi 2 kolom seimbang
+            $chunks = array_chunk($muridopts, ceil(count($muridopts) / 2), true);
+            $no = 1;
 
-// === KOLOM 1 ===
-$html .= '<div class="jw-col">';
-$no = 1;
-foreach ($col1 as $id => $name) {
-    $html .= '<label class="jw-item">
-        <span class="jw-no">'.$no++.'.</span>
-        <input type="checkbox" name="muridids[]" value="'.$id.'">
-        <span class="jw-name">'.$name.'</span>
-    </label>';
-}
-$html .= '</div>';
+            foreach ($chunks as $chunk) {
+                $m->addElement('html', '<div class="col-md-6 d-flex flex-column" style="gap: 6px;">');
+                foreach ($chunk as $id => $name) {
+                    $m->addElement('html', '<div class="custom-control custom-checkbox text-left">');
+                    $m->addElement('html', '<input type="checkbox" class="custom-control-input" id="murid_'.$id.'" name="muridids[]" value="'.$id.'">');
+                    $m->addElement('html', '<label class="custom-control-label font-weight-normal" for="murid_'.$id.'"><span class="text-muted mr-1">'.$no++.'.</span> '.$name.'</label>');
+                    $m->addElement('html', '</div>');
+                }
+                $m->addElement('html', '</div>'); // Tutup col-md-6
+            }
 
-// === KOLOM 2 ===
-$html .= '<div class="jw-col">';
-foreach ($col2 as $id => $name) {
-    $html .= '<label class="jw-item">
-        <span class="jw-no">'.$no++.'.</span>
-        <input type="checkbox" name="muridids[]" value="'.$id.'">
-        <span class="jw-name">'.$name.'</span>
-    </label>';
-}
-$html .= '</div>';
+            $m->addElement('html', '</div>'); // Tutup row dalam
+            $m->addElement('html', '</div>'); // Tutup col-md-9
+            $m->addElement('html', '</div>'); // Tutup form-group row
+        } else {
+            $m->addElement('static', 'emptymurid', 'Pilih Murid', '<span class="text-danger">Tidak ada data murid binaan ditemukan di binaan.csv</span>');
+        }
 
-$html .= '</div>';
-
-// CSS
-$html .= '
-<style>
-.jw-grid {
-    display: flex;
-    gap: 40px;
-    margin: 10px 0;
-}
-.jw-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-.jw-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-}
-.jw-no {
-    width: 25px;
-    color: #666;
-}
-.jw-name {
-    flex: 1;
-}
-</style>
-';
-
-        $m->addElement('html', $html);
-
-        $m->addElement('text','topik','Topik',['size'=>80]);
+// Hapus class CSS manual dan gunakan atribut standar form Moodle
+        $m->addElement('text', 'topik', 'Topik', ['size' => 80]);
         $m->setType('topik', PARAM_TEXT);
+        $m->addRule('topik', 'Topik tidak boleh kosong', 'required', null, 'client');
 
-        $m->addElement('textarea','tindaklanjut','Tindak Lanjut',['rows'=>3]);
+        $m->addElement('textarea', 'tindaklanjut', 'Tindak Lanjut', ['rows' => 3, 'cols' => 80]);
         $m->setType('tindaklanjut', PARAM_TEXT);
 
-        $m->addElement('textarea','keterangan','Keterangan',['rows'=>3]);
+        $m->addElement('textarea', 'keterangan', 'Keterangan', ['rows' => 3, 'cols' => 80]);
         $m->setType('keterangan', PARAM_TEXT);
 
-        $this->add_action_buttons(true, 'Simpan');
+        $this->add_action_buttons(true, 'Simpan Data');
     }
 }
 
-/* ======================= HANDLE SUBMIT ======================= */
+/* ======================= PROCESS CRUD ======================= */
 
-$mform = new jw_form();
+$murid_options = jw_get_murid_options_from_csv($USER->id);
+$mform = new jw_form(null, ['murid_options' => $murid_options]);
+
+// Set default data jika dalam mode EDIT
+if ($editid > 0) {
+    $existing = $DB->get_record('local_jurnalguruwali', ['id' => $editid, 'guruid' => $USER->id]);
+    if ($existing) {
+        $mform->set_data([
+            'editid' => $existing->id,
+            'topik' => $existing->topik,
+            'tindaklanjut' => $existing->tindaklanjut,
+            'keterangan' => $existing->keterangan,
+        ]);
+        // Script inject sederhana untuk otomatis mencentang murid yang sedang diedit
+        $PAGE->requires->js_init_code("
+            var checkbox = document.getElementById('murid_".$existing->userid."');
+            if(checkbox) checkbox.checked = true;
+        ");
+    }
+}
 
 if ($data = $mform->get_data()) {
-
     require_sesskey();
-
     $muridids = optional_param_array('muridids', [], PARAM_INT);
 
-if (empty($muridids)) {
-    echo $OUTPUT->header();
-    echo $OUTPUT->notification('Pilih minimal satu murid.', 'error');
-    $mform->display();
-    echo $OUTPUT->footer();
-    exit;
-}
+    if (empty($muridids)) {
+        echo $OUTPUT->header();
+        echo $OUTPUT->notification('Pilih minimal satu murid.', 'error');
+        $mform->display();
+        echo $OUTPUT->footer();
+        exit;
+    }
 
     $now = time();
 
-    foreach ($muridids as $muridid) {
+    // Jika bernilai editid > 0, kita perbarui record tunggal saja
+    if ($data->editid > 0) {
+        foreach ($muridids as $muridid) { // Umumnya hanya 1 yang dicentang saat edit
+            $kelas = jw_get_kelas_siswa($muridid);
+            $update = new stdClass();
+            $update->id = $data->editid;
+            $update->userid = $muridid;
+            $update->kelas = $kelas;
+            $update->topik = $data->topik;
+            $update->tindaklanjut = $data->tindaklanjut;
+            $update->keterangan = $data->keterangan;
+            
+            $DB->update_record('local_jurnalguruwali', $update);
+        }
+        redirect($PAGE->url, 'Data berhasil diperbarui', null, \core\output\notification::NOTIFY_SUCCESS);
+    } else {
+        // Mode Insert Baru (Bisa banyak murid sekaligus)
+        foreach ($muridids as $muridid) {
+            $murid = $DB->get_record('user', ['id' => $muridid], 'lastname');
+            $kelas = jw_get_kelas_siswa($muridid);
+            
+            $record = new stdClass();
+            $record->guruid = $USER->id;
+            $record->userid = $muridid;
+            $record->kelas = $kelas;
+            $record->topik = $data->topik;
+            $record->tindaklanjut = $data->tindaklanjut;
+            $record->keterangan = $data->keterangan;
+            $record->timecreated = $now;
 
-        $murid = $DB->get_record('user', ['id'=>$muridid], 'lastname');
-        $kelas = jw_get_kelas_siswa($muridid);
-        
-        $record = new stdClass();
-        $record->guruid = $USER->id;
-        $record->userid = $muridid;
-        $record->kelas = $kelas;
-        $record->topik = $data->topik;
-        $record->tindaklanjut = $data->tindaklanjut;
-        $record->keterangan = $data->keterangan;
-        $record->timecreated = $now;
+            $DB->insert_record('local_jurnalguruwali', $record);
 
-        $DB->insert_record('local_jurnalguruwali', $record);
+            // ===== KIRIM NOTIFIKASI WA =====
+            $pesan = "*📋 Jurnal Guru Wali*\n\n"
+                   . "📅 Waktu: ".tanggal_indo($now)."\n"
+                   . "👤 Murid: ".format_nama_siswa($murid->lastname)."\n"
+                   . "🏫 Kelas: ".$kelas."\n"
+                   . "🧩 Topik: ".$data->topik."\n"
+                   . "💡 Tindak lanjut: ".$data->tindaklanjut."\n"
+                   . "📝 Keterangan: ".$data->keterangan."\n"
+                   . "👨‍🏫 Guru Wali: ".$USER->lastname;
 
-        // ===== WA =====
-
-        $pesan = "*📋 Jurnal Guru Wali*\n\n"
-               . "📅 Waktu: ".tanggal_indo($now)."\n"
-               . "👤 Murid: ".format_nama_siswa($murid->lastname)."\n"
-               . "🏫 Kelas: ".$kelas."\n"
-               . "🧩 Topik: ".$data->topik."\n"
-               . "💡 Tindak lanjut: ".$data->tindaklanjut."\n"
-               . "📝 Keterangan: ".$data->keterangan."\n"
-               . "👨‍🏫 Guru Wali: ".$USER->lastname;
-
-        $tujuan = [
-    get_nomor_wali_kelas($kelas)
-];
-
-jurnalmengajar_kirim_wa($tujuan, $pesan);
+            $tujuan = [get_nomor_wali_kelas($kelas)];
+            jurnalmengajar_kirim_wa($tujuan, $pesan);
+        }
+        redirect($PAGE->url, 'Data berhasil disimpan', null, \core\output\notification::NOTIFY_SUCCESS);
     }
-
-    redirect($PAGE->url, 'Data berhasil disimpan');
 }
 
-/* ======================= TAMPILAN ======================= */
+/* ======================= TAMPILAN PAGE ======================= */
 
 echo $OUTPUT->header();
 
+// Tampilkan Form Input/Edit
+echo html_writer::start_div('card mb-4 shadow-sm');
+echo html_writer::div($editid > 0 ? '✏️ Edit Jurnal Guru Wali' : '📝 Input Jurnal Guru Wali', 'card-header bg-light font-weight-bold');
+echo html_writer::start_div('card-body');
 $mform->display();
+echo html_writer::end_div();
+echo html_writer::end_div();
 
-echo html_writer::tag('h3','Riwayat');
+// Bagian Tabel Riwayat
+echo html_writer::tag('h3', '📋 Riwayat Jurnal Terakhir', ['class' => 'mt-4 mb-3']);
 
 $rows = $DB->get_records_sql("
     SELECT j.*, u.lastname
@@ -264,47 +274,39 @@ $rows = $DB->get_records_sql("
 ", [$USER->id], 0, 10);
 
 $table = new html_table();
-$table->head = ['No','Waktu','Murid','Kelas','Topik','Tindak','Ket','Aksi'];
+$table->attributes['class'] = 'table table-bordered table-striped table-hover generic_table';
+$table->head = ['No', 'Waktu', 'Murid', 'Kelas', 'Topik', 'Tindak Lanjut', 'Keterangan', 'Aksi'];
 
 $no = 1;
-
 foreach ($rows as $r) {
-$editurl = new moodle_url('/local/jurnalmengajar/jurnalguruwali.php', [
-    'editid' => $r->id,
-    'sesskey' => sesskey()
-]);
+    $editurl = new moodle_url('/local/jurnalmengajar/jurnalguruwali.php', [
+        'editid' => $r->id
+    ]);
 
-$aksi = html_writer::link($editurl, '✏️ Edit');
-    $kelas = $r->kelas;
+    $aksi = html_writer::link($editurl, '✏️ Edit', ['class' => 'btn btn-sm btn-outline-primary']);
 
     $table->data[] = [
         $no++,
         tanggal_indo($r->timecreated),
-    s(format_nama_siswa($r->lastname)),
-        s($kelas),
-	s($r->topik),
+        html_writer::tag('strong', s(format_nama_siswa($r->lastname))),
+        s($r->kelas),
+        s($r->topik),
         s($r->tindaklanjut),
         s($r->keterangan),
         $aksi
     ];
 }
 
-echo html_writer::table($table);
-echo html_writer::start_div('mt-3');
+if (empty($rows)) {
+    echo $OUTPUT->notification('Belum ada riwayat jurnal yang diisi.', 'info');
+} else {
+    echo html_writer::table($table);
+}
 
-echo html_writer::start_tag('form', [
-    'method' => 'get',
-    'action' => (new moodle_url('/local/jurnalmengajar/exportguruwali_form.php'))->out(false),
-    'class'  => 'd-inline'
-]);
+// Tombol Navigasi Bawah (Ekspor dan Kembali)
+echo html_writer::start_div('d-flex justify-content-between align-items-center mt-4');
 
-echo html_writer::tag('button', '<strong>💾 Ekspor Jurnal Guru Wali per Bulan</strong>', [
-    'type'  => 'submit',
-    'class' => 'btn btn-outline-secondary'
-], false);
-
-echo html_writer::end_tag('form');
-echo html_writer::end_div();
+// Tombol Kembali
 echo html_writer::link(
     '#',
     '⬅ Kembali',
@@ -314,5 +316,19 @@ echo html_writer::link(
         'title' => 'Kembali ke halaman sebelumnya'
     ]
 );
+
+// Tombol Ekspor
+echo html_writer::start_tag('form', [
+    'method' => 'get',
+    'action' => (new moodle_url('/local/jurnalmengajar/exportguruwali_form.php'))->out(false),
+    'class'  => 'm-0'
+]);
+echo html_writer::tag('button', '💾 Ekspor Jurnal per Bulan', [
+    'type'  => 'submit',
+    'class' => 'btn btn-success font-weight-bold'
+], false);
+echo html_writer::end_tag('form');
+
+echo html_writer::end_div();
 
 echo $OUTPUT->footer();

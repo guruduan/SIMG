@@ -11,17 +11,15 @@ $PAGE->set_url(new moodle_url('/local/jurnalmengajar/rekap_kehadiran.php'));
 $PAGE->set_title('Rekap Kehadiran Murid');
 $PAGE->set_heading('Rekap Kehadiran Murid');
 $PAGE->requires->jquery();
-// load css sticky header
-//$PAGE->requires->css('/local/jurnalmengajar/css/stickyheader.css');
 
 echo $OUTPUT->header();
 
-// Tombol kembali dan Rekap Bulanan (Dipisah atau digabung dengan benar)
+// --- Tombol Aksi Atas ---
 $tombol_kembali = html_writer::link(
     '#',
     '⬅ Kembali',
     [
-        'class' => 'btn btn-secondary mr-2', // Menambahkan mr-2 agar ada jarak antar tombol
+        'class' => 'btn btn-secondary me-2', 
         'onclick' => 'history.back(); return false;'
     ]
 );
@@ -32,26 +30,23 @@ $tombol_bulanan = html_writer::link(
     ['class' => 'btn btn-info']
 );
 
-// Bungkus kedua tombol di dalam satu div container
-echo html_writer::div($tombol_kembali . $tombol_bulanan, 'mb-3');
-
-echo $OUTPUT->heading('Rekap Kehadiran Murid Per Kelas');
+echo html_writer::div($tombol_kembali . $tombol_bulanan, 'mb-4');
+echo $OUTPUT->heading('Rekap Kehadiran Murid Per Kelas', 3, 'mb-4');
 
 // Ambil daftar kelas
 $kelaslist = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
 
-// Ambil parameter (mode default HARI)
+// Ambil parameter
 $kelasid     = optional_param('kelas', 0, PARAM_INT);
 $dari_raw    = optional_param('dari', '', PARAM_RAW);
 $sampai_raw  = optional_param('sampai', '', PARAM_RAW);
-$mode        = optional_param('mode', 'hari', PARAM_ALPHA); // 'hari' | 'jam'  ← default HARI
+$mode        = optional_param('mode', 'hari', PARAM_ALPHA); 
 $onlymine    = optional_param('onlymine', 0, PARAM_BOOL);
 $matpel      = optional_param('matpel', '', PARAM_TEXT);
 
 $dari   = $dari_raw   ? strtotime($dari_raw . ' 00:00:00') : 0;
 $sampai = $sampai_raw ? strtotime($sampai_raw . ' 23:59:59') : 0;
 
-// Prioritas status untuk mode "hari" (semakin besar => makin dominan)
 $priority = [
     'hadir'       => 0,
     'dispensasi'  => 1,
@@ -60,132 +55,89 @@ $priority = [
     'alpa'        => 4,
 ];
 
-// ===== Form filter (vertikal) =====
-echo html_writer::start_tag('form', ['method' => 'get', 'class' => 'mb-3']);
+// ===== FORM FILTER RESPONSIVE (BOOTSTRAP GRID) =====
+echo html_writer::start_tag('form', ['method' => 'get', 'class' => 'card card-body bg-light mb-4']);
 
-// Pilih Kelas & Mode Hitung (1 baris)
-echo html_writer::start_div('mb-2 d-flex gap-3 align-items-end');
+echo html_writer::start_div('row g-3 align-items_end mb-3');
 
-// Pilih Kelas
-echo html_writer::start_div('flex-fill');
-echo html_writer::tag('label', 'Pilih Kelas:', ['for' => 'kelas', 'class' => 'form-label']);
-echo html_writer::select(
-    $kelaslist,
-    'kelas',
-    $kelasid ?: '',
-    ['' => '-- Pilih Kelas --'],
-    ['class' => 'form-select', 'id' => 'kelas']
-);
+// Baris 1: Kelas & Mode Hitung
+echo html_writer::start_div('col-md-6');
+echo html_writer::tag('label', 'Pilih Kelas:', ['for' => 'kelas', 'class' => 'form-label fw-bold']);
+echo html_writer::select($kelaslist, 'kelas', $kelasid ?: '', ['' => '-- Pilih Kelas --'], ['class' => 'form-control form-select', 'id' => 'kelas']);
 echo html_writer::end_div();
 
-// Mode Hitung
-echo html_writer::start_div('flex-fill');
-echo html_writer::tag('label', 'Mode Hitung:', ['for' => 'mode', 'class' => 'form-label']);
+echo html_writer::start_div('col-md-6');
+echo html_writer::tag('label', 'Mode Hitung:', ['for' => 'mode', 'class' => 'form-label fw-bold']);
 $optionsmode = ['hari' => 'Per Hari', 'jam' => 'Per Jam'];
-echo html_writer::select(
-    $optionsmode,
-    'mode',
-    in_array($mode, ['hari','jam']) ? $mode : 'hari',
-    false,
-    ['class' => 'form-select', 'id' => 'mode']
-);
+echo html_writer::select($optionsmode, 'mode', in_array($mode, ['hari','jam']) ? $mode : 'hari', false, ['class' => 'form-control form-select', 'id' => 'mode']);
 echo html_writer::end_div();
 
+echo html_writer::end_div(); // End Row 1
+
+
+echo html_writer::start_div('row g-3 align-items-end mb-3');
+
+// Baris 2: Rentang Tanggal
+echo html_writer::start_div('col-md-6');
+echo html_writer::tag('label', 'Dari Tanggal:', ['for' => 'dari', 'class' => 'form-label fw-bold']);
+echo html_writer::empty_tag('input', ['type' => 'date', 'name' => 'dari', 'id' => 'dari', 'value' => s($dari_raw), 'class' => 'form-control', 'required' => 'required']);
 echo html_writer::end_div();
 
-// Dari tanggal & Sampai tanggal (1 baris)
-echo html_writer::start_div('mb-2 d-flex gap-3 align-items-end');
-
-// Dari tanggal
-echo html_writer::start_div('flex-fill');
-echo html_writer::tag('label', 'Dari tanggal:', ['for' => 'dari', 'class' => 'form-label']);
-echo html_writer::empty_tag('input', [
-    'type'     => 'date',
-    'name'     => 'dari',
-    'id'       => 'dari',
-    'value'    => s($dari_raw),
-    'class'    => 'form-control',
-    'required' => 'required'
-]);
+echo html_writer::start_div('col-md-6');
+echo html_writer::tag('label', 'Sampai Tanggal:', ['for' => 'sampai', 'class' => 'form-label fw-bold']);
+echo html_writer::empty_tag('input', ['type' => 'date', 'name' => 'sampai', 'id' => 'sampai', 'value' => s($sampai_raw), 'class' => 'form-control', 'required' => 'required']);
 echo html_writer::end_div();
 
-// Sampai tanggal
-echo html_writer::start_div('flex-fill');
-echo html_writer::tag('label', 'Sampai tanggal:', ['for' => 'sampai', 'class' => 'form-label']);
-echo html_writer::empty_tag('input', [
-    'type'     => 'date',
-    'name'     => 'sampai',
-    'id'       => 'sampai',
-    'value'    => s($sampai_raw),
-    'class'    => 'form-control',
-    'required' => 'required'
-]);
+echo html_writer::end_div(); // End Row 2
+
+
+echo html_writer::start_div('row g-3 align-items-center');
+
+// Baris 3: Mata Pelajaran & Checkbox & Tombol
+echo html_writer::start_div('col-md-5');
+echo html_writer::tag('label', 'Mata Pelajaran:', ['for' => 'matpel', 'class' => 'form-label fw-bold']);
+echo html_writer::empty_tag('input', ['type' => 'text', 'name' => 'matpel', 'id' => 'matpel', 'value' => s($matpel), 'class' => 'form-control', 'placeholder' => 'Semua mata pelajaran']);
 echo html_writer::end_div();
 
+echo html_writer::start_div('col-md-4 pt-4'); // pt-4 mendorong agar sejajar input text
+echo html_writer::start_div('form-check py-2');
+echo html_writer::empty_tag('input', ['type' => 'checkbox', 'name' => 'onlymine', 'id' => 'onlymine', 'value' => 1, 'class' => 'form-check-input', 'checked' => $onlymine ? 'checked' : null]);
+echo html_writer::tag('label', 'Hanya Jurnal Saya', ['for' => 'onlymine', 'class' => 'form-check-label fw-bold']);
+echo html_writer::end_div();
 echo html_writer::end_div();
 
-// Mata Pelajaran + Hanya Jurnal Saya + Tombol Tampilkan (1 baris)
-echo html_writer::start_div('mb-3 d-flex align-items-end gap-3');
-
-// Mata pelajaran
-echo html_writer::start_div('flex-fill');
-echo html_writer::tag('label', 'Mata Pelajaran:', ['for' => 'matpel', 'class' => 'form-label']);
-echo html_writer::empty_tag('input', [
-    'type'        => 'text',
-    'name'        => 'matpel',
-    'id'          => 'matpel',
-    'value'       => s($matpel),
-    'class'       => 'form-control',
-    'placeholder' => 'Kosongkan jika semua mapel'
-]);
+echo html_writer::start_div('col-md-3 pt-4 text-end');
+echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => '🔍 Tampilkan', 'class' => 'btn btn-primary w-100']);
 echo html_writer::end_div();
 
-// Checkbox hanya jurnal saya
-echo html_writer::start_div('form-check mb-0 ms-2');
-echo html_writer::empty_tag('input', [
-    'type'    => 'checkbox',
-    'name'    => 'onlymine',
-    'id'      => 'onlymine',
-    'value'   => 1,
-    'class'   => 'form-check-input',
-    'checked' => $onlymine ? 'checked' : null
-]);
-echo html_writer::tag('label', 'Hanya Jurnal Saya', ['for' => 'onlymine', 'class' => 'form-check-label']);
-echo html_writer::end_div();
+echo html_writer::end_div(); // End Row 3
 
-// Tombol tampilkan
-echo html_writer::empty_tag('input', [
-    'type'  => 'submit',
-    'value' => 'Tampilkan',
-    'class' => 'btn btn-primary ms-2'
-]);
-
-echo html_writer::end_div(); // end flex baris
 echo html_writer::end_tag('form');
 
 
-// ===== Ringkasan filter =====
-if ($dari && $sampai) {
-    echo '<p><strong>Rentang Tanggal:</strong> ' 
-    . tanggal_indo($dari, 'tanggal') 
-    . ' sampai ' 
-    . tanggal_indo($sampai, 'tanggal') . '</p>';
-}
-echo '<p><strong>Mode:</strong> ' . ($mode === 'hari' ? 'Per Hari' : 'Per Jam') . '</p>';
-if ($onlymine || $matpel !== '') {
-    $badge = [];
-    if ($onlymine) { $badge[] = 'Hanya jurnal saya'; }
-    if ($matpel !== '') { $badge[] = 'Matpel: '.s($matpel); }
-    echo '<p><em>Filter: ' . implode(' | ', $badge) . '</em></p>';
+// ===== RINGKASAN FILTER AKTIF =====
+if ($kelasid && $dari && $sampai) {
+    echo html_writer::start_div('alert alert-info py-2 px-3 mb-4 d-flex flex-wrap gap-3 align-items-center justify-content-between');
+    echo '<div>';
+    echo '<strong>Rentang:</strong> ' . tanggal_indo($dari, 'tanggal') . ' s/d ' . tanggal_indo($sampai, 'tanggal') . ' | ';
+    echo '<strong>Mode:</strong> ' . ($mode === 'hari' ? 'Per Hari' : 'Per Jam');
+    if ($onlymine || $matpel !== '') {
+        $badge = [];
+        if ($onlymine) { $badge[] = 'Internal (Saya)'; }
+        if ($matpel !== '') { $badge[] = 'Mapel: '.s($matpel); }
+        echo ' | <span class="badge bg-secondary">' . implode('</span> <span class="badge bg-secondary">', $badge) . '</span>';
+    }
+    echo '</div>';
+    echo html_writer::end_div();
 }
 
-// ===== Proses data =====
+// ===== PROSES DATA & TABEL =====
 if ($kelasid && $dari && $sampai) {
     $members = $DB->get_records('cohort_members', ['cohortid' => $kelasid]);
     $userids = array_map(fn($m) => $m->userid, $members);
 
     if (empty($userids)) {
-        echo 'Tidak ada murid dalam kelas ini.';
+        echo html_writer::div('Tidak ada murid dalam kelas ini.', 'alert alert-warning text-center fw-bold mt-3');
         echo $OUTPUT->footer();
         exit;
     }
@@ -198,7 +150,6 @@ if ($kelasid && $dari && $sampai) {
         ORDER BY lastname ASC, firstname ASC
     ", $paramsin);
 
-    // Build SELECT jurnal dengan filter tambahan
     $params = ['kelas' => $kelasid, 'dari' => $dari, 'sampai' => $sampai];
     $wheres = ['kelas = :kelas', 'timecreated BETWEEN :dari AND :sampai'];
 
@@ -208,133 +159,89 @@ if ($kelasid && $dari && $sampai) {
         $params['uid'] = $USER->id;
     }
     if ($matpel !== '') {
-        // exact match; jika ingin LIKE, ganti dua baris di bawah
         $wheres[] = 'matapelajaran = :matpel';
         $params['matpel'] = $matpel;
-        // Alternatif LIKE:
-        // $wheres[] = $DB->sql_like('matapelajaran', ':matpel', false, false);
-        // $params['matpel'] = "%{$matpel}%";
     }
 
     $selectsql = implode(' AND ', $wheres);
     $jurnals = $DB->get_records_select('local_jurnalmengajar', $selectsql, $params);
 
-    // ==========================
-    // CABANG PERHITUNGAN
-    // ==========================
     $data = [];
     foreach ($users as $u) {
         $data[$u->id] = ['hadir' => 0, 'sakit' => 0, 'ijin' => 0, 'alpa' => 0, 'dispensasi' => 0];
     }
 
     if ($mode === 'hari') {
-    // ====== MODE PER HARI: HANYA HITUNG KETIDAKHADIRAN PENUH ======
+        $perhari = [];
+        $all_dates = [];
 
-    $perhari = [];     // [userid][tgl] => ['hadir'=>x,'sakit'=>x,'ijin'=>x,'alpa'=>x,'dispensasi'=>x]
-    $all_dates = [];   // daftar tanggal unik
+        foreach ($jurnals as $jurnal) {
+            $tgl = date('Y-m-d', $jurnal->timecreated);
+            $all_dates[$tgl] = true;
 
-    foreach ($jurnals as $jurnal) {
-        $tgl = date('Y-m-d', $jurnal->timecreated);
-        $all_dates[$tgl] = true;
+            $jamke  = array_filter(array_map('trim', explode(',', (string)($jurnal->jamke ?? ''))));
+            $jmljam = count($jamke) ?: 1;
 
-        // Ambil daftar jam di jurnal ini
-        $jamke  = array_filter(array_map('trim', explode(',', (string)($jurnal->jamke ?? ''))));
-        $jmljam = count($jamke);
-        if ($jmljam == 0) {
-            // fallback: kalau jamke kosong, anggap 1 jam
-            $jmljam = 1;
+            $absen = json_decode($jurnal->absen, true) ?? [];
+            $lookup = [];
+            foreach ($absen as $nama => $alasan) {
+                $lookup[mb_strtolower(trim($nama), 'UTF-8')] = strtolower(trim($alasan));
+            }
+
+            foreach ($users as $uid => $u) {
+                $namasiswa = mb_strtolower(trim($u->lastname), 'UTF-8');
+
+                if (!isset($perhari[$uid][$tgl])) {
+                    $perhari[$uid][$tgl] = ['hadir' => 0, 'sakit' => 0, 'ijin' => 0, 'alpa' => 0, 'dispensasi' => 0];
+                }
+
+                $status = isset($lookup[$namasiswa]) ? $lookup[$namasiswa] : 'hadir';
+                if (!isset($perhari[$uid][$tgl][$status])) {
+                    $status = 'hadir';
+                }
+
+                $perhari[$uid][$tgl][$status] += $jmljam;
+            }
         }
 
-        // JSON absen: nama => alasan
-        $absen = json_decode($jurnal->absen, true) ?? [];
-        $lookup = [];
-        foreach ($absen as $nama => $alasan) {
-            $namajson = trim($nama);
-            $lookup[mb_strtolower($namajson, 'UTF-8')] = strtolower(trim($alasan));
-        }
+        $uniqdates = array_keys($all_dates);
+        sort($uniqdates);
 
-        // Isi per hari per siswa
         foreach ($users as $uid => $u) {
-            $namasiswa = mb_strtolower(trim($u->lastname), 'UTF-8');
+            foreach ($uniqdates as $tgl) {
+                if (empty($perhari[$uid][$tgl])) { continue; }
 
-            if (!isset($perhari[$uid][$tgl])) {
-                $perhari[$uid][$tgl] = [
-                    'hadir'       => 0,
-                    'sakit'       => 0,
-                    'ijin'        => 0,
-                    'alpa'        => 0,
-                    'dispensasi'  => 0,
-                ];
-            }
+                $h = $perhari[$uid][$tgl]['hadir'];
+                $tot = array_sum($perhari[$uid][$tgl]);
+                if ($tot == 0) { continue; }
 
-            // Default hadir, kecuali ada di JSON absen
-            if (isset($lookup[$namasiswa])) {
-                $status = $lookup[$namasiswa];
-            } else {
-                $status = 'hadir';
-            }
+                $nonhadir = $tot - $h;
 
-            if (!isset($perhari[$uid][$tgl][$status])) {
-                $status = 'hadir';
-            }
-
-            // Tambahkan sejumlah jam jurnal ini
-            $perhari[$uid][$tgl][$status] += $jmljam;
-        }
-    }
-
-    $uniqdates = array_keys($all_dates);
-    sort($uniqdates);
-
-    // Konversi per-jam ke per-hari (full day only)
-    foreach ($users as $uid => $u) {
-        foreach ($uniqdates as $tgl) {
-            if (empty($perhari[$uid][$tgl])) {
-                continue;
-            }
-
-            $h = $perhari[$uid][$tgl]['hadir'];
-            $tot = array_sum($perhari[$uid][$tgl]); // total jam hari itu
-            if ($tot == 0) {
-                continue;
-            }
-
-            $nonhadir = $tot - $h;
-
-            if ($nonhadir == 0) {
-                // Semua jam hadir -> 1 hari hadir
-                $statushari = 'hadir';
-            } else if ($h == 0) {
-                // Tidak hadir sama sekali seharian -> pilih status nonhadir prioritas tertinggi
-                $statushari = 'hadir';
-                $maxprio = -1;
-                foreach (['dispensasi','sakit','ijin','alpa'] as $st) {
-                    if (!empty($perhari[$uid][$tgl][$st])) {
-                        $p = $priority[$st] ?? 0;
-                        if ($p > $maxprio) {
-                            $maxprio = $p;
-                            $statushari = $st;
+                if ($nonhadir == 0) {
+                    $statushari = 'hadir';
+                } else if ($h == 0) {
+                    $statushari = 'hadir';
+                    $maxprio = -1;
+                    foreach (['dispensasi','sakit','ijin','alpa'] as $st) {
+                        if (!empty($perhari[$uid][$tgl][$st])) {
+                            $p = $priority[$st] ?? 0;
+                            if ($p > $maxprio) {
+                                $maxprio = $p;
+                                $statushari = $st;
+                            }
                         }
                     }
+                } else {
+                    $statushari = 'hadir';
                 }
-            } else {
-                // Campuran hadir + tidak hadir di hari itu
-                // → dianggap HADIR di rekap harian (tidak merugikan murid)
-                $statushari = 'hadir';
-            }
 
-            if (!isset($data[$uid][$statushari])) {
-                $statushari = 'hadir';
+                $data[$uid][$statushari] += 1;
             }
-            $data[$uid][$statushari] += 1;
         }
-    }
 
-    $total_unit = count($uniqdates); // total hari
-    $unit_label = 'hari';
-}
- else {
-        // ====== MODE PER JAM (JAMKE) ======
+        $total_unit = count($uniqdates);
+        $unit_label = 'hari';
+    } else {
         foreach ($jurnals as $jurnal) {
             $jamke  = array_filter(array_map('trim', explode(',', (string)($jurnal->jamke ?? ''))));
             $jmljam = count($jamke);
@@ -345,10 +252,7 @@ if ($kelasid && $dari && $sampai) {
                 $found = false;
 
                 foreach ($absen as $nama => $alasan) {
-                    $namajson = trim($nama);
-                    $alasan = strtolower(trim($alasan));
-
-                    if (strcasecmp($namajson, $namasiswa) == 0) {
+                    if (strcasecmp(trim($nama), $namasiswa) == 0) {
                         $alasan = strtolower(trim($alasan));
                         if (isset($data[$uid][$alasan])) {
                             $data[$uid][$alasan] += $jmljam;
@@ -364,7 +268,6 @@ if ($kelasid && $dari && $sampai) {
             }
         }
 
-        // total_unit = total jam (ambil maksimum agar konsisten tampilan)
         $total_unit = 0;
         foreach ($data as $d) {
             $total_unit = max($total_unit, $d['hadir'] + $d['sakit'] + $d['ijin'] + $d['alpa'] + $d['dispensasi']);
@@ -372,35 +275,38 @@ if ($kelasid && $dari && $sampai) {
         $unit_label = 'jam';
     }
 
-    // ====== TABEL HASIL ======
-    echo html_writer::start_div('table-wrapper');
-    echo html_writer::start_tag('table', ['class' => 'generaltable']);
-    echo html_writer::start_tag('thead');
-    echo html_writer::tag('tr',
-        html_writer::tag('th', 'No') .
-        html_writer::tag('th', 'Nama Murid') .
-        html_writer::tag('th', 'Hadir') .
-        html_writer::tag('th', 'Sakit') .
-        html_writer::tag('th', 'Ijin') .
-        html_writer::tag('th', 'Alpa') .
-        html_writer::tag('th', 'Dispensasi') .
-        html_writer::tag('th', 'Persentase') .
-        html_writer::tag('th', 'Aksi')
-    );
+    // ====== DESAIN TABEL TERBARU ======
+    echo html_writer::start_div('table-responsive card mb-4');
+    echo html_writer::start_tag('table', ['class' => 'table table-striped table-hover m-0 table-bordered align-middle']);
+    echo html_writer::start_tag('thead', ['class' => 'table-dark text-center']);
+    echo html_writer::start_tag('tr');
+    echo html_writer::tag('th', 'No', ['style' => 'width: 50px;']);
+    echo html_writer::tag('th', 'Nama Murid', ['class' => 'text-start']);
+    echo html_writer::tag('th', 'Hadir', ['style' => 'width: 90px;']);
+    echo html_writer::tag('th', 'Sakit', ['style' => 'width: 90px;']);
+    echo html_writer::tag('th', 'Ijin', ['style' => 'width: 90px;']);
+    echo html_writer::tag('th', 'Alpa', ['style' => 'width: 90px;']);
+    echo html_writer::tag('th', 'Dispensasi', ['style' => 'width: 100px;']);
+    echo html_writer::tag('th', 'Persentase');
+    echo html_writer::tag('th', 'Aksi', ['style' => 'width: 220px;']);
+    echo html_writer::end_tag('tr');
     echo html_writer::end_tag('thead');
     echo html_writer::start_tag('tbody');
 
     $no = 1;
     foreach ($data as $uid => $d) {
-        $total = $total_unit; // total hari atau total jam (tergantung mode)
+        $total = $total_unit;
         if ($total > 0) {
             $p = ($d['hadir'] / $total) * 100;
             $p1 = round($p, 1);
             $is_int = abs($p1 - round($p1)) < 0.00001;
             $pstr = $is_int ? (string)round($p1) : number_format($p1, 1, ',', '');
-            $persen = $pstr . '% dari ' . $total . ' ' . $unit_label;
+            
+            // Pewarnaan teks persentase biar stand-out
+            $text_color = ($p1 >= 85) ? 'text-success fw-bold' : (($p1 >= 75) ? 'text-warning fw-bold' : 'text-danger fw-bold');
+            $persen = '<span class="'.$text_color.'">' . $pstr . '%</span> <small class="text-muted">dari ' . $total . ' ' . $unit_label . '</small>';
         } else {
-            $persen = '-';
+            $persen = '<span class="text-muted">-</span>';
         }
 
         $namasiswa = ucwords(strtolower($users[$uid]->lastname));
@@ -414,26 +320,27 @@ if ($kelasid && $dari && $sampai) {
             'onlymine' => $onlymine ? 1 : 0,
             'matpel'   => $matpel
         ]);
-        $aksi = html_writer::link($link, '🔍 Lihat Rekap Per Murid');
+        
+        $aksi = html_writer::link($link, '🔍 Lihat Detail', ['class' => 'btn btn-outline-primary btn-sm rounded-pill px-3']);
 
-        echo html_writer::tag('tr',
-            html_writer::tag('td', $no++) .
-            html_writer::tag('td', $namasiswa) .
-            html_writer::tag('td', $d['hadir']) .
-            html_writer::tag('td', $d['sakit']) .
-            html_writer::tag('td', $d['ijin']) .
-            html_writer::tag('td', $d['alpa']) .
-            html_writer::tag('td', $d['dispensasi']) .
-            html_writer::tag('td', $persen) .
-            html_writer::tag('td', $aksi)
-        );
+        echo html_writer::start_tag('tr', ['class' => 'text-center']);
+        echo html_writer::tag('td', $no++);
+        echo html_writer::tag('td', $namasiswa, ['class' => 'text-start fw-bold']);
+        echo html_writer::tag('td', '<span class="badge bg-success-light text-success fw-bold">' . $d['hadir'] . '</span>');
+        echo html_writer::tag('td', $d['sakit'] ?: '<span class="text-muted">0</span>');
+        echo html_writer::tag('td', $d['ijin'] ?: '<span class="text-muted">0</span>');
+        echo html_writer::tag('td', $d['alpa'] ? '<span class="text-danger fw-bold">' . $d['alpa'] . '</span>' : '<span class="text-muted">0</span>');
+        echo html_writer::tag('td', $d['dispensasi'] ?: '<span class="text-muted">0</span>');
+        echo html_writer::tag('td', $persen);
+        echo html_writer::tag('td', $aksi);
+        echo html_writer::end_tag('tr');
     }
 
     echo html_writer::end_tag('tbody');
     echo html_writer::end_tag('table');
-    echo html_writer::end_div(); // end wrapper
+    echo html_writer::end_div(); // End Table Responsive
 
-    // Tombol ekspor
+    // ====== TOMBOL EKSPOR BAWAH ======
     if (!empty($data)) {
         $exportbase = new moodle_url('/local/jurnalmengajar/rekap_kehadiran_export.php', [
             'kelas'  => $kelasid,
@@ -443,14 +350,9 @@ if ($kelasid && $dari && $sampai) {
             'onlymine' => $onlymine ? 1 : 0,
             'matpel'   => $matpel
         ]);
-        echo html_writer::start_div('mt-3 mb-3');
-        echo html_writer::link(new moodle_url($exportbase, ['format' => 'xlsx']), '📤 Ekspor ke XLSX', [
-            'class' => 'btn btn-primary mr-2',
-            'style' => 'margin-right: 10px;'
-        ]);
-        echo html_writer::link(new moodle_url($exportbase, ['format' => 'ods']), '📤 Ekspor ke ODS', [
-            'class' => 'btn btn-success'
-        ]);
+        echo html_writer::start_div('d-flex gap-2 justify-content-start mb-4 shadow-sm p-3 bg-white rounded border');
+        echo html_writer::link(new moodle_url($exportbase, ['format' => 'xlsx']), '📥 Ekspor ke XLSX', ['class' => 'btn btn-success px-4 fw-bold']);
+        echo html_writer::link(new moodle_url($exportbase, ['format' => 'ods']), '📥 Ekspor ke ODS', ['class' => 'btn btn-outline-success px-4']);
         echo html_writer::end_div();
     }
 }

@@ -17,66 +17,45 @@ $PAGE->requires->jquery();
 $PAGE->requires->js_init_code(<<<JS
 
 function updatePesertaField() {
-
     let hasil = [];
     let hasilid = [];
 
     $(".siswa-checkbox:checked").each(function() {
-
         hasil.push($(this).data("nama"));
-
-        hasilid.push(
-            parseInt($(this).data("userid"))
-        );
+        hasilid.push(parseInt($(this).data("userid")));
     });
 
-    $("#id_peserta")
-        .val(JSON.stringify(hasil));
-
-    $("#id_pesertaid")
-        .val(JSON.stringify(hasilid));
+    $("#id_peserta").val(JSON.stringify(hasil));
+    $("#id_pesertaid").val(JSON.stringify(hasilid));
 }
 
 function bindPesertaEvent() {
-
-    $(".siswa-checkbox").on(
-        "change",
-        updatePesertaField
-    );
+    $(".siswa-checkbox").on("change", updatePesertaField);
 }
 
 function loadSiswa(kelasid) {
-
     if (!kelasid) return;
 
     $.get(
         "/local/jurnalmengajar/get_students_bk.php",
         {kelas: kelasid},
         function(html) {
-
             $("#siswa-area").html(html);
-
             bindPesertaEvent();
         }
     );
 }
 
 $(document).ready(function() {
-
-    const awalKelas =
-        $("select[name='kelas']").val();
+    const awalKelas = $("select[name='kelas']").val();
 
     if (awalKelas) {
         loadSiswa(awalKelas);
     }
 
-    $("select[name='kelas']").on(
-        "change",
-        function() {
-
-            loadSiswa($(this).val());
-        }
-    );
+    $("select[name='kelas']").on("change", function() {
+        loadSiswa($(this).val());
+    });
 });
 
 JS
@@ -97,7 +76,7 @@ if ($mform->is_cancelled()) {
     $record->userid        = $USER->id;
     $record->kelas         = (int)$data->kelas; // ✅ pakai ID
     $record->peserta       = $data->peserta ?? '[]';
-    $record->pesertaid = $data->pesertaid ?? '[]';
+    $record->pesertaid     = $data->pesertaid ?? '[]';
     $record->permasalahan  = $data->permasalahan ?: '-';
     $record->tindakan      = $data->tindakan ?: '-';
     $record->tempat        = '-';
@@ -114,16 +93,15 @@ if ($mform->is_cancelled()) {
     $nomorwa = get_nomor_wali_kelas($record->kelas);
 
     if ($nomorwa) {
-
         $waktu = tanggal_indo($record->timecreated);
-
         $peserta = json_decode($record->peserta, true);
-if (is_array($peserta) && !empty($peserta)) {
-    $peserta = array_map('format_nama_siswa', $peserta);
-    $peserta_str = implode(', ', $peserta);
-} else {
-    $peserta_str = '-';
-}
+        
+        if (is_array($peserta) && !empty($peserta)) {
+            $peserta = array_map('format_nama_siswa', $peserta);
+            $peserta_str = implode(', ', $peserta);
+        } else {
+            $peserta_str = '-';
+        }
 
         $pesan = "*📋 Laporan Pembinaan Siswa*\n\n"
                . "📅 Waktu: $waktu\n"
@@ -134,50 +112,64 @@ if (is_array($peserta) && !empty($peserta)) {
                . "👤 Guru BK: $nama\n\n"
                . "_Dikirim kepada Wali kelas sebagai laporan_";
 
-$tujuan = [$nomorwa];
-jurnalmengajar_kirim_wa($tujuan, $pesan);
+        $tujuan = [$nomorwa];
+        jurnalmengajar_kirim_wa($tujuan, $pesan);
 
     } else {
         debugging("Nomor WA wali kelas tidak ditemukan untuk kelas ID: {$record->kelas}", DEBUG_DEVELOPER);
     }
 
-    redirect(new moodle_url('/local/jurnalmengajar/pembinaan.php'), 'Data berhasil disimpan');
+    redirect(new moodle_url('/local/jurnalmengajar/pembinaan.php'), 'Data berhasil disimpan', null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
 // ================= TAMPILAN =================
 echo $OUTPUT->header();
-echo $OUTPUT->heading('Laporan Pembinaan Siswa');
 
+// Menampilkan form input laporan
 $mform->display();
 
-// ================= EXPORT =================
+// Jarak / Pemisah antara Form dan Data Table
+echo html_writer::tag('hr', '', ['class' => 'mt-5 mb-4']);
+echo $OUTPUT->heading('Daftar Laporan Pembinaan', 3);
+
+// ================= EXPORT BOX (Dipercantik dengan Card Moodle/Bootstrap) =================
 $bulanlist = [
     '01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=>'Mei','06'=>'Juni',
     '07'=>'Juli','08'=>'Agustus','09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'
 ];
-
 $tahunlist = array_combine(range(2025, 2030), range(2025, 2030));
 
+// Card Container
+echo html_writer::start_div('card mb-4 bg-light');
+echo html_writer::start_div('card-body p-3');
+
 echo html_writer::start_tag('form', [
-    'method'=>'get',
-    'action'=>'export_pembinaan.php',
-    'style'=>'margin:10px 0;'
+    'method' => 'get',
+    'action' => 'export_pembinaan.php',
+    'class'  => 'form-inline d-flex flex-wrap align-items-center'
 ]);
 
-echo html_writer::label('Pilih bulan: ', 'bulan');
-echo html_writer::select($bulanlist, 'bulan', date('m'));
+echo html_writer::tag('strong', '📥 Ekspor Data:', ['class' => 'mr-3 me-3 mb-2 mb-md-0']);
 
-echo html_writer::label(' Tahun: ', 'tahun', false, ['style'=>'margin-left:10px;']);
-echo html_writer::select($tahunlist, 'tahun', date('Y'));
+// Input Bulan
+echo html_writer::label('Bulan', 'bulan', false, ['class' => 'mr-2 me-2 mb-0 sr-only']);
+echo html_writer::select($bulanlist, 'bulan', date('m'), false, ['class' => 'custom-select form-control mr-3 me-3 mb-2 mb-md-0']);
 
+// Input Tahun
+echo html_writer::label('Tahun', 'tahun', false, ['class' => 'mr-2 me-2 mb-0 sr-only']);
+echo html_writer::select($tahunlist, 'tahun', date('Y'), false, ['class' => 'custom-select form-control mr-3 me-3 mb-2 mb-md-0']);
+
+// Tombol Submit
 echo html_writer::empty_tag('input', [
-    'type'=>'submit',
-    'value'=>'Ekspor ke Excel (XLSX)',
-    'class'=>'btn btn-primary',
-    'style'=>'margin-left:10px;'
+    'type'  => 'submit',
+    'value' => 'Unduh Excel (XLSX)',
+    'class' => 'btn btn-success mb-2 mb-md-0'
 ]);
 
 echo html_writer::end_tag('form');
+echo html_writer::end_div(); // end card-body
+echo html_writer::end_div(); // end card
+
 
 // ================= PAGING =================
 $page = optional_param('page', 0, PARAM_INT);
@@ -187,7 +179,7 @@ $offset = $page * $perpage;
 // ================= TOTAL DATA =================
 $total = $DB->count_records('local_jurnalpembinaan');
 
-// ================= TABEL =================
+// ================= TABEL DATA =================
 $records = $DB->get_records_sql("
     SELECT *
     FROM {local_jurnalpembinaan}
@@ -198,14 +190,15 @@ $records = $DB->get_records_sql("
 if ($records) {
 
     $table = new html_table();
-    $table->head = ['No','Waktu','Nama Murid','Kelas','Permasalahan','Upaya','Guru BK'];
+    $table->head = ['No', 'Waktu', 'Nama Murid', 'Kelas', 'Permasalahan', 'Upaya', 'Guru BK'];
+    
+    // Tambahan kelas Bootstrap untuk mempercantik tabel
+    $table->attributes['class'] = 'generaltable table table-striped table-hover table-bordered';
 
     $no = $offset + 1;
 
     foreach ($records as $r) {
-
         $namakelas = get_nama_kelas($r->kelas);
-
         $peserta = json_decode($r->peserta ?? '[]', true);
 
         if (is_array($peserta) && !empty($peserta)) {
@@ -216,7 +209,6 @@ if ($records) {
         }
 
         $gurubk = $DB->get_field('user', 'lastname', ['id' => $r->userid]) ?? '-';
-
         $waktu = tanggal_indo($r->timecreated);
 
         $table->data[] = [
@@ -230,10 +222,13 @@ if ($records) {
         ];
     }
 
+    // Dibungkus dengan table-responsive agar tabel bisa digeser/scroll horizontal di layar HP
+    echo html_writer::start_div('table-responsive');
     echo html_writer::table($table);
+    echo html_writer::end_div();
 
 } else {
-    echo $OUTPUT->notification('Belum ada data Laporan Pembinaan.', 'notifymessage');
+    echo $OUTPUT->notification('Belum ada data Laporan Pembinaan.', 'info');
 }
 
 // ================= PAGING BAR =================

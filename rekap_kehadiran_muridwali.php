@@ -84,7 +84,11 @@ $muridopts = jw_get_murid_options_from_csv($USER->id);
 $userids   = array_keys($muridopts);
 
 if (empty($userids)) {
-    echo $OUTPUT->notification('Anda belum memiliki murid binaan.', 'warning');
+    echo html_writer::div(
+        html_writer::tag('h4', '<i class="fa fa-exclamation-triangle"></i> Peringatan', ['class'=>'alert-heading']).
+        html_writer::tag('p', 'Anda belum memiliki murid binaan.', ['class'=>'mb-0']),
+        'alert alert-warning shadow-sm mt-3'
+    );
     echo $OUTPUT->footer();
     exit;
 }
@@ -124,55 +128,56 @@ usort($users_with_class, function($a, $b) {
 /* ==========================
  * INFO HEADER
  * ========================== */
-echo html_writer::div(
-    '<strong>Guru Wali:</strong> '.s($USER->lastname).
-    ' | <strong>Jumlah Murid Binaan:</strong> '.count($users_with_class),
-    'alert alert-info'
-);
-
-/* ==========================
- * FORM FILTER
- * ========================== */
-echo html_writer::start_tag('form', ['method'=>'get','class'=>'mb-3']);
-echo html_writer::start_div('d-flex gap-3 mb-2');
-
-echo html_writer::div(
-    html_writer::label('Dari Tanggal','dari').
-    html_writer::empty_tag('input',[
-        'type'=>'date','name'=>'dari','value'=>s($dari_raw),
-        'class'=>'form-control','required'=>'required'
-    ]),
-    'flex-fill'
-);
-
-echo html_writer::div(
-    html_writer::label('Sampai Tanggal','sampai').
-    html_writer::empty_tag('input',[
-        'type'=>'date','name'=>'sampai','value'=>s($sampai_raw),
-        'class'=>'form-control','required'=>'required'
-    ]),
-    'flex-fill'
-);
-
+echo html_writer::start_div('alert alert-info d-flex justify-content-between align-items-center mb-4 shadow-sm');
+echo html_writer::span('<strong><i class="fa fa-user-circle"></i> Guru Wali:</strong> ' . s($USER->lastname));
+echo html_writer::span('<strong><i class="fa fa-users"></i> Jumlah Murid Binaan:</strong> <span class="badge bg-primary text-white ml-2" style="font-size:14px;">' . count($users_with_class) . '</span>');
 echo html_writer::end_div();
 
-echo html_writer::div(
-    html_writer::label('Mode Hitung','mode').
-    html_writer::select(
-        ['hari'=>'Per Hari','jam'=>'Per Jam'],
-        'mode',
-        $mode,
-        false,
-        ['class'=>'form-select w-auto']
-    ),
-    'mb-3'
-);
+/* ==========================
+ * FORM FILTER (CARD & GRID)
+ * ========================== */
+echo html_writer::start_div('card mb-4 shadow-sm');
+echo html_writer::div('<strong><i class="fa fa-filter"></i> Filter Pencarian</strong>', 'card-header bg-light');
+echo html_writer::start_div('card-body');
+echo html_writer::start_tag('form', ['method'=>'get', 'class'=>'row g-3 align-items-end']);
 
-echo html_writer::empty_tag('input',[
-    'type'=>'submit','value'=>'Tampilkan','class'=>'btn btn-primary'
+// Kolom Dari Tanggal
+echo html_writer::start_div('col-md-3 col-sm-6 mb-2');
+echo html_writer::label('Dari Tanggal', 'dari', ['class'=>'font-weight-bold form-label']);
+echo html_writer::empty_tag('input', [
+    'type'=>'date', 'name'=>'dari', 'value'=>s($dari_raw),
+    'class'=>'form-control', 'required'=>'required'
 ]);
+echo html_writer::end_div();
+
+// Kolom Sampai Tanggal
+echo html_writer::start_div('col-md-3 col-sm-6 mb-2');
+echo html_writer::label('Sampai Tanggal', 'sampai', ['class'=>'font-weight-bold form-label']);
+echo html_writer::empty_tag('input', [
+    'type'=>'date', 'name'=>'sampai', 'value'=>s($sampai_raw),
+    'class'=>'form-control', 'required'=>'required'
+]);
+echo html_writer::end_div();
+
+// Kolom Mode Hitung
+echo html_writer::start_div('col-md-3 col-sm-6 mb-2');
+echo html_writer::label('Mode Hitung', 'mode', ['class'=>'font-weight-bold form-label']);
+echo html_writer::select(
+    ['hari'=>'Per Hari', 'jam'=>'Per Jam'],
+    'mode', $mode, false, ['class'=>'form-control custom-select']
+);
+echo html_writer::end_div();
+
+// Kolom Tombol Tampilkan
+echo html_writer::start_div('col-md-3 col-sm-6 mb-2');
+echo html_writer::tag('button', '<i class="fa fa-search"></i> Tampilkan Data', [
+    'type'=>'submit', 'class'=>'btn btn-primary w-100'
+]);
+echo html_writer::end_div();
 
 echo html_writer::end_tag('form');
+echo html_writer::end_div(); // end card-body
+echo html_writer::end_div(); // end card
 
 /* ==========================
  * PROSES DATA
@@ -192,12 +197,9 @@ if ($dari && $sampai) {
 
     /* ===== MODE PER HARI ===== */
     if ($mode === 'hari') {
-
         $perhari   = [];
         $all_dates = [];
-
         foreach ($jurnals as $j) {
-
             $jamke  = array_filter(array_map('trim', explode(',', (string)$j->jamke)));
             $jmljam = count($jamke) ?: 1;
 
@@ -208,11 +210,7 @@ if ($dari && $sampai) {
             }
 
             foreach ($users_with_class as $u) {
-
-                if (
-                    empty($kelasid_siswa[$u->id]) ||
-                    (int)$j->kelas !== (int)$kelasid_siswa[$u->id]
-                ) {
+                if (empty($kelasid_siswa[$u->id]) || (int)$j->kelas !== (int)$kelasid_siswa[$u->id]) {
                     continue;
                 }
 
@@ -222,14 +220,12 @@ if ($dari && $sampai) {
                 $key = mb_strtolower(trim($u->lastname),'UTF-8');
                 $status = $lookup[$key] ?? 'hadir';
 
-                $perhari[$u->id][$tgl][$status] =
-                    ($perhari[$u->id][$tgl][$status] ?? 0) + $jmljam;
+                $perhari[$u->id][$tgl][$status] = ($perhari[$u->id][$tgl][$status] ?? 0) + $jmljam;
             }
         }
 
         foreach ($users_with_class as $u) {
             foreach (array_keys($all_dates[$u->id] ?? []) as $tgl) {
-
                 $tot   = array_sum($perhari[$u->id][$tgl]);
                 $hadir = $perhari[$u->id][$tgl]['hadir'] ?? 0;
 
@@ -251,9 +247,7 @@ if ($dari && $sampai) {
 
     /* ===== MODE PER JAM ===== */
     } else {
-
         foreach ($jurnals as $j) {
-
             $jamke  = array_filter(array_map('trim', explode(',', (string)$j->jamke)));
             $jmljam = count($jamke);
             if (!$jmljam) continue;
@@ -261,11 +255,7 @@ if ($dari && $sampai) {
             $absen = json_decode($j->absen, true) ?? [];
 
             foreach ($users_with_class as $u) {
-
-                if (
-                    empty($kelasid_siswa[$u->id]) ||
-                    (int)$j->kelas !== (int)$kelasid_siswa[$u->id]
-                ) {
+                if (empty($kelasid_siswa[$u->id]) || (int)$j->kelas !== (int)$kelasid_siswa[$u->id]) {
                     continue;
                 }
 
@@ -287,13 +277,25 @@ if ($dari && $sampai) {
     /* ==========================
      * TABEL OUTPUT
      * ========================== */
-    echo html_writer::start_tag('table',['class'=>'generaltable']);
-    echo html_writer::tag('tr',
-        '<th>No</th><th>Nama Murid</th><th>Kelas</th>
-         <th>Hadir</th><th>Sakit</th><th>Ijin</th><th>Alpa</th><th>Disp</th>
-         <th>Detail Kehadiran</th>'
+    echo html_writer::start_div('table-responsive bg-white p-3 rounded shadow-sm mb-4');
+    echo html_writer::start_tag('table',['class'=>'generaltable table table-striped table-hover table-bordered text-center align-middle']);
+    
+    // Header tabel
+    echo html_writer::tag('thead', 
+        html_writer::tag('tr',
+            '<th class="align-middle" style="width: 50px;">No</th>
+             <th class="align-middle text-left">Nama Murid</th>
+             <th class="align-middle">Kelas</th>
+             <th class="align-middle text-success"><i class="fa fa-check-circle"></i> Hadir</th>
+             <th class="align-middle text-warning"><i class="fa fa-stethoscope"></i> Sakit</th>
+             <th class="align-middle text-info"><i class="fa fa-envelope"></i> Ijin</th>
+             <th class="align-middle text-danger"><i class="fa fa-times-circle"></i> Alpa</th>
+             <th class="align-middle text-secondary"><i class="fa fa-briefcase"></i> Disp</th>
+             <th class="align-middle">Aksi</th>'
+        ), ['class'=>'thead-light bg-light']
     );
 
+    echo html_writer::start_tag('tbody');
     $no = 1;
     foreach ($users_with_class as $u) {
         $d = $data[$u->id];
@@ -308,26 +310,35 @@ if ($dari && $sampai) {
 
         echo html_writer::tag('tr',
             '<td>'.$no++.'</td>'.
-            '<td>'.s(ucwords(strtolower($u->lastname))).'</td>'.
-            '<td>'.s($u->kelas).'</td>'.
-            '<td>'.$d['hadir'].'</td>'.
-            '<td>'.$d['sakit'].'</td>'.
-            '<td>'.$d['ijin'].'</td>'.
-            '<td>'.$d['alpa'].'</td>'.
-            '<td>'.$d['dispensasi'].'</td>'.
-            '<td>'.html_writer::link($detailurl,'🔍 Detail',['class'=>'btn btn-sm btn-outline-primary']).'</td>'
+            '<td class="text-left font-weight-bold">'.s(ucwords(strtolower($u->lastname))).'</td>'.
+            '<td><span class="badge badge-secondary bg-secondary">'.s($u->kelas).'</span></td>'.
+            '<td><span class="badge badge-success bg-success text-white">'.$d['hadir'].'</span></td>'.
+            '<td><span class="badge badge-warning bg-warning text-dark">'.$d['sakit'].'</span></td>'.
+            '<td><span class="badge badge-info bg-info text-white">'.$d['ijin'].'</span></td>'.
+            '<td><span class="badge badge-danger bg-danger text-white">'.$d['alpa'].'</span></td>'.
+            '<td><span class="badge badge-secondary bg-secondary text-white">'.$d['dispensasi'].'</span></td>'.
+            '<td>'.html_writer::link($detailurl, '<i class="fa fa-search-plus"></i> Detail', ['class'=>'btn btn-sm btn-outline-primary']).'</td>'
         );
     }
-
+    echo html_writer::end_tag('tbody');
     echo html_writer::end_tag('table');
+    echo html_writer::end_div(); // End table-responsive
 }
-echo html_writer::link(
-    '#',
-    '⬅ Kembali',
-    [
-        'class' => 'btn btn-secondary',
-        'onclick' => 'history.back(); return false;',
-        'title' => 'Kembali ke halaman sebelumnya'
-    ]
+
+/* ==========================
+ * FOOTER & TOMBOL KEMBALI
+ * ========================== */
+echo html_writer::div(
+    html_writer::link(
+        '#',
+        '<i class="fa fa-arrow-left"></i> Kembali',
+        [
+            'class' => 'btn btn-secondary',
+            'onclick' => 'history.back(); return false;',
+            'title' => 'Kembali ke halaman sebelumnya'
+        ]
+    ),
+    'mt-2 mb-4'
 );
+
 echo $OUTPUT->footer();

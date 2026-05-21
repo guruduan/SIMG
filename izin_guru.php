@@ -8,7 +8,7 @@ require_login();
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submitsuratizin', $context);
 
-global $DB;
+global $DB, $USER, $PAGE, $OUTPUT;
 
 // ================= AMBIL DATA USER =================
 $fieldid = $DB->get_field('user_info_field', 'id', ['shortname' => 'nip']);
@@ -71,11 +71,12 @@ if ($mform->is_cancelled()) {
 } else if ($data = $mform->get_data()) {
 
     $record = new stdClass();
-    $record->userid      = $data->userid;
+    $record->userid      = $data->userid; // Guru yang izin
     $record->nip         = $data->nip;
     $record->alasan      = $data->alasan;
     $record->keperluan   = $data->keperluan;
     $record->waktuinput  = time();
+    $record->userinput   = $USER->id; // ✅ Penginput: Admin / Guru Piket / Diri Sendiri
 
     $insertid = $DB->insert_record('local_jurnalmengajar_suratizinguru', $record);
 
@@ -85,8 +86,7 @@ if ($mform->is_cancelled()) {
     if ($kepsek) {
         $waktu = tanggal_indo(time(), 'judul');
         $jam = date('H:i');
-        global $USER;
-        $penginput = $USER->lastname;
+        $penginput = $USER->lastname; // Mengambil nama yang sedang login
 
         $pesan = "*📄 Surat Izin Guru/Pegawai*\n\n"
                . "📅 Hari, tanggal: $waktu\n"
@@ -103,9 +103,13 @@ if ($mform->is_cancelled()) {
 
     redirect(new moodle_url('/local/jurnalmengajar/cetak_surat_izin_guru.php', ['id' => $insertid]));
 }
+
 // ================= TAMPILAN =================
 echo $OUTPUT->header();
+
+echo html_writer::start_div('container-fluid mt-3');
 $mform->display();
+echo html_writer::end_div();
 
 // ================= AUTO ISI NIP =================
 if (!empty($nipdata)) {
@@ -125,23 +129,40 @@ if (!empty($nipdata)) {
 }
 
 // ================= RIWAYAT =================
+// ✅ Kembalikan query seperti semula (tanpa join ke u2/penginput)
 $riwayat = $DB->get_records_sql("
-    SELECT s.*, u.lastname 
+    SELECT s.*, u.lastname AS namaguru 
     FROM {local_jurnalmengajar_suratizinguru} s
     JOIN {user} u ON u.id = s.userid
     ORDER BY s.waktuinput DESC
 ");
 
-echo html_writer::tag('h3', 'Riwayat Surat Izin');
+echo html_writer::start_div('card mt-5 mb-4');
+echo html_writer::start_div('card-header text-white bg-primary');
+echo html_writer::tag('h4', '📋 Riwayat Surat Izin', ['class' => 'mb-0 text-white']);
+echo html_writer::end_div();
+
+echo html_writer::start_div('card-body table-responsive');
 
 $table = new html_table();
-$table->head = ['No','Waktu','Nama','NIP','Alasan','Keperluan','Aksi'];
+
+// ✅ Header Tabel dengan pengaturan lebar minimum untuk Nama dan NIP
+$table->head = [
+    'No', 
+    html_writer::tag('span', 'Waktu', ['style' => 'min-width: 110px; display: inline-block;']), 
+//    'Penginput', 
+    html_writer::tag('span', 'Nama Guru', ['style' => 'min-width: 200px; display: inline-block;']), 
+    html_writer::tag('span', 'NIP', ['style' => 'min-width: 180px; display: inline-block;']), 
+    'Alasan', 
+    'Keperluan', 
+    'Aksi'
+];
+$table->attributes['class'] = 'table table-bordered table-striped table-hover text-center align-middle';
 
 $no = 1;
 
 foreach ($riwayat as $r) {
-
-    // ✅ pakai format global
+    // ✅ Tanggal format global
     $tanggal = tanggal_indo($r->waktuinput);
 
     $hapusurl = new moodle_url('/local/jurnalmengajar/hapus_surat_izin_guru.php', [
@@ -154,14 +175,15 @@ foreach ($riwayat as $r) {
         '🗑 Hapus',
         [
             'onclick' => "return confirm('Yakin ingin menghapus data ini?')",
-            'class' => 'btn btn-danger btn-sm'
+            'class' => 'btn btn-outline-danger btn-sm'
         ]
     );
 
+    // Jika data lama belum ada ID penginput, tampilkan strip (-)
     $table->data[] = [
         $no++,
-        $tanggal,
-        $r->lastname,
+        $tanggal, // ✅ Tampil sebagai teks biasa
+        html_writer::tag('strong', $r->namaguru),
         $r->nip,
         $r->alasan,
         $r->keperluan,
@@ -170,25 +192,36 @@ foreach ($riwayat as $r) {
 }
 
 echo html_writer::table($table);
+echo html_writer::end_div(); // end card-body
+echo html_writer::end_div(); // end card
 
 // ================= REKAP =================
 $exporturl = new moodle_url('/local/jurnalmengajar/rekap_surat_izin_guru.php');
 
-echo html_writer::start_tag('form', ['method' => 'get', 'action' => $exporturl]);
+echo html_writer::start_div('card mb-5');
+echo html_writer::start_div('card-body bg-light');
 
-echo 'Pilih Bulan: ';
+echo html_writer::tag('h5', '🖨️ Cetak Rekapitulasi Surat Izin', ['class' => 'card-title mb-3']);
+
+echo html_writer::start_tag('form', ['method' => 'get', 'action' => $exporturl, 'class' => 'd-flex align-items-center gap-3']);
+
+echo html_writer::tag('label', 'Pilih Bulan:', ['class' => 'fw-bold mb-0 mr-2']);
+
 echo html_writer::select([
-    '01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April',
-    '05'=>'Mei','06'=>'Juni','07'=>'Juli','08'=>'Agustus',
-    '09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'
-], 'bulan', date('m'));
+    '01'=>'Januari', '02'=>'Februari', '03'=>'Maret', '04'=>'April',
+    '05'=>'Mei', '06'=>'Juni', '07'=>'Juli', '08'=>'Agustus',
+    '09'=>'September', '10'=>'Oktober', '11'=>'November', '12'=>'Desember'
+], 'bulan', date('m'), false, ['class' => 'custom-select form-select w-auto mr-3']);
 
 echo html_writer::empty_tag('input', [
     'type' => 'submit',
-    'value' => 'Rekap PDF',
-    'class' => 'btn btn-primary'
+    'value' => 'Download Rekap PDF',
+    'class' => 'btn btn-success'
 ]);
 
 echo html_writer::end_tag('form');
+
+echo html_writer::end_div(); // end card-body
+echo html_writer::end_div(); // end card
 
 echo $OUTPUT->footer();

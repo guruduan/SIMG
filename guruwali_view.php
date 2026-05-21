@@ -28,13 +28,16 @@ if (file_exists($binaanfile)) {
     if (($handle = fopen($binaanfile, 'r')) !== false) {
         $header = fgetcsv($handle);
         while (($row = fgetcsv($handle)) !== false) {
-            $data[] = [
-                'userid' => $row[0],
-                'lastname' => $row[1],
-                'nis' => $row[2],
-                'murid' => $row[3],
-                'kelas' => $row[4]
-            ];
+            // Cek jumlah kolom untuk mencegah error 'undefined offset' pada baris kosong
+            if (count($row) >= 5) {
+                $data[] = [
+                    'userid'   => $row[0],
+                    'lastname' => $row[1],
+                    'nis'      => $row[2],
+                    'murid'    => $row[3],
+                    'kelas'    => $row[4]
+                ];
+            }
         }
         fclose($handle);
     }
@@ -47,6 +50,8 @@ $listguru = [];
 foreach ($data as $d) {
     $listguru[$d['userid']] = $d['lastname'];
 }
+// Hapus duplikat dan urutkan abjad
+$listguru = array_unique($listguru);
 asort($listguru);
 
 // Default = guru login
@@ -63,49 +68,66 @@ foreach ($data as $d) {
 }
 
 // ============================
-// Filter dropdown
+// UI: Tampilan Card Bootstrap
+// ============================
+echo html_writer::start_div('card mb-3');
+echo html_writer::start_div('card-body');
+
+// ============================
+// Filter dropdown (Form)
 // ============================
 echo html_writer::start_tag('form', [
     'method' => 'get',
-    'style' => 'margin-bottom:15px;'
+    'class'  => 'mb-4' // Margin bawah
 ]);
 
-echo "Filter Guru Wali: ";
-echo html_writer::select($listguru, 'guru', $filterguru);
+// Gunakan flexbox Bootstrap agar label, dropdown, dan tombol rapi sebaris
+echo html_writer::start_div('d-flex align-items-center flex-wrap gap-2');
+echo html_writer::tag('strong', 'Filter Guru Wali: ', ['class' => 'mr-2']);
+echo html_writer::select($listguru, 'guru', $filterguru, false, ['class' => 'custom-select form-select w-auto mr-2']);
 
 echo html_writer::empty_tag('input', [
-    'type' => 'submit',
+    'type'  => 'submit',
     'value' => 'Tampilkan',
-    'class' => 'btn btn-secondary',
-    'style' => 'margin-left:5px'
+    'class' => 'btn btn-primary'
 ]);
+echo html_writer::end_div(); // End flexbox
 
 echo html_writer::end_tag('form');
 
 // ============================
 // Tabel binaan
 // ============================
-echo "<table class='generaltable'>";
-echo "<tr>
-        <th>No</th>
-        <th>NIS</th>
-        <th>Nama Murid</th>
-        <th>Kelas</th>
-        <th>Guru Wali</th>
-      </tr>";
+if (!empty($filtered)) {
+    // Gunakan html_table bawaan Moodle
+    $table = new html_table();
+    $table->head = ['No', 'NIS', 'Nama Murid', 'Kelas', 'Guru Wali'];
+    // Tambahkan class tabel bawaan Bootstrap agar ada efek garis & hover
+    $table->attributes['class'] = 'generaltable table table-striped table-hover table-bordered mt-3';
 
-$no = 1;
-foreach ($filtered as $d) {
-    echo "<tr>";
-    echo "<td>$no</td>";
-    echo "<td>{$d['nis']}</td>";
-    echo "<td>{$d['murid']}</td>";
-    echo "<td>{$d['kelas']}</td>";
-    echo "<td>{$d['lastname']}</td>";
-    echo "</tr>";
-    $no++;
+    $no = 1;
+    foreach ($filtered as $d) {
+        $row = new html_table_row([
+            $no,
+            $d['nis'],
+            $d['murid'],
+            $d['kelas'],
+            $d['lastname']
+        ]);
+        $table->data[] = $row;
+        $no++;
+    }
+    
+    // Render tabel
+    echo html_writer::table($table);
+} else {
+    // Tampilkan notifikasi biru (Alert) jika tidak ada murid yang ditemukan
+    echo html_writer::start_div('alert alert-info mt-3', ['role' => 'alert']);
+    echo "Tidak ada data murid binaan untuk guru yang dipilih.";
+    echo html_writer::end_div();
 }
 
-echo "</table>";
+echo html_writer::end_div(); // End card-body
+echo html_writer::end_div(); // End card
 
 echo $OUTPUT->footer();

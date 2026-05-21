@@ -16,81 +16,41 @@ $PAGE->set_heading('Layanan BK');
 $PAGE->requires->jquery();
 
 // ================= JS =================
-$PAGE->requires->jquery();
-
 $PAGE->requires->js_init_code(<<<JS
-
 $(document).ready(function() {
-
     function updatePesertaField() {
-
         let hasil = [];
         let hasilid = [];
 
         $(".siswa-checkbox:checked").each(function() {
-
-            hasil.push(
-                $(this).data("nama")
-            );
-
-            hasilid.push(
-                parseInt(
-                    $(this).data("userid")
-                )
-            );
+            hasil.push($(this).data("nama"));
+            hasilid.push(parseInt($(this).data("userid")));
         });
 
-        $("#id_peserta")
-            .val(JSON.stringify(hasil));
-
-        $("#id_pesertaid")
-            .val(JSON.stringify(hasilid));
-
-        console.log(
-            $("#id_pesertaid").val()
-        );
+        $("#id_peserta").val(JSON.stringify(hasil));
+        $("#id_pesertaid").val(JSON.stringify(hasilid));
     }
 
     function loadSiswa(kelasid) {
-
         if (!kelasid) {
             return;
         }
 
-        $.get(
-            "/local/jurnalmengajar/get_students_bk.php",
-            {kelas: kelasid},
-            function(html) {
-
-                $("#siswa-area")
-                    .html(html);
-
-                $(".siswa-checkbox")
-                    .on(
-                        "change",
-                        updatePesertaField
-                    );
-            }
-        );
+        $.get("/local/jurnalmengajar/get_students_bk.php", {kelas: kelasid}, function(html) {
+            $("#siswa-area").html(html);
+            $(".siswa-checkbox").on("change", updatePesertaField);
+        });
     }
 
-    const awalKelas =
-        $("select[name='kelas']").val();
-
+    const awalKelas = $("select[name='kelas']").val();
     if (awalKelas) {
         loadSiswa(awalKelas);
     }
 
-    $("select[name='kelas']").on(
-        "change",
-        function() {
-
-            loadSiswa($(this).val());
-        }
-    );
-
+    $("select[name='kelas']").on("change", function() {
+        loadSiswa($(this).val());
+    });
 });
-
 JS
 );
 
@@ -118,94 +78,100 @@ if ($mform->is_cancelled()) {
 
     $DB->insert_record('local_jurnallayananbk', $record);
 
-   // ================= WA =================
-$guru = $DB->get_record('user', ['id' => $record->userid], 'lastname');
-$kelasnama = get_nama_kelas($record->kelas);
-$nama = $guru ? $guru->lastname : '-';
+    // ================= WA =================
+    $guru = $DB->get_record('user', ['id' => $record->userid], 'lastname');
+    $kelasnama = get_nama_kelas($record->kelas);
+    $nama = $guru ? $guru->lastname : '-';
 
-$nomorwa = get_nomor_wali_kelas($record->kelas);
+    $nomorwa = get_nomor_wali_kelas($record->kelas);
 
-if ($nomorwa) {
+    if ($nomorwa) {
+        $waktu = tanggal_indo($record->timecreated);
+        $peserta = json_decode($record->peserta, true);
+        $peserta_str = is_array($peserta) && !empty($peserta) ? implode(', ', $peserta) : '-';
 
-    $waktu = tanggal_indo($record->timecreated);
+        $pesan = "*📋 Laporan Layanan BK*\n\n"
+               . "📅 Hari: $waktu\n"
+               . "👥 Murid: $peserta_str\n"
+               . "🏫 Kelas: $kelasnama\n"
+               . "📝 Jenis Layanan: {$record->jenislayanan}\n"
+               . "📌 Topik: {$record->topik}\n"
+               . "🔧 Tindak lanjut: {$record->tindaklanjut}\n"
+               . "📑 Catatan: {$record->catatan}\n"
+               . "👤 Guru BK: $nama\n\n"
+               . "_Dikirim kepada Wali kelas sebagai laporan_";
 
-    $peserta = json_decode($record->peserta, true);
-    $peserta_str = is_array($peserta) && !empty($peserta)
-        ? implode(', ', $peserta)
-        : '-';
+        $tujuan = [$nomorwa];
+        jurnalmengajar_kirim_wa($tujuan, $pesan);
 
-    $pesan = "*📋 Laporan Layanan BK*\n\n"
-           . "📅 Hari: $waktu\n"
-           . "👥 Murid: $peserta_str\n"
-           . "🏫 Kelas: $kelasnama\n"
-           . "📝 Jenis Layanan: {$record->jenislayanan}\n"
-           . "📌 Topik: {$record->topik}\n"
-           . "🔧 Tindak lanjut: {$record->tindaklanjut}\n"
-           . "📑 Catatan: {$record->catatan}\n"
-           . "👤 Guru BK: $nama\n\n"
-           . "_Dikirim kepada Wali kelas sebagai laporan_";
+    } else {
+        debugging("Nomor WA wali kelas tidak ditemukan untuk kelas ID: {$record->kelas}", DEBUG_DEVELOPER);
+    }
 
-    $tujuan = [$nomorwa];
-
-    jurnalmengajar_kirim_wa($tujuan, $pesan);
-
-} else {
-    debugging("Nomor WA wali kelas tidak ditemukan untuk kelas ID: {$record->kelas}", DEBUG_DEVELOPER);
-}
-
-    redirect(new moodle_url('/local/jurnalmengajar/layananbk.php'), 'Data berhasil disimpan');
+    redirect(new moodle_url('/local/jurnalmengajar/layananbk.php'), 'Data berhasil disimpan', null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
 // ================= TAMPILAN =================
 echo $OUTPUT->header();
-echo $OUTPUT->heading('Jurnal Mengajar - Layanan BK');
 
+// Menampilkan form input (Moodle QuickForm)
 $mform->display();
 
-// ================= EXPORT =================
+// ================= EXPORT SECTION (Dipercantik dengan Card) =================
 $currentmonth = date('m');
 $currentyear  = date('Y');
+$yearoptions  = array_combine(range(2025, 2030), range(2025, 2030));
+
+echo html_writer::start_tag('div', ['class' => 'card mb-4 mt-4']);
+echo html_writer::start_tag('div', ['class' => 'card-body']);
+echo html_writer::tag('h5', 'Ekspor Data Layanan BK', ['class' => 'card-title mb-3']);
 
 echo html_writer::start_tag('form', [
-    'method'=>'get',
-    'action'=>'export_layananbk.php',
-    'style'=>'margin:10px 0;'
+    'method' => 'get',
+    'action' => 'export_layananbk.php',
+    'class'  => 'd-flex flex-wrap align-items-center' // Menggunakan flexbox agar sejajar
 ]);
 
-echo html_writer::label('Pilih bulan: ', 'bulan');
+echo html_writer::label('Bulan:', 'bulan', false, ['class' => 'mr-2 mb-0']);
+// Menambahkan div wrapper agar select Moodle lebih rapi
+echo html_writer::start_tag('div', ['class' => 'mr-3']);
 echo html_writer::select_time('months', 'bulan', $currentmonth);
+echo html_writer::end_tag('div');
 
-$yearoptions = array_combine(range(2025, 2030), range(2025, 2030));
-
-echo html_writer::label('Tahun: ', 'tahun', false, ['style'=>'margin-left:10px;']);
-echo html_writer::select($yearoptions, 'tahun', $currentyear);
+echo html_writer::label('Tahun:', 'tahun', false, ['class' => 'mr-2 mb-0']);
+echo html_writer::select($yearoptions, 'tahun', $currentyear, false, ['class' => 'custom-select mr-3']);
 
 echo html_writer::empty_tag('input', [
-    'type'=>'submit',
-    'value'=>'Ekspor ke Excel (XLSX)',
-    'class'=>'btn btn-primary',
-    'style'=>'margin-left:10px;'
+    'type'  => 'submit',
+    'value' => 'Ekspor ke Excel (XLSX)',
+    'class' => 'btn btn-success' // Warna hijau untuk Excel
 ]);
 
 echo html_writer::end_tag('form');
+echo html_writer::end_tag('div'); // end card-body
+echo html_writer::end_tag('div'); // end card
 
-// ================= TABEL =================
+
+// ================= TABEL SECTION (Dipercantik) =================
+echo html_writer::start_tag('div', ['class' => 'card']);
+echo html_writer::start_tag('div', ['class' => 'card-body']);
+echo html_writer::tag('h5', 'Riwayat Jurnal Layanan BK', ['class' => 'card-title mb-3']);
+
 $records = $DB->get_records('local_jurnallayananbk', null, 'timecreated DESC');
 
 if ($records) {
-
     $table = new html_table();
-    $table->head = ['Waktu','Kelas','Jenis Layanan','Topik','Peserta','Guru BK'];
+    // Menambahkan class bootstrap ke tabel
+    $table->attributes['class'] = 'table table-striped table-hover table-bordered mt-3';
+    $table->head = ['Waktu', 'Kelas', 'Jenis Layanan', 'Topik', 'Peserta', 'Guru BK'];
 
     foreach ($records as $r) {
-
         $namakelas = get_nama_kelas($r->kelas);
-
+        
         $peserta = json_decode($r->peserta, true);
         $peserta_str = is_array($peserta) ? implode(', ', $peserta) : '-';
-
-        $gurubk = $DB->get_field('user','lastname',['id'=>$r->userid]) ?? '-';
-
+        
+        $gurubk = $DB->get_field('user', 'lastname', ['id' => $r->userid]) ?? '-';
         $waktu = tanggal_indo($r->timecreated);
 
         $table->data[] = [
@@ -213,15 +179,21 @@ if ($records) {
             $namakelas,
             $r->jenislayanan,
             $r->topik,
-            shorten_text($peserta_str,50),
+            shorten_text($peserta_str, 50),
             $gurubk
         ];
     }
 
+    // Dibungkus dengan table-responsive agar tabel bisa discroll ke kanan di HP
+    echo html_writer::start_div('table-responsive');
     echo html_writer::table($table);
+    echo html_writer::end_div();
 
 } else {
-    echo $OUTPUT->notification('Belum ada data Jurnal Layanan BK.', 'notifymessage');
+    echo $OUTPUT->notification('Belum ada data Jurnal Layanan BK.', 'notifymessage info');
 }
+
+echo html_writer::end_tag('div'); // end card-body
+echo html_writer::end_tag('div'); // end card
 
 echo $OUTPUT->footer();
