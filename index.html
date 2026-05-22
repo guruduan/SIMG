@@ -87,7 +87,155 @@
             </div>
         </div>
     </section>
+<section id="galeri" class="py-20 bg-slate-100">
+    <div class="max-w-7xl mx-auto px-4">
 
+        <div class="text-center mb-12">
+            <h3 class="text-3xl font-bold text-slate-900">
+                Galeri Screenshot SiM
+            </h3>
+            <p class="text-slate-600 mt-4">
+                Dokumentasi tampilan dan fitur Sistem Informasi Manajemen
+            </p>
+        </div>
+
+        <div class="relative max-w-6xl mx-auto overflow-hidden rounded-2xl shadow-2xl bg-black">
+
+            <!-- Slides -->
+            <div class="slide fade">
+                <img src="img/01.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/02.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/03.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/04.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/05.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/1.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/2.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/3.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/4.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/5.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/6.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/7.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/8.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/9.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/10.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/11.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/12.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/13.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/14.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/15.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/16.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/17.png" class="w-full">
+            </div>
+
+            <div class="slide fade">
+                <img src="img/18.png" class="w-full">
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<style>
+.slide{
+    display:none;
+}
+
+.fade{
+    animation:fadeEffect 1s;
+}
+
+@keyframes fadeEffect{
+    from {opacity:0.4}
+    to {opacity:1}
+}
+</style>
+
+<script>
+let slideIndex = 0;
+showSlides();
+
+function showSlides() {
+
+    let slides = document.getElementsByClassName("slide");
+
+    for (let i = 0; i < slides.length; i++) {
+        slides[i].style.display = "none";
+    }
+
+    slideIndex++;
+
+    if (slideIndex > slides.length) {
+        slideIndex = 1;
+    }
+
+    slides[slideIndex-1].style.display = "block";
+
+    setTimeout(showSlides, 3000);
+}
+</script>
     <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800">
         <div class="max-w-7xl mx-auto px-4 flex flex-col justify-center items-center">
             <p>&copy; 2026 Sistem Informasi Manajemen - SMAN 2 Kandangan[cite: 1].</p>
