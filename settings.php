@@ -200,6 +200,56 @@ $settings->add(new admin_setting_configtextarea(
         'Isi sesuai dashboard Wablas'
     ));
 
+//  tv
+$settings->add(new admin_setting_configtextarea(
+    'local_jurnalmengajar/pengumuman_tv',
+    'Pengumuman TV',
+    'Satu baris satu pengumuman',
+    '',
+    PARAM_TEXT
+));
+// guru piket
+$settings->add(new admin_setting_configtextarea(
+    'local_jurnalmengajar/guru_piket_senin',
+    'Guru Piket Senin',
+    'Satu nama per baris',
+    '',
+    PARAM_TEXT
+));
+
+$settings->add(new admin_setting_configtextarea(
+    'local_jurnalmengajar/guru_piket_selasa',
+    'Guru Piket Selasa',
+    'Satu nama per baris',
+    '',
+    PARAM_TEXT
+));
+
+$settings->add(new admin_setting_configtextarea(
+    'local_jurnalmengajar/guru_piket_rabu',
+    'Guru Piket Rabu',
+    'Satu nama per baris',
+    '',
+    PARAM_TEXT
+));
+
+$settings->add(new admin_setting_configtextarea(
+    'local_jurnalmengajar/guru_piket_kamis',
+    'Guru Piket Kamis',
+    'Satu nama per baris',
+    '',
+    PARAM_TEXT
+));
+
+
+$settings->add(new admin_setting_configtextarea(
+    'local_jurnalmengajar/guru_piket_jumat',
+    'Guru Piket Jumat',
+    'Satu nama per baris',
+    '',
+    PARAM_TEXT
+));
+
     // =========================
     // HALAMAN WALI KELAS
     // =========================

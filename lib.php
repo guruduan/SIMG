@@ -419,6 +419,210 @@ function jurnalmengajar_get_beban_jam_guru_by_date($timestamp) {
 
     return $beban;
 }
+// ======================================
+// Load snapshot beban mengajar semester
+// ======================================
+function jurnalmengajar_load_beban_snapshot($tahunajaran, $semester) {
+
+    // Validasi
+    if (empty($tahunajaran) || empty($semester)) {
+        return [];
+    }
+
+    // Format nama file
+    $tahunajaran_file = str_replace('/', '_', trim($tahunajaran));
+    $semester_file = strtolower(trim($semester));
+
+    // Lokasi file snapshot
+    $filepath = __DIR__ . '/data/beban/beban_' .
+        $tahunajaran_file . '_' .
+        $semester_file . '.json';
+
+    // Jika file tidak ada
+    if (!file_exists($filepath)) {
+        debugging('File snapshot beban tidak ditemukan: ' . $filepath);
+        return [];
+    }
+
+    // Ambil isi file
+    $json = file_get_contents($filepath);
+
+    if ($json === false) {
+        debugging('Gagal membaca file snapshot beban.');
+        return [];
+    }
+
+    // Decode JSON
+    $data = json_decode($json, true);
+
+    if (!is_array($data)) {
+        debugging('Format JSON snapshot beban tidak valid.');
+        return [];
+    }
+
+    return $data;
+}
+// ======================================
+// Generate snapshot beban semester
+// ======================================
+function jurnalmengajar_generate_beban_snapshot($tahunajaran, $semester) {
+
+    global $CFG;
+
+    // Ambil beban aktif sekarang
+    $beban = jurnalmengajar_get_beban_jam_guru_by_date(time());
+
+    if (empty($beban)) {
+        return false;
+    }
+
+    // Format nama file
+    $tahunajaran_file = str_replace('/', '_', trim($tahunajaran));
+    $semester_file = strtolower(trim($semester));
+
+    // Folder snapshot
+    $folder = __DIR__ . '/data/beban';
+
+    // Buat folder jika belum ada
+    if (!file_exists($folder)) {
+        mkdir($folder, 0755, true);
+    }
+
+    // Nama file
+    $filepath = $folder . '/beban_' .
+        $tahunajaran_file . '_' .
+        $semester_file . '.json';
+
+    // Encode JSON
+    $json = json_encode(
+    $beban,
+    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+);
+
+    // Simpan file
+$result = file_put_contents($filepath, $json);
+
+if ($result === false) {
+    debugging('Gagal menulis file snapshot: ' . $filepath);
+    return false;
+}
+
+return true;
+}
+// ======================================
+// Deteksi tahun ajaran dari timestamp
+// ======================================
+function jurnalmengajar_get_tahunajaran_by_timestamp($timestamp = null) {
+
+    if (empty($timestamp)) {
+        $timestamp = time();
+    }
+
+    $bulan = (int)date('n', $timestamp);
+    $tahun = (int)date('Y', $timestamp);
+
+    // Juli-Desember
+    if ($bulan >= 7) {
+        return $tahun . '/' . ($tahun + 1);
+    }
+
+    // Januari-Juni
+    return ($tahun - 1) . '/' . $tahun;
+}
+// ======================================
+// Ambil awal semester dari jurnal pertama
+// ======================================
+function jurnalmengajar_get_awal_semester_dari_jurnal(
+    $tahunajaran,
+    $semester
+) {
+
+    global $DB;
+
+    $tahun = explode('/', $tahunajaran);
+
+    if ($semester == 'Ganjil') {
+
+        $start = strtotime($tahun[0] . '-07-01 00:00:00');
+        $end   = strtotime($tahun[0] . '-12-31 23:59:59');
+
+    } else {
+
+        $start = strtotime($tahun[1] . '-01-01 00:00:00');
+        $end   = strtotime($tahun[1] . '-06-30 23:59:59');
+    }
+
+    $sql = "
+        SELECT MIN(timecreated)
+        FROM {local_jurnalmengajar}
+        WHERE timecreated BETWEEN ? AND ?
+    ";
+
+    $first = $DB->get_field_sql($sql, [$start, $end]);
+
+    return $first ?: $start;
+}
+// ======================================
+// Hitung total minggu semester
+// ======================================
+function jurnalmengajar_get_total_minggu_semester(
+    $tahunajaran,
+    $semester
+) {
+
+    global $DB;
+
+    // awal semester dari jurnal pertama
+    $awal = jurnalmengajar_get_awal_semester_dari_jurnal(
+        $tahunajaran,
+        $semester
+    );
+
+    $tahun = explode('/', $tahunajaran);
+
+    // rentang semester
+    if ($semester == 'Ganjil') {
+
+        $start = strtotime($tahun[0] . '-07-01 00:00:00');
+        $end   = strtotime($tahun[0] . '-12-31 23:59:59');
+
+    } else {
+
+        $start = strtotime($tahun[1] . '-01-01 00:00:00');
+        $end   = strtotime($tahun[1] . '-06-30 23:59:59');
+    }
+
+    // jurnal terakhir semester
+    $sql = "
+        SELECT MAX(timecreated)
+        FROM {local_jurnalmengajar}
+        WHERE timecreated BETWEEN ? AND ?
+    ";
+
+    $terakhir = $DB->get_field_sql(
+        $sql,
+        [$start, $end]
+    );
+
+    // jika belum ada jurnal
+    if (empty($terakhir)) {
+        return 1;
+    }
+
+    // hitung selisih hari
+    $selisih_hari = floor(
+        ($terakhir - $awal) / 86400
+    );
+
+    $totalminggu = floor($selisih_hari / 7) + 1;
+
+    // minimal 1 minggu
+    if ($totalminggu < 1) {
+        $totalminggu = 1;
+    }
+
+    return $totalminggu;
+}
 
 // ===============================
 // Ambil semua kelas (cohort)
@@ -546,4 +750,53 @@ function jurnalmengajar_get_ttd_path() {
     }
 
     return '';
+}
+/// fungsi plugin file
+
+function local_jurnalmengajar_pluginfile(
+    $course,
+    $cm,
+    $context,
+    $filearea,
+    $args,
+    $forcedownload,
+    array $options = []
+) {
+
+    if ($context->contextlevel != CONTEXT_SYSTEM) {
+        return false;
+    }
+
+    if ($filearea !== 'logo') {
+        return false;
+    }
+
+    $fs = get_file_storage();
+
+    $itemid = 0;
+
+    $filepath = '/';
+
+    $filename = array_pop($args);
+
+    $file = $fs->get_file(
+        $context->id,
+        'local_jurnalmengajar',
+        'logo',
+        $itemid,
+        $filepath,
+        $filename
+    );
+
+    if (!$file || $file->is_directory()) {
+        return false;
+    }
+
+    send_stored_file(
+        $file,
+        0,
+        0,
+        false,
+        $options
+    );
 }
