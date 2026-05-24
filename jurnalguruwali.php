@@ -181,7 +181,7 @@ if ($editid > 0) {
         ]);
         // Script inject sederhana untuk otomatis mencentang murid yang sedang diedit
         $PAGE->requires->js_init_code("
-            var checkbox = document.getElementById('murid_".$existing->userid."');
+            var checkbox = document.getElementById('murid_".$existing->muridid."');
             if(checkbox) checkbox.checked = true;
         ");
     }
@@ -207,7 +207,8 @@ if ($data = $mform->get_data()) {
             $kelas = jw_get_kelas_siswa($muridid);
             $update = new stdClass();
             $update->id = $data->editid;
-            $update->userid = $muridid;
+	    $update->userid = $muridid;
+            $update->muridid = $muridid;
             $update->kelas = $kelas;
             $update->topik = $data->topik;
             $update->tindaklanjut = $data->tindaklanjut;
@@ -225,6 +226,7 @@ if ($data = $mform->get_data()) {
             $record = new stdClass();
             $record->guruid = $USER->id;
             $record->userid = $muridid;
+            $record->muridid = $muridid;
             $record->kelas = $kelas;
             $record->topik = $data->topik;
             $record->tindaklanjut = $data->tindaklanjut;
@@ -268,7 +270,7 @@ echo html_writer::tag('h3', '📋 Riwayat Jurnal Terakhir', ['class' => 'mt-4 mb
 $rows = $DB->get_records_sql("
     SELECT j.*, u.lastname
     FROM {local_jurnalguruwali} j
-    JOIN {user} u ON u.id=j.userid
+    JOIN {user} u ON u.id=j.muridid
     WHERE j.guruid=?
     ORDER BY j.timecreated DESC
 ", [$USER->id], 0, 10);
