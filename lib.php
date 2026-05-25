@@ -164,6 +164,25 @@ function jurnalmengajar_get_hari_ini() {
     $hari = date('l');
 return $map[$hari] ?? '';
 }
+
+// Konversi timestamp → nama hari Indonesia
+function jurnalmengajar_get_hari_by_timestamp($timestamp) {
+
+    $map = [
+        'Monday' => 'Senin',
+        'Tuesday' => 'Selasa',
+        'Wednesday' => 'Rabu',
+        'Thursday' => 'Kamis',
+        'Friday' => 'Jumat',
+        'Saturday' => 'Sabtu',
+        'Sunday' => 'Minggu'
+    ];
+
+    $hari = date('l', $timestamp);
+
+    return $map[$hari] ?? '';
+}
+
 /**
  * Cek tanggal libur
  */
@@ -194,6 +213,162 @@ function jurnalmengajar_cek_libur($tanggal) {
     }
 
     return false;
+}
+
+// Hitung pengurang target karena libur
+function jurnalmengajar_get_pengurang_target_libur(
+    $userid,
+    $tanggal_awal,
+    $tanggal_akhir
+) {
+
+    require_once(__DIR__.'/jadwal_acuan_lib.php');
+
+    $pengurang = 0;
+
+    $tanggallibur = get_config(
+        'local_jurnalmengajar',
+        'tanggallibur'
+    );
+
+    if (empty($tanggallibur)) {
+        return 0;
+    }
+
+    $jadwal = jurnalmengajar_get_jadwal_acuan();
+
+    $lines = preg_split(
+        '/\r\n|\r|\n/',
+        $tanggallibur
+    );
+
+    foreach ($lines as $line) {
+
+        $line = trim($line);
+
+        if ($line == '') {
+            continue;
+        }
+
+        // ==========================
+        // SUPPORT RANGE TANGGAL
+        // ==========================
+
+        $daftar_tanggal = [];
+
+        if (stripos($line, 's/d') !== false) {
+
+            list($start, $end) = explode('s/d', $line);
+
+            $start = trim($start);
+            $end   = trim($end);
+
+            $start_ts = strtotime($start);
+            $end_ts   = strtotime($end);
+
+            if (!$start_ts || !$end_ts) {
+                continue;
+            }
+
+            for (
+                $t = $start_ts;
+                $t <= $end_ts;
+                $t += 86400
+            ) {
+                $daftar_tanggal[] = $t;
+            }
+
+        } else {
+
+            $timestamp = strtotime($line);
+
+            if (!$timestamp) {
+                continue;
+            }
+
+            $daftar_tanggal[] = $timestamp;
+        }
+
+        // ==========================
+        // PROSES SETIAP TANGGAL
+        // ==========================
+
+        foreach ($daftar_tanggal as $timestamp) {
+
+            // hanya minggu aktif
+            if (
+                $timestamp < $tanggal_awal
+                ||
+                $timestamp > $tanggal_akhir
+            ) {
+                continue;
+            }
+
+            $hari =
+                jurnalmengajar_get_hari_by_timestamp(
+                    $timestamp
+                );
+
+            foreach ($jadwal as $j) {
+
+                if ($j['userid'] != $userid) {
+                    continue;
+                }
+
+                if ($j['hari'] != $hari) {
+                    continue;
+                }
+
+                // ==========================
+                // CEK CUTOFF
+                // ==========================
+
+                $kelas = isset($j['kelas'])
+                    ? trim($j['kelas'])
+                    : '';
+
+                $kelas_level = null;
+
+                if (
+                    preg_match(
+                        '/\b(VI|IX|XII)\b/i',
+                        $kelas,
+                        $match
+                    )
+                ) {
+                    $kelas_level = strtoupper($match[1]);
+                }
+
+                $cutoff = null;
+
+                if ($kelas_level) {
+
+                    $cutoff =
+                        jurnalmengajar_get_cutoff_by_kelas(
+                            $kelas_level,
+                            $timestamp
+                        );
+                }
+
+                // jika sudah cutoff
+                if (
+                    !empty($cutoff)
+                    &&
+                    $timestamp >= $cutoff
+                ) {
+                    continue;
+                }
+
+                // ==========================
+                // HITUNG PENGURANG
+                // ==========================
+
+                $pengurang++;
+            }
+        }
+    }
+
+    return $pengurang;
 }
 /**
  * Ambil cutoff berdasarkan kode kelas (VI, IX, XII)

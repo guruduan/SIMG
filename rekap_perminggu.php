@@ -26,7 +26,6 @@ if ($param_mingguke > 0) {
     $selisih_hari = floor((time() - $timestart) / (60 * 60 * 24));
     $mingguke = floor($selisih_hari / 7) + 1;
     if ($mingguke < 1) $mingguke = 1;
-    if ($mingguke > 20) $mingguke = 20;
 }
 $namasekolah = get_config('local_jurnalmengajar', 'nama_sekolah');
 $tahunajaran = get_config('local_jurnalmengajar', 'tahun_ajaran');
@@ -123,7 +122,9 @@ echo html_writer::start_div('row align-items-center');
         echo html_writer::start_div('form-group mr-3 mb-0');
             echo '<label for="mingguke" class="mr-2 font-weight-bold small">Minggu:</label>';
             echo '<select name="mingguke" class="custom-select custom-select-sm" onchange="this.form.submit()">';
-            for ($i = 1; $i <= 20; $i++) {
+            $maxminggu = max($mingguke, 20);
+
+            for ($i = 1; $i <= $maxminggu; $i++) {
                 $selected = ($i == $mingguke) ? 'selected' : '';
                 echo "<option value=\"$i\" $selected>Minggu ke-$i</option>";
             }
@@ -180,8 +181,8 @@ echo html_writer::start_tag('tr');
     echo html_writer::tag('th', 'No', ['class' => 'text-center align-middle', 'style' => 'width: 5%']);
     echo html_writer::tag('th', 'Nama Guru', ['class' => 'align-middle']);
     echo html_writer::tag('th', 'Realisasi / Jam Mengajar', ['class' => 'text-center align-middle']);
-    echo html_writer::tag('th', 'Beban Target', ['class' => 'text-center align-middle']);
-    echo html_writer::tag('th', 'Persentase Kerja', ['class' => 'text-center align-middle', 'style' => 'width: 15%']);
+    echo html_writer::tag('th', 'Beban Mengajar', ['class' => 'text-center align-middle']);
+    echo html_writer::tag('th', 'Persentase', ['class' => 'text-center align-middle', 'style' => 'width: 15%']);
     echo html_writer::tag('th', 'Aksi / Detail', ['class' => 'text-center align-middle', 'style' => 'width: 10%']);
 echo html_writer::end_tag('tr');
 echo html_writer::end_tag('thead');
@@ -212,7 +213,21 @@ if (empty($rekap)) {
         $nama = ucwords($lastname);
         $beban_minggu = $beban[$userid] ?? 0;
 
-        $persen = ($beban_minggu > 0) ? round(($jumlahjam / $beban_minggu) * 100) : 0;
+$pengurang_libur =
+    jurnalmengajar_get_pengurang_target_libur(
+        $userid,
+        $tanggal_awal_minggu_ini,
+        $tanggal_akhir_minggu_ini
+    );
+
+$target_final =
+    max(0, $beban_minggu - $pengurang_libur);
+
+$persen = ($target_final > 0)
+    ? round(($jumlahjam / $target_final) * 100)
+    : 0;
+
+$persen = min($persen, 100);
 
         // Atur warna Badge Persentase & Soft warning di Baris Tabel
         $tr_class = '';
@@ -233,7 +248,27 @@ if (empty($rekap)) {
             echo html_writer::tag('td', html_writer::link($urlguru, $nama, ['class' => 'font-weight-bold text-dark text-decoration-none']));
             
             echo html_writer::tag('td', $jumlahjam . ' JP', ['class' => 'text-center align-middle']);
-            echo html_writer::tag('td', $beban_minggu . ' JP', ['class' => 'text-center align-middle text-muted']);
+            $teks_target = $beban_minggu . ' JP';
+
+if ($pengurang_libur > 0) {
+
+    $teks_target .=
+        '<br><small class="text-danger">-'
+        . $pengurang_libur .
+        ' JP Libur</small>';
+
+    $teks_target .=
+    '<br><small class="text-success font-weight-bold">'
+    . 'Target Akhir: '
+    . $target_final .
+    ' JP</small>';
+}
+
+echo html_writer::tag(
+    'td',
+    $teks_target,
+    ['class' => 'text-center align-middle text-muted']
+);
             
             // Badge Persentase
             $badge = html_writer::tag('span', $persen . '%', ['class' => 'badge ' . $badge_class . ' p-2 w-100', 'style' => 'font-size: 85%']);

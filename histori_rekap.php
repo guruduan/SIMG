@@ -161,7 +161,35 @@ echo html_writer::tag(
 
 echo '<form method="get">';
 echo '<label>Tahun Ajaran: </label>';
-echo '<input type="text" name="tahunajaran" value="'.$tahunajaran.'" placeholder="2025/2026"> ';
+echo '<select name="tahunajaran" onchange="this.form.submit()">';
+
+// tahun ajaran paling lama
+$awalminimal = 2025;
+
+// tahun sekarang
+$tahunsekarang = (int)date('Y');
+
+// jika masih sebelum Juli,
+// tahun ajaran aktif dimulai tahun sebelumnya
+if (date('n') < 7) {
+    $tahunaktif = $tahunsekarang - 1;
+} else {
+    $tahunaktif = $tahunsekarang;
+}
+
+// tampilkan dari 2025 sampai tahun aktif +1
+for ($awal = $awalminimal; $awal <= ($tahunaktif + 1); $awal++) {
+
+    $ta = $awal . '/' . ($awal + 1);
+
+    $selected = ($tahunajaran == $ta)
+        ? 'selected'
+        : '';
+
+    echo "<option value=\"$ta\" $selected>$ta</option>";
+}
+
+echo '</select> ';
 
 echo '<label>Semester: </label>';
 echo '<select name="semester" onchange="this.form.submit()">';

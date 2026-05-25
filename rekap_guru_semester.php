@@ -61,7 +61,6 @@ $minggu_berjalan = floor($selisih_hari / 7) + 1;
 
 // batas aman
 if ($minggu_berjalan < 1) $minggu_berjalan = 1;
-if ($minggu_berjalan > 20) $minggu_berjalan = 20;
 
 for ($i = 1; $i <= $minggu_berjalan; $i++) {
 
@@ -166,7 +165,7 @@ echo html_writer::start_div('row mb-4');
     echo html_writer::start_div('col-md-6');
         echo html_writer::start_div('card border-0 shadow-sm bg-light');
             echo html_writer::start_div('card-body p-3 text-center');
-                echo html_writer::tag('span', 'Rata-rata Capaian Kinerja', ['class' => 'text-muted small text-uppercase font-weight-bold d-block mb-1']);
+                echo html_writer::tag('span', 'Rata-rata Jurnal diisi', ['class' => 'text-muted small text-uppercase font-weight-bold d-block mb-1']);
                 
                 // Tentukan warna teks rata-rata
                 $avg_color = 'text-danger';
@@ -191,7 +190,7 @@ echo html_writer::start_tag('tr');
     echo html_writer::tag('th', 'Minggu', ['class' => 'text-center align-middle', 'style' => 'width: 10%']);
     echo html_writer::tag('th', 'Rentang Tanggal', ['class' => 'align-middle']);
     echo html_writer::tag('th', 'Realisasi Mengajar', ['class' => 'text-center align-middle']);
-    echo html_writer::tag('th', 'Beban Target', ['class' => 'text-center align-middle']);
+    echo html_writer::tag('th', 'Beban Mengajar', ['class' => 'text-center align-middle']);
     echo html_writer::tag('th', 'Persentase', ['class' => 'text-center align-middle', 'style' => 'width: 15%']);
     echo html_writer::tag('th', 'Aksi', ['class' => 'text-center align-middle', 'style' => 'width: 10%']);
 echo html_writer::end_tag('tr');
