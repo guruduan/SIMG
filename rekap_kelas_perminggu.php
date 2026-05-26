@@ -19,16 +19,29 @@ if (empty($tanggalawalminggu)) {
     throw new moodle_exception('Tanggal awal minggu belum diset di pengaturan plugin.');
 }
 
-// === Hitung rentang minggu ke-1 s.d. ke-20 ===
+// === Hitung rentang minggu dinamis ===
 $mingguoptions = [];
-for ($i = 0; $i < 20; $i++) {
+
+$hariini = strtotime(date('Y-m-d'));
+$selisihhari = floor(($hariini - strtotime($tanggalawalminggu)) / (60 * 60 * 24));
+
+$jumlahminggu = floor($selisihhari / 7) + 1;
+
+if ($jumlahminggu < 1) {
+    $jumlahminggu = 1;
+}
+
+for ($i = 0; $i < $jumlahminggu; $i++) {
+
     $start = strtotime($tanggalawalminggu . " +{$i} week");
     $end   = strtotime("+6 day", $start);
-    $label = 'Minggu Ke-' . ($i+1) . ' (' 
-    . tanggal_indo($start, 'tanggal') 
-    . ' s/d ' 
-    . tanggal_indo($end, 'tanggal') . ')';
-    $mingguoptions[$i+1] = $label;
+
+    $label = 'Minggu Ke-' . ($i + 1) . ' (' 
+        . tanggal_indo($start, 'tanggal') 
+        . ' s/d ' 
+        . tanggal_indo($end, 'tanggal') . ')';
+
+    $mingguoptions[$i + 1] = $label;
 }
 
 // === Ambil cohort (kelas) ===
@@ -41,7 +54,7 @@ foreach ($kelasrecords as $k) {
 // === Hitung minggu berjalan (default) ===
 $hariini = strtotime(date('Y-m-d'));
 $diff = floor(($hariini - strtotime($tanggalawalminggu)) / (7 * 24 * 60 * 60));
-$minggu_berjalan = ($diff >= 0 && $diff < 20) ? $diff + 1 : 1;
+$minggu_berjalan = ($diff >= 0) ? $diff + 1 : 1;
 
 // === Ambil input dengan default kelas pertama & minggu berjalan ===
 $kelas = optional_param('kelas', key($kelasoptions), PARAM_INT); 

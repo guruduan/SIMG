@@ -135,6 +135,109 @@ $is_hari_sekolah =
 
 /*
 =====================================================
+TANGGAL LIBUR DARI SETTING PLUGIN
+Format:
+2026-06-01
+2026-06-17
+2026-12-25
+=====================================================
+*/
+
+$tanggallibur =
+    get_config(
+        'local_jurnalmengajar',
+        'tanggallibur'
+    );
+
+$daftarlibur = array_filter(
+    array_map(
+        'trim',
+        preg_split(
+            '/\r\n|\r|\n/',
+            $tanggallibur
+        )
+    )
+);
+
+/*
+=====================================================
+TANGGAL HARI INI
+=====================================================
+*/
+
+$tanggalhariini = date('Y-m-d');
+
+/*
+=====================================================
+MODE SIMULASI TANGGAL
+=====================================================
+*/
+
+if ($issimulasi && !empty($_GET['tanggal'])) {
+
+    $tanggalhariini = $_GET['tanggal'];
+}
+
+$is_tanggal_libur = false;
+
+/*
+=====================================================
+CEK LIBUR
+SUPPORT:
+2026-05-27
+2026-05-27 s/d 2026-05-28
+=====================================================
+*/
+
+foreach ($daftarlibur as $libur) {
+
+    /*
+    =============================================
+    RENTANG TANGGAL
+    =============================================
+    */
+
+    if (stripos($libur, 's/d') !== false) {
+
+        $parts = explode('s/d', $libur);
+
+        if (count($parts) == 2) {
+
+            $mulai =
+                trim($parts[0]);
+
+            $selesai =
+                trim($parts[1]);
+
+            if (
+                $tanggalhariini >= $mulai
+                &&
+                $tanggalhariini <= $selesai
+            ) {
+
+                $is_tanggal_libur = true;
+                break;
+            }
+        }
+
+    } else {
+
+        /*
+        =============================================
+        TANGGAL TUNGGAL
+        =============================================
+        */
+
+        if ($tanggalhariini == $libur) {
+
+            $is_tanggal_libur = true;
+            break;
+        }
+    }
+}
+
+/*
+=====================================================
 GURU PIKET
 =====================================================
 */
@@ -249,6 +352,25 @@ foreach ($jam_pelajaran as $j => $w) {
         $jamberikut = $jamaktif + 1;
 
         break;
+    }
+}
+
+/*
+=====================================================
+JIKA SEDANG ISTIRAHAT
+AMBIL JAM BERIKUTNYA
+=====================================================
+*/
+
+if (!$jamaktif) {
+
+    foreach ($jam_pelajaran as $j => $w) {
+
+        if ($now < $w['mulai']) {
+
+            $jamberikut = (int)$j;
+            break;
+        }
     }
 }
 
@@ -376,7 +498,7 @@ uksort($data, function($a, $b) {
 
 <title>TV</title>
 
-<meta http-equiv="refresh" content="300">
+<meta http-equiv="refresh" content="60">
 
 <style>
 
@@ -675,13 +797,15 @@ RUNNING TEXT
 
 <?php endif; ?>
 
-<?php if (!$is_hari_sekolah): ?>
+<?php if (!$is_hari_sekolah || $is_tanggal_libur): ?>
 
 <div class="libur">
     Hari Ini Libur Sekolah
 </div>
 
 <?php endif; ?>
+
+<?php if (!$is_tanggal_libur && $is_hari_sekolah): ?>
 
 <div class="top-panels">
 
@@ -807,12 +931,13 @@ RUNNING TEXT
 
 </div>
 
+<?php endif; ?>
 <div class="running">
 
     <span>
 
         Selamat datang di SiM TV •
-        Monitoring kegiatan belajar mengajar realtime •
+        Jadwal kegiatan belajar mengajar realtime •
         <?= format_string($namasekolah); ?> •
         Hari <?= s($hari_ini); ?>
 

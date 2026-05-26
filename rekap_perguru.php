@@ -24,7 +24,7 @@ function format_tanggal_indonesia($timestamp) {
 $userid = required_param('userid', PARAM_INT);
 $mingguke = required_param('mingguke', PARAM_INT);
 
-if ($mingguke < 1 || $mingguke > 20) {
+if ($mingguke < 1) {
     print_error('Parameter minggu ke tidak valid.');
 }
 
