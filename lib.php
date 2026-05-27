@@ -370,6 +370,40 @@ function jurnalmengajar_get_pengurang_target_libur(
 
     return $pengurang;
 }
+
+// cek asesmen
+function jurnalmengajar_is_tanggal_asesmen($tanggal = null) {
+    if (!$tanggal) {
+        $tanggal = date('Y-m-d');
+    }
+
+    $config = get_config('local_jurnalmengajar');
+    $data = trim($config->tanggalasesmen ?? '');
+
+    if (empty($data)) {
+        return false;
+    }
+
+    $lines = explode("\n", $data);
+
+    foreach ($lines as $line) {
+
+        $line = trim($line);
+
+        if (preg_match('/(\d{4}-\d{2}-\d{2})\s+s\/d\s+(\d{4}-\d{2}-\d{2})/', $line, $m)) {
+
+            $mulai = strtotime($m[1]);
+            $selesai = strtotime($m[2]);
+            $cek = strtotime($tanggal);
+
+            if ($cek >= $mulai && $cek <= $selesai) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 /**
  * Ambil cutoff berdasarkan kode kelas (VI, IX, XII)
  */

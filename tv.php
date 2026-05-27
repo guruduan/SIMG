@@ -4,6 +4,7 @@ require('../../config.php');
 
 require_once(__DIR__.'/jadwal_acuan_lib.php');
 require_once(__DIR__.'/jam_pelajaran_lib.php');
+require_once(__DIR__.'/jadwal_asesmen_lib.php');
 require_once(__DIR__.'/lib.php');
 require_once($CFG->libdir . '/filelib.php');
 
@@ -167,6 +168,7 @@ TANGGAL HARI INI
 
 $tanggalhariini = date('Y-m-d');
 
+
 /*
 =====================================================
 MODE SIMULASI TANGGAL
@@ -179,6 +181,140 @@ if ($issimulasi && !empty($_GET['tanggal'])) {
 }
 
 $is_tanggal_libur = false;
+
+$mode_tv = 'KBM';
+
+/*
+=====================================================
+MODE ASESMEN
+=====================================================
+*/
+
+$is_asesmen = false;
+
+$tanggalasesmen =
+    get_config(
+        'local_jurnalmengajar',
+        'tanggalasesmen'
+    );
+
+if (!empty($tanggalasesmen)) {
+
+    $lines = explode("\n", $tanggalasesmen);
+
+    foreach ($lines as $line) {
+
+        $line = trim($line);
+
+        if (empty($line)) {
+            continue;
+        }
+
+        if (stripos($line, 's/d') !== false) {
+
+            $parts = explode('s/d', $line);
+
+            if (count($parts) == 2) {
+
+                $mulai = trim($parts[0]);
+
+                $selesai = trim($parts[1]);
+
+                if (
+                    $tanggalhariini >= $mulai
+                    &&
+                    $tanggalhariini <= $selesai
+                ) {
+
+                    $is_asesmen = true;
+                    break;
+                }
+            }
+
+        } else {
+
+            if ($tanggalhariini == $line) {
+
+                $is_asesmen = true;
+                break;
+            }
+        }
+    }
+}
+
+/*
+=====================================================
+JADWAL KHUSUS TV
+Format:
+2026-06-02 s/d 2026-06-12|ASESMEN AKHIR TAHUN|Tidak Ada KBM Reguler
+=====================================================
+*/
+
+$jadwalkhusus_text =
+    get_config(
+        'local_jurnalmengajar',
+        'jadwal_khusus_tv'
+    );
+
+$jadwalkhusus = [];
+
+$is_jadwal_khusus = false;
+
+$judulkhusus = '';
+$subjudulkhusus = '';
+
+if (!empty($jadwalkhusus_text)) {
+
+    $lines = explode("\n", $jadwalkhusus_text);
+
+    foreach ($lines as $line) {
+
+        $line = trim($line);
+
+        if (empty($line)) {
+            continue;
+        }
+
+        $parts = explode('|', $line);
+
+        if (count($parts) < 3) {
+            continue;
+        }
+
+        $rentang = trim($parts[0]);
+
+        $judul = trim($parts[1]);
+
+        $subjudul = trim($parts[2]);
+
+        if (stripos($rentang, 's/d') !== false) {
+
+            $tanggal = explode('s/d', $rentang);
+
+            if (count($tanggal) == 2) {
+
+                $mulai = trim($tanggal[0]);
+
+                $selesai = trim($tanggal[1]);
+
+                if (
+                    $tanggalhariini >= $mulai
+                    &&
+                    $tanggalhariini <= $selesai
+                ) {
+
+                    $is_jadwal_khusus = true;
+
+                    $judulkhusus = $judul;
+
+                    $subjudulkhusus = $subjudul;
+
+                    break;
+                }
+            }
+        }
+    }
+}
 
 /*
 =====================================================
@@ -234,6 +370,298 @@ foreach ($daftarlibur as $libur) {
             break;
         }
     }
+}
+
+
+
+/*
+=====================================================
+DATA ASESMEN
+=====================================================
+*/
+
+/*
+=============================================
+KHUSUS JUMAT
+=============================================
+*/
+
+$hari_en =
+    strtolower(
+        date(
+            'l',
+            strtotime($tanggalhariini)
+        )
+    );
+
+if ($hari_en == 'friday') {
+
+    $mulaipukul =
+        get_config(
+            'local_jurnalmengajar',
+            'asesmen_mulai_jumat'
+        ) ?: '07:30';
+
+    $jumlahsesi =
+        get_config(
+            'local_jurnalmengajar',
+            'asesmen_jumlah_sesi_jumat'
+        ) ?: 5;
+
+} else {
+
+    $mulaipukul =
+        get_config(
+            'local_jurnalmengajar',
+            'asesmen_mulai'
+        ) ?: '08:00';
+
+    $jumlahsesi =
+        get_config(
+            'local_jurnalmengajar',
+            'asesmen_jumlah_sesi'
+        ) ?: 10;
+}
+
+$sesiasesmen =
+    jurnalmengajar_generate_sesi_asesmen(
+        $mulaipukul,
+        $jumlahsesi
+    );
+
+$jadwalpengawas = [];
+
+$jsonfile =
+    __DIR__.'/jadwal_pengawas.json';
+
+if (file_exists($jsonfile)) {
+
+    $json =
+        file_get_contents($jsonfile);
+
+    $jadwalpengawas =
+        json_decode($json, true);
+}
+
+/*
+=====================================================
+DETEKSI SESI AKTIF
+=====================================================
+*/
+
+$sesiaktif = null;
+$sesiberikut = null;
+
+foreach ($sesiasesmen as $nomor => $sesi) {
+
+    if (
+        $now >= $sesi['mulai']
+        &&
+        $now < $sesi['selesai']
+    ) {
+
+        $sesiaktif = $nomor;
+
+        if (
+    !empty($sesiasesmen[$nomor + 1])
+    ) {
+
+    $sesiberikut = $nomor + 1;
+
+    } else {
+
+    $sesiberikut = null;
+    }
+
+        break;
+    }
+}
+/*
+=====================================================
+JIKA BELUM MASUK SESI PERTAMA
+=====================================================
+*/
+
+$sebelumsesipertama = false;
+
+if (!$sesiaktif) {
+
+    foreach ($sesiasesmen as $nomor => $sesi) {
+
+        if ($now < $sesi['mulai']) {
+
+            $sesiberikut = $nomor;
+
+            /*
+            =====================================
+            SEBELUM SESI PERTAMA
+            =====================================
+            */
+
+            if ($nomor == 1) {
+
+                $sebelumsesipertama = true;
+            }
+
+            break;
+        }
+    }
+}
+/*
+=====================================================
+PENGAWAS AKTIF
+=====================================================
+*/
+
+$pengawasaktif = [];
+
+if (
+    !empty($jadwalpengawas[$tanggalhariini][$sesiaktif])
+) {
+
+    $pengawasaktif =
+        $jadwalpengawas[$tanggalhariini][$sesiaktif];
+}
+
+/*
+=====================================================
+PENGAWAS BERIKUTNYA
+=====================================================
+*/
+
+$pengawasberikut = [];
+
+if (
+    !empty($jadwalpengawas[$tanggalhariini][$sesiberikut])
+) {
+
+    $pengawasberikut =
+        $jadwalpengawas[$tanggalhariini][$sesiberikut];
+}
+
+$countdowntitle =
+    'SISA WAKTU MENUJU GANTI SESI';
+    
+/*
+=====================================================
+COUNTDOWN ASESMEN
+=====================================================
+*/
+
+$sisadetikasesmen = 0;
+
+if (
+    (
+        $sesiaktif
+        &&
+        !empty($sesiasesmen[$sesiaktif])
+    )
+    ||
+    (
+        !$sesiaktif
+        &&
+        !empty($sesiasesmen[$sesiberikut])
+    )
+) {
+
+    $targetjam = null;
+
+    /*
+    =============================================
+    SEBELUM SESI PERTAMA
+    =============================================
+    */
+
+    if (
+        $sebelumsesipertama
+        &&
+        !empty($sesiasesmen[$sesiberikut])
+    ) {
+
+        $targetjam =
+            $sesiasesmen[$sesiberikut]['mulai'];
+
+    } else {
+
+        /*
+        =========================================
+        JIKA ADA SESI BERIKUTNYA
+        =========================================
+        */
+
+        if (
+            !empty($sesiasesmen[$sesiberikut])
+        ) {
+
+            $targetjam =
+                $sesiasesmen[$sesiberikut]['mulai'];
+
+        } else {
+
+            /*
+            =====================================
+            JIKA SESI TERAKHIR
+            =====================================
+            */
+
+            $targetjam =
+                $sesiasesmen[$sesiaktif]['selesai'];
+        }
+    }
+
+    $timestamp_target =
+        strtotime(
+            $tanggalhariini . ' ' . $targetjam
+        );
+
+    $timestamp_now =
+        strtotime(
+            $tanggalhariini . ' ' . $now
+        );
+
+    $sisadetikasesmen =
+        max(
+            0,
+            $timestamp_target - $timestamp_now
+        );
+}
+/*
+=====================================================
+SESI TERAKHIR
+=====================================================
+*/
+
+if (
+    $sesiaktif
+    &&
+    empty($sesiasesmen[$sesiberikut])
+) {
+
+    $countdowntitle =
+        'SISA WAKTU MENUJU SELESAI ASESMEN';
+}
+
+/*
+=====================================================
+MODE TV
+=====================================================
+*/
+
+if ($is_tanggal_libur || !$is_hari_sekolah) {
+
+    $mode_tv = 'LIBUR';
+
+} else if ($is_jadwal_khusus) {
+
+    $mode_tv = 'KHUSUS';
+
+} else if ($is_asesmen) {
+
+    $mode_tv = 'ASESMEN';
+
+} else {
+
+    $mode_tv = 'KBM';
 }
 
 /*
@@ -498,7 +926,7 @@ uksort($data, function($a, $b) {
 
 <title>TV</title>
 
-<meta http-equiv="refresh" content="60">
+<!-- <meta http-equiv="refresh" content="60"> -->
 
 <style>
 
@@ -791,21 +1219,345 @@ RUNNING TEXT
 
 <div class="simulasi">
     MODE SIMULASI<br>
-    <?= s($hari_ini); ?><br>
+
+    <?= s($hari_ini); ?>,
+    <?= s($tanggalhariini); ?><br>
+
     <?= s($now); ?>
 </div>
 
 <?php endif; ?>
 
-<?php if (!$is_hari_sekolah || $is_tanggal_libur): ?>
+<?php if (
+    $mode_tv === 'LIBUR'
+    ||
+    $mode_tv === 'KHUSUS'
+): ?>
 
 <div class="libur">
+
+<?php if ($is_jadwal_khusus): ?>
+
+    <div style="font-size:56px;">
+        <?= s($judulkhusus); ?>
+    </div>
+
+    <div style="margin-top:20px;font-size:32px;">
+        <?= s($subjudulkhusus); ?>
+    </div>
+
+<?php else: ?>
+
     Hari Ini Libur Sekolah
+
+<?php endif; ?>
+
 </div>
 
 <?php endif; ?>
 
-<?php if (!$is_tanggal_libur && $is_hari_sekolah): ?>
+<?php if ($mode_tv === 'ASESMEN'): ?>
+
+<style>
+
+.asesmen-wrapper{
+    padding:20px;
+}
+
+.asesmen-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+.asesmen-card{
+    background:#1e293b;
+    border-radius:20px;
+    padding:18px;
+}
+
+.asesmen-title{
+    font-size:38px;
+    font-weight:bold;
+    color:#facc15;
+    margin-bottom:24px;
+}
+
+.asesmen-info{
+    display:grid;
+    grid-template-columns:150px 1fr;
+    row-gap:18px;
+    column-gap:10px;
+    font-size:30px;
+    margin-bottom:24px;
+}
+
+.asesmen-label{
+    color:#cbd5e1;
+}
+
+.asesmen-value{
+    font-weight:bold;
+}
+
+.ruang-list{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+
+.ruang-item{
+    display:grid;
+    grid-template-columns:100px 1fr;
+    background:#0f172a;
+    border-radius:14px;
+    overflow:hidden;
+}
+
+.ruang-label{
+    background:#14b8a6;
+    padding:18px;
+    font-size:28px;
+    font-weight:bold;
+    text-align:center;
+}
+
+.ruang-guru{
+    padding:14px 18px;
+    font-size:22px;
+    font-weight:bold;
+}
+
+.countdown-box{
+    margin:20px;
+    background:#1e293b;
+    border-radius:20px;
+    padding:30px;
+    text-align:center;
+}
+
+.countdown-box{
+    position:fixed;
+    left:20px;
+    right:20px;
+    bottom:60px;
+}
+
+.countdown-title{
+    font-size:34px;
+    color:#facc15;
+    margin-bottom:10px;
+    font-weight:bold;
+}
+
+.countdown{
+    font-size:72px;
+    font-weight:bold;
+    letter-spacing:4px;
+}
+
+</style>
+
+<div class="asesmen-wrapper">
+
+    <div class="asesmen-grid">
+
+        <!-- ================================= -->
+        <!-- SESI AKTIF -->
+        <!-- ================================= -->
+
+        <div class="asesmen-card">
+
+            <div class="asesmen-title">
+                PENGAWAS SESI AKTIF
+            </div>
+
+            <div class="asesmen-info">
+
+                <div class="asesmen-label">
+                    SESI KE
+                </div>
+
+                <div class="asesmen-value">
+                    <?= $sesiaktif ?: '-'; ?>
+                </div>
+
+                <div class="asesmen-label">
+                    WAKTU
+                </div>
+
+                <div class="asesmen-value">
+
+                    <?php if (!empty($sesiasesmen[$sesiaktif])): ?>
+
+                        <?= substr($sesiasesmen[$sesiaktif]['mulai'],0,5); ?>
+                        -
+                        <?= substr($sesiasesmen[$sesiaktif]['selesai'],0,5); ?>
+
+                    <?php else: ?>
+
+                        -
+
+                    <?php endif; ?>
+
+                </div>
+
+            </div>
+
+            <div class="ruang-list">
+
+                <?php foreach ($pengawasaktif as $ruang => $guru): ?>
+
+                    <div class="ruang-item">
+
+                        <div class="ruang-label">
+                            <?= s($ruang); ?>
+                        </div>
+
+                        <div class="ruang-guru">
+                            <?= s($guru); ?>
+                        </div>
+
+                    </div>
+
+                <?php endforeach; ?>
+
+            </div>
+
+        </div>
+
+        <!-- ================================= -->
+        <!-- SESI BERIKUTNYA -->
+        <!-- ================================= -->
+
+        <div class="asesmen-card">
+
+            <div class="asesmen-title">
+                PENGAWAS SESI BERIKUTNYA
+            </div>
+
+            <div class="asesmen-info">
+
+                <div class="asesmen-label">
+                    SESI KE
+                </div>
+
+                <div class="asesmen-value">
+                    <?= $sesiberikut ?: '-'; ?>
+                </div>
+
+                <div class="asesmen-label">
+                    WAKTU
+                </div>
+
+                <div class="asesmen-value">
+
+                    <?php if (!empty($sesiasesmen[$sesiberikut])): ?>
+
+                        <?= substr($sesiasesmen[$sesiberikut]['mulai'],0,5); ?>
+                        -
+                        <?= substr($sesiasesmen[$sesiberikut]['selesai'],0,5); ?>
+
+                    <?php else: ?>
+
+                        -
+
+                    <?php endif; ?>
+
+                </div>
+
+            </div>
+
+            <div class="ruang-list">
+
+                <?php foreach ($pengawasberikut as $ruang => $guru): ?>
+
+                    <div class="ruang-item">
+
+                        <div class="ruang-label">
+                            <?= s($ruang); ?>
+                        </div>
+
+                        <div class="ruang-guru">
+                            <?= s($guru); ?>
+                        </div>
+
+                    </div>
+
+                <?php endforeach; ?>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="countdown-box">
+
+    <div class="countdown-title">
+    <?= s($countdowntitle); ?>
+    </div>
+
+    <div
+        class="countdown"
+        id="countdownasesmen"
+    >
+        00:00:00
+    </div>
+
+</div>
+
+<script>
+
+let sisaasesmen =
+    <?= (int)$sisadetikasesmen; ?>;
+
+function updateCountdownAsesmen(){
+
+    if (sisaasesmen < 0) {
+        sisaasesmen = 0;
+    }
+
+    let jam =
+        String(Math.floor(sisaasesmen / 3600))
+        .padStart(2,'0');
+
+    let menit =
+        String(Math.floor((sisaasesmen % 3600) / 60))
+        .padStart(2,'0');
+
+    let detik =
+        String(sisaasesmen % 60)
+        .padStart(2,'0');
+
+    document.getElementById(
+        'countdownasesmen'
+    ).innerHTML =
+        jam + ':' + menit + ':' + detik;
+
+    if (sisaasesmen > 0) {
+    sisaasesmen--;
+
+    } else {
+
+    location.reload();
+    }
+}
+
+setInterval(
+    updateCountdownAsesmen,
+    1000
+);
+
+updateCountdownAsesmen();
+
+</script>
+
+<?php endif; ?>
+
+<?php if ($mode_tv === 'KBM'): ?>
 
 <div class="top-panels">
 
@@ -930,8 +1682,8 @@ RUNNING TEXT
 </table>
 
 </div>
-
 <?php endif; ?>
+
 <div class="running">
 
     <span>
@@ -1065,7 +1817,10 @@ KECEPATAN SCROLL
 =====================================================
 */
 
-setInterval(autoScroll,60);
+if (container) {
+
+    setInterval(autoScroll,60);
+}
 
 /*
 =====================================================

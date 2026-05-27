@@ -143,6 +143,25 @@ Contoh:
 2026-03-23 s/d 2026-03-25',
     ''
 ));
+     $settings->add(
+    new admin_setting_configtextarea(
+        'local_jurnalmengajar/jadwal_khusus_tv',
+        'Jadwal Khusus TV',
+        'Format:
+2026-06-02 s/d 2026-06-12|HALAL BIHALAL |Tidak Ada KBM Reguler
+2026-03-10 s/d 2026-03-18|ASESMEN AKHIR SEMESTER|KBM Ditiadakan',
+        ''
+    )
+);
+$settings->add(
+    new admin_setting_configtextarea(
+        'local_jurnalmengajar/tanggalasesmen',
+        'Tanggal Asesmen',
+        'Format:
+2026-06-02 s/d 2026-06-12',
+        ''
+    )
+);
 
 // ==============================
 // CUT OFF MULTI KELAS

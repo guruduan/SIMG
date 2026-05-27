@@ -79,7 +79,6 @@ echo $OUTPUT->header();
 echo $custom_css;
 ?>
 
-<!-- HTML Konten Dashboard -->
 <div class="jurnal-dashboard-container">
     <div class="jurnal-dashboard-header">
         <h3>⚙️ Panel Admin Jurnal Mengajar</h3>
@@ -87,7 +86,6 @@ echo $custom_css;
     </div>
 
     <div class="jurnal-menu-grid">
-        <!-- Pengaturan Sistem & Jadwal -->
         <a href="<?php echo new moodle_url('/admin/settings.php', array('section' => 'local_jurnalmengajar')); ?>" class="jurnal-menu-item">
             <span class="jurnal-emoji">🗓️</span> Pengaturan Awal
         </a>
@@ -104,7 +102,6 @@ echo $custom_css;
             <span class="jurnal-emoji">🗓️</span> Pengaturan Guru Wali
         </a>
 
-        <!-- Rekap & Histori Jurnal -->
         <a href="<?php echo new moodle_url('/local/jurnalmengajar/histori_rekap.php'); ?>" class="jurnal-menu-item">
             <span class="jurnal-emoji">🗓️</span> Lihat Semua KBM Guru Tiap Tahun
         </a>
@@ -118,7 +115,6 @@ echo $custom_css;
             <span class="jurnal-emoji">🗓️</span> Lihat Semua Surat Izin Murid
         </a>
 
-        <!-- BK & Pramuka -->
         <a href="<?php echo new moodle_url('/local/jurnalmengajar/riwayat_layananbk.php'); ?>" class="jurnal-menu-item">
             <span class="jurnal-emoji">🗓️</span> Lihat Riwayat Layanan BK
         </a>
@@ -126,7 +122,6 @@ echo $custom_css;
             <span class="jurnal-emoji">🗓️</span> Lihat Riwayat Kegiatan Pramuka
         </a>
 
-        <!-- Ekstrakurikuler -->
         <a href="<?php echo new moodle_url('/local/jurnalmengajar/ekstra.php'); ?>" class="jurnal-menu-item">
             <span class="jurnal-emoji">🗓️</span> Isi Daftar Ekstrakurikuler
         </a>
@@ -137,9 +132,14 @@ echo $custom_css;
             <span class="jurnal-emoji">🗓️</span> Isi Daftar Peserta Ekstrakurikuler
         </a>
 
-        <!-- Ujian -->
         <a href="<?php echo new moodle_url('/local/jurnalmengajar/kartu_ujian.php'); ?>" class="jurnal-menu-item">
             <span class="jurnal-emoji">🗓️</span> Generate Kartu Ujian & Daftar Hadir
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_asesmen.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> Pengaturan Sesi Asesmen
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_pengawas.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> Import Jadwal Pengawas Asesmen
         </a>
     </div>
 </div>
