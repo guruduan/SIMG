@@ -6,6 +6,7 @@ require_login();
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);
 require_once(__DIR__ . '/jadwal_asesmen_lib.php');
+require_once(__DIR__ . '/lib.php');
 
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/jadwal_pengawas_view.php'));
 $PAGE->set_context($context);
@@ -75,18 +76,22 @@ echo $OUTPUT->header();
     <h2>Jadwal Pengawas Asesmen</h2>
 
     <form method="get" id="filterform" class="form-inline my-3">
-        <div class="form-group">
-            <label for="tanggal" class="mr-2 font-weight-bold">Hari / Tanggal:</label>
-            <input 
-                type="date" 
-                id="tanggal"
-                name="tanggal" 
-                class="form-control"
-                value="<?= s($tanggal); ?>" 
-                onchange="document.getElementById('filterform').submit();"
-            >
-        </div>
-    </form>
+    <div class="form-group">
+        <label for="tanggal" class="mr-2 font-weight-bold">Hari / Tanggal:</label>
+        <input 
+            type="date" 
+            id="tanggal"
+            name="tanggal" 
+            class="form-control"
+            value="<?= s($tanggal); ?>" 
+            onchange="document.getElementById('filterform').submit();"
+        >
+    </div>
+</form>
+
+<p class="mt-2 mb-3 text-muted">
+    <?= tanggal_indo(strtotime($tanggal), 'judul'); ?>
+</p>
 
     <div class="table-responsive">
         <table class="generaltable table table-striped table-bordered table-hover">
