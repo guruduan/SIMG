@@ -21,6 +21,26 @@ $sampai = optional_param('sampai', '', PARAM_RAW);
 $page = optional_param('page', 0, PARAM_INT);
 $keperluanfilter = optional_param('keperluan', '', PARAM_TEXT);
 
+// FILTER CETAK HARIAN BULANAN
+$bulan = optional_param('bulan', date('n'), PARAM_INT);
+$tahun = optional_param('tahun', date('Y'), PARAM_INT);
+$hari  = optional_param('hari', 1, PARAM_INT); //default hari senin
+$cetakharian = optional_param('cetakharian', '', PARAM_TEXT);
+
+if ($cetakharian) {
+
+    $url = new moodle_url('/local/jurnalmengajar/cetak_harian_bulanan.php', [
+        'bulan' => $bulan,
+        'tahun' => $tahun,
+        'hari' => $hari,
+        'kelas' => $kelasfilter,
+        'siswaid' => $siswafilter,
+        'keperluan' => $keperluanfilter
+    ]);
+
+    redirect($url);
+}
+
 $perpage = 20;
 $offset  = $page * $perpage;
 
@@ -132,8 +152,80 @@ echo ' ';
 echo html_writer::label('Sampai', 'sampai') . ' ';
 echo html_writer::empty_tag('input', ['type' => 'date', 'name' => 'sampai', 'value' => $sampai]);
 echo ' ';
-echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Tampilkan']);
+echo html_writer::empty_tag('input', [
+    'type' => 'submit',
+    'value' => 'Tampilkan'
+]);
+
 echo html_writer::end_div();
+
+//BUAT CETAK HARIAN BULANAN
+echo html_writer::start_div('mt-2');
+
+echo html_writer::tag(
+    'div',
+    'Pilih opsi berikut ini saja untuk Cetak Harian Bulanan',
+    [
+        'style' => '
+            font-weight:bold;
+            margin-bottom:8px;
+            color:#0f4c81;
+        '
+    ]
+);
+
+echo html_writer::label('Bulan', 'bulan') . ' ';
+
+echo html_writer::select([
+    1=>'Januari',
+    2=>'Februari',
+    3=>'Maret',
+    4=>'April',
+    5=>'Mei',
+    6=>'Juni',
+    7=>'Juli',
+    8=>'Agustus',
+    9=>'September',
+    10=>'Oktober',
+    11=>'November',
+    12=>'Desember'
+], 'bulan', $bulan);
+
+echo ' ';
+
+echo html_writer::label('Tahun', 'tahun') . ' ';
+
+echo html_writer::select([
+    2025=>2025,
+    2026=>2026,
+    2027=>2027
+], 'tahun', $tahun);
+
+echo ' ';
+
+echo html_writer::label('Hari', 'hari') . ' ';
+
+echo html_writer::select([
+    1=>'Senin',
+    2=>'Selasa',
+    3=>'Rabu',
+    4=>'Kamis',
+    5=>'Jumat',
+    6=>'Sabtu',
+    0=>'Minggu'
+], 'hari', $hari);
+
+echo html_writer::end_div();
+//
+
+echo ' ';
+
+echo html_writer::empty_tag('input', [
+    'type' => 'submit',
+    'name' => 'cetakharian',
+    'value' => '🖨 Cetak Harian Bulanan',
+    'formtarget' => '_blank'
+]);
 
 echo html_writer::end_tag('form');
 
@@ -145,13 +237,13 @@ if ($results) {
     echo "<table class='generaltable'>";
     echo "<tr>
     <th>No</th>
-    <th>Tanggal</th>
+    <th>Hari Tanggal</th>
     <th>Nama Murid</th>
     <th>Kelas</th>
     <th>Guru Pengajar</th>
     <th>Alasan</th>
     <th>Keperluan</th>
-    <th>Pengawas</th>
+    <th>Guru Piket</th>
     </tr>";
 
     $no = $offset + 1;
@@ -206,7 +298,10 @@ $baseurl = new moodle_url('/local/jurnalmengajar/rekap_surat_izin.php', [
     'siswaid' => $siswafilter,
     'dari' => $dari,
     'sampai' => $sampai,
-    'keperluan' => $keperluanfilter
+    'keperluan' => $keperluanfilter,
+    'bulan' => $bulan,
+    'tahun' => $tahun,
+    'hari' => $hari
 ]);
 
 echo $OUTPUT->paging_bar($total, $page, $perpage, $baseurl);

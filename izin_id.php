@@ -66,8 +66,8 @@ echo html_writer::end_div();
 if ($riwayatsurat) {
     $table = new html_table();
     $table->head  = [
-        'No', 'Tanggal', 'Nama Murid', 'Kelas', 
-        'Guru Pengajar', 'Alasan', 'Keperluan', 'Guru Pengawas', 'ID'
+        'No', 'Hari Tanggal', 'Nama Murid', 'Kelas', 
+        'Guru Pengajar', 'Alasan', 'Keperluan', 'Guru Piket', 'ID'
     ];
 
     $no = $offset + 1;
