@@ -105,6 +105,10 @@ $now = date('H:i:s');
 $tanggalindo =
     tanggal_indo(time(), 'judul');
 
+// Tambahkan ini di bagian PHP
+$server_h = date('H');
+$server_i = date('i');
+$server_s = date('s');
 /*
 =====================================================
 MODE SIMULASI
@@ -1698,159 +1702,115 @@ updateCountdownAsesmen();
 </div>
 
 <script>
-
 /*
 =====================================================
-JAM DIGITAL
+1. JAM DIGITAL
 =====================================================
 */
+let jam   = <?= (int)$server_h ?>;
+let menit = <?= (int)$server_i ?>;
+let detik = <?= (int)$server_s ?>;
 
-function updateClock(){
+function updateClock() {
 
-    const now = new Date();
+    document.getElementById('clock').innerHTML =
+        String(jam).padStart(2,'0') + ':' +
+        String(menit).padStart(2,'0') + ':' +
+        String(detik).padStart(2,'0');
 
-    const time =
-        now.getHours().toString().padStart(2,'0')
-        + ':' +
-        now.getMinutes().toString().padStart(2,'0')
-        + ':' +
-        now.getSeconds().toString().padStart(2,'0');
+    detik++;
 
-    document.getElementById('clock')
-        .innerHTML = time;
+    if (detik >= 60) {
+        detik = 0;
+        menit++;
+    }
+
+    if (menit >= 60) {
+        menit = 0;
+        jam++;
+    }
+
+    if (jam >= 24) {
+        jam = 0;
+    }
 }
 
-setInterval(updateClock,1000);
-
 updateClock();
+setInterval(updateClock, 1000);
 
 /*
 =====================================================
-AUTO SCROLL TABLE
+2. AUTO SCROLL TABLE (JADWAL KBM)
 =====================================================
 */
+const container = document.getElementById('tableContainer');
+let tablePause = false;
+let tableFirstPause = true;
 
-const container =
-    document.getElementById('tableContainer');
+function autoScrollTable() {
+    if (!container || tablePause) return;
 
-let pause = false;
-
-/*
-=====================================================
-PAUSE AWAL
-=====================================================
-*/
-
-let firstPause = true;
-
-function autoScroll(){
-
-    if (pause) {
-        return;
-    }
-
-    /*
-    =============================================
-    TAHAN DATA AWAL 5 DETIK
-    =============================================
-    */
-
-    if (firstPause) {
-
+    if (tableFirstPause) {
+        tablePause = true;
         setTimeout(() => {
-
-            firstPause = false;
-
+            tableFirstPause = false;
+            tablePause = false;
         }, 5000);
-
         return;
     }
-
-    /*
-    =============================================
-    SCROLL PERLAHAN
-    =============================================
-    */
 
     container.scrollTop += 1;
 
-    /*
-    =============================================
-    JIKA SUDAH BAWAH
-    =============================================
-    */
-
-    if (
-        container.scrollTop + container.clientHeight
-        >= container.scrollHeight
-    ){
-
-        pause = true;
-
-        /*
-        =========================================
-        TAHAN DI BAWAH 5 DETIK
-        =========================================
-        */
-
+    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+        tablePause = true;
         setTimeout(() => {
-
-            container.scrollTop = 0;
-
-            pause = false;
-
-            /*
-            =====================================
-            ULANGI PAUSE AWAL
-            =====================================
-            */
-
-            firstPause = true;
-
+            container.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => {
+                tablePause = false;
+                tableFirstPause = true;
+            }, 1500); 
         }, 5000);
     }
 }
 
-/*
-=====================================================
-KECEPATAN SCROLL
-=====================================================
-*/
-
 if (container) {
-
-    setInterval(autoScroll,60);
+    setInterval(autoScrollTable, 50);
 }
 
 /*
 =====================================================
-AUTO SCROLL PANEL
+3. AUTO SCROLL PANEL (GURU PIKET & PENGUMUMAN)
 =====================================================
 */
-
-document.querySelectorAll('.panel-scroll')
-.forEach(panel => {
-
-    let pos = -40;
-
+document.querySelectorAll('.panel-scroll').forEach(panel => {
+    let panelPause = false;
     setInterval(() => {
-
-        pos += 1;
-
-        panel.scrollTop = pos;
-
-        if (
-            panel.scrollTop + panel.clientHeight
-            >= panel.scrollHeight
-        ){
-
-            pos = 0;
-            panel.scrollTop = 0;
+        if (panelPause) return;
+        if (panel.scrollHeight > panel.clientHeight) {
+            panel.scrollTop += 1;
+            if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight) {
+                panelPause = true;
+                setTimeout(() => {
+                    panel.scrollTop = 0;
+                    panelPause = false;
+                }, 3000);
+            }
         }
-
-    }, 90);
-
+    }, 100);
 });
+
+/*
+=====================================================
+4. AUTO REFRESH (ANTI-STUCK)
+=====================================================
+*/
+<?php if ($mode_tv === 'KBM'): ?>
+
+setTimeout(() => {
+    location.reload();
+}, 900000); // 15 menit
+
+<?php endif; ?>
 
 </script>
 
