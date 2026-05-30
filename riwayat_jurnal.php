@@ -66,18 +66,6 @@ echo html_writer::link(
     ['class' => 'btn btn-secondary mr-md-2']
 );
 
-// Tombol ekspor disatukan secara sejajar (inline-block)
-echo html_writer::start_tag('form', [
-    'method' => 'get',
-    'action' => new moodle_url('/local/jurnalmengajar/export_form.php'),
-    'style' => 'display:inline-block;'
-]);
-echo html_writer::tag('button', '🌏 Ekspor Bulanan', [
-    'type' => 'submit',
-    'class' => 'btn btn-success shadow-sm'
-]);
-echo html_writer::end_tag('form');
-
 echo html_writer::end_div(); // close col-md-4
 echo html_writer::end_div(); // close row
 

@@ -312,11 +312,11 @@ if ($dari && $sampai) {
             '<td>'.$no++.'</td>'.
             '<td class="text-left font-weight-bold">'.s(ucwords(strtolower($u->lastname))).'</td>'.
             '<td><span class="badge badge-secondary bg-secondary">'.s($u->kelas).'</span></td>'.
-            '<td><span class="badge badge-success bg-success text-white">'.$d['hadir'].'</span></td>'.
-            '<td><span class="badge badge-warning bg-warning text-dark">'.$d['sakit'].'</span></td>'.
-            '<td><span class="badge badge-info bg-info text-white">'.$d['ijin'].'</span></td>'.
-            '<td><span class="badge badge-danger bg-danger text-white">'.$d['alpa'].'</span></td>'.
-            '<td><span class="badge badge-secondary bg-secondary text-white">'.$d['dispensasi'].'</span></td>'.
+           '<td class="text-success font-weight-bold">'.$d['hadir'].'</td>'.
+           '<td class="text-warning font-weight-bold">'.$d['sakit'].'</td>'.
+           '<td class="text-info font-weight-bold">'.$d['ijin'].'</td>'.
+           '<td class="text-danger font-weight-bold">'.$d['alpa'].'</td>'.
+           '<td class="text-secondary font-weight-bold">'.$d['dispensasi'].'</td>'.
             '<td>'.html_writer::link($detailurl, '<i class="fa fa-search-plus"></i> Detail', ['class'=>'btn btn-sm btn-outline-primary']).'</td>'
         );
     }

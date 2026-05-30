@@ -78,20 +78,25 @@ echo html_writer::start_div('card-body');
 // ============================
 echo html_writer::start_tag('form', [
     'method' => 'get',
-    'class'  => 'mb-4' // Margin bawah
+    'class'  => 'mb-4'
 ]);
 
-// Gunakan flexbox Bootstrap agar label, dropdown, dan tombol rapi sebaris
 echo html_writer::start_div('d-flex align-items-center flex-wrap gap-2');
-echo html_writer::tag('strong', 'Filter Guru Wali: ', ['class' => 'mr-2']);
-echo html_writer::select($listguru, 'guru', $filterguru, false, ['class' => 'custom-select form-select w-auto mr-2']);
 
-echo html_writer::empty_tag('input', [
-    'type'  => 'submit',
-    'value' => 'Tampilkan',
-    'class' => 'btn btn-primary'
-]);
-echo html_writer::end_div(); // End flexbox
+echo html_writer::tag('strong', 'Filter Guru Wali: ', ['class' => 'mr-2']);
+
+echo html_writer::select(
+    $listguru,
+    'guru',
+    $filterguru,
+    false,
+    [
+        'class'    => 'custom-select form-select w-auto',
+        'onchange' => 'this.form.submit();'
+    ]
+);
+
+echo html_writer::end_div();
 
 echo html_writer::end_tag('form');
 

@@ -28,7 +28,11 @@ foreach ($jadwal as $j) {
 asort($daftarkelas);
 
 // Default filter kelas
-$filterkelas = $_GET['kelas'] ?? array_key_first($daftarkelas);
+$filterkelas = optional_param(
+    'kelas',
+    array_key_first($daftarkelas),
+    PARAM_TEXT
+);
 
 /*
 =====================================================
@@ -46,16 +50,8 @@ echo html_writer::start_div('row align-items-end');
 echo html_writer::start_div('col-md-5 mb-2 mb-md-0');
 echo html_writer::tag('label', 'Filter Kelas', ['class' => 'font-weight-bold mb-1']);
 echo html_writer::select($daftarkelas, 'kelas', $filterkelas, null, [
-    'class' => 'form-control form-control-sm'
-]);
-echo html_writer::end_div();
-
-// Tombol Tampilkan (Memenuhi kolom sisa)
-echo html_writer::start_div('col-md-2');
-echo html_writer::empty_tag('input', [
-    'type' => 'submit',
-    'value' => 'Tampilkan',
-    'class' => 'btn btn-primary btn-sm btn-block'
+    'class' => 'form-control form-control-sm',
+    'onchange' => 'this.form.submit();'
 ]);
 echo html_writer::end_div();
 

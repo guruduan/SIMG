@@ -114,10 +114,6 @@ echo html_writer::select($daftarhari, 'hari', $filterhari, null, [
 ]);
 echo html_writer::end_div();
 
-echo html_writer::start_div('col-md-3');
-echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => '⚡ Tampilkan Jadwal', 'class' => 'btn btn-primary btn-sm btn-block']);
-echo html_writer::end_div();
-
 echo html_writer::end_div();
 echo html_writer::end_tag('form');
 
