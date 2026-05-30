@@ -960,6 +960,29 @@ function jurnalmengajar_get_ttd_path() {
 
     return '';
 }
+
+// fungsi ambil kelas dari mapping wali kelas
+function jurnalmengajar_get_kelas_wali($userid) {
+
+    $json = get_config(
+        'local_jurnalmengajar',
+        'wali_kelas_mapping'
+    );
+
+    $mapping = json_decode($json, true);
+
+    if (!is_array($mapping)) {
+        return 0;
+    }
+
+    foreach ($mapping as $cohortid => $waliid) {
+        if ((int)$waliid === (int)$userid) {
+            return (int)$cohortid;
+        }
+    }
+
+    return 0;
+}
 /// fungsi plugin file
 
 function local_jurnalmengajar_pluginfile(

@@ -66,7 +66,8 @@ $mform = new \local_jurnalmengajar\form\suratiguru_form(null, [
 ]);
 
 if ($mform->is_cancelled()) {
-    redirect(new moodle_url('/my/'));
+    redirect(new moodle_url('/local/jurnalmengajar/index.php'));
+
 } else if ($data = $mform->get_data()) {
 
     $record = new stdClass();
@@ -145,14 +146,16 @@ echo html_writer::start_div('card-body table-responsive');
 
 $table = new html_table();
 
-// ✅ Header Tabel
+// ✅ Header Tabel dengan pengaturan lebar minimum untuk Nama dan NIP
 $table->head = [
-    'No',
-    html_writer::tag('span', 'Waktu', ['style' => 'min-width: 110px; display: inline-block;']),
-    html_writer::tag('span', 'Nama Guru', ['style' => 'min-width: 200px; display: inline-block;']),
-    html_writer::tag('span', 'NIP', ['style' => 'min-width: 180px; display: inline-block;']),
-    'Alasan',
-    'Keperluan'
+    'No', 
+    html_writer::tag('span', 'Waktu', ['style' => 'min-width: 110px; display: inline-block;']), 
+//    'Penginput', 
+    html_writer::tag('span', 'Nama Guru', ['style' => 'min-width: 200px; display: inline-block;']), 
+    html_writer::tag('span', 'NIP', ['style' => 'min-width: 180px; display: inline-block;']), 
+    'Alasan', 
+    'Keperluan', 
+    'Aksi'
 ];
 $table->attributes['class'] = 'table table-bordered table-striped table-hover text-center align-middle';
 
@@ -162,14 +165,29 @@ foreach ($riwayat as $r) {
     // ✅ Tanggal format global
     $tanggal = tanggal_indo($r->waktuinput);
 
+    $hapusurl = new moodle_url('/local/jurnalmengajar/hapus_surat_izin_guru.php', [
+        'id' => $r->id,
+        'sesskey' => sesskey()
+    ]);
+
+    $hapus = html_writer::link(
+        $hapusurl,
+        '🗑 Hapus',
+        [
+            'onclick' => "return confirm('Yakin ingin menghapus data ini?')",
+            'class' => 'btn btn-outline-danger btn-sm'
+        ]
+    );
+
     // Jika data lama belum ada ID penginput, tampilkan strip (-)
     $table->data[] = [
-    	$no++,
-    	$tanggal,
-    	html_writer::tag('strong', $r->namaguru),
-    	$r->nip,
-    	$r->alasan,
-    	$r->keperluan
+        $no++,
+        $tanggal, // ✅ Tampil sebagai teks biasa
+        html_writer::tag('strong', $r->namaguru),
+        $r->nip,
+        $r->alasan,
+        $r->keperluan,
+        $hapus
     ];
 }
 

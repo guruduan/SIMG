@@ -141,6 +141,9 @@ echo $custom_css;
         <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_pengawas.php'); ?>" class="jurnal-menu-item">
             <span class="jurnal-emoji">🗓️</span> Import Jadwal Pengawas Asesmen
         </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/izin_guru_hapus.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> Hapus Surat Izin Guru
+        </a>
     </div>
 </div>
 
