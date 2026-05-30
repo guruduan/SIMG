@@ -121,6 +121,7 @@ if ($muridid) {
     $count_izin = 0;
     $count_bk = 0;
     $count_wali = 0;
+    $count_walikelas = 0;
 
     /* 1. ABSEN JURNAL MENGAJAR */
     $rows = $DB->get_records('local_jurnalmengajar');
@@ -271,7 +272,56 @@ if ($muridid) {
         ];
         $count_wali++;
     }
+    /* 6. PEMBINAAN WALI KELAS */
+$walikelas = $DB->get_records_sql(
+    "
+    SELECT *
+    FROM {local_jurnalwalikelas}
+    WHERE jenis = 'pembinaan'
+      AND muridid = ?
+    ORDER BY timecreated ASC
+    ",
+    [$muridid]
+);
 
+foreach ($walikelas as $r) {
+
+    $guru = $DB->get_record(
+        'user',
+        ['id' => $r->userid]
+    );
+
+    $kelas = $r->kelas;
+
+    if (is_numeric($kelas)) {
+
+        $cohort = $DB->get_record(
+            'cohort',
+            ['id' => $kelas]
+        );
+
+        if ($cohort) {
+            $kelas = $cohort->name;
+        }
+    }
+
+    $timeline[] = [
+        'time'      => $r->timecreated,
+        'kelas'     => $kelas,
+        'jenis'     => 'Pembinaan Wali Kelas',
+        'catatan'   =>
+            '<b>Topik:</b> ' .
+            $r->topik .
+            '<br><b>Tindak Lanjut:</b> ' .
+            $r->tindaklanjut,
+        'guru'      => $guru
+            ? $guru->lastname
+            : '-',
+        'kategori'  => 'walikelas'
+    ];
+
+    $count_walikelas++;
+}
     /* SORT BY TIME DESCENDING */
     usort($timeline, function($a, $b) {
         return $b['time'] <=> $a['time'];
@@ -291,13 +341,14 @@ if ($muridid) {
     
     $cards = [
     ['Tidak Hadir KBM', $count_absen, 'bg-danger text-white', 'absen'],
-    ['Surat Izin', $count_izin, 'bg-warning text-dark', 'izin'],
+    ['Izin Keluar/Masuk/Pulang', $count_izin, 'bg-warning text-dark', 'izin'],
     ['Layanan & Pembinaan BK', $count_bk, 'bg-info text-white', 'bk'],
-    ['Pendampingan Wali', $count_wali, 'bg-primary text-white', 'wali']
+    ['Pendampingan Guru Wali', $count_wali, 'bg-primary text-white', 'wali'],
+    ['Pembinaan Wali Kelas', $count_walikelas, 'bg-success text-white', 'walikelas']
 ];
 
     foreach ($cards as $card) {
-        echo html_writer::start_div('col-6 col-md-3 mb-2');
+        echo html_writer::start_div('col-6 col-md mb-2');
 
 $url = new moodle_url(
     '/local/jurnalmengajar/log_perkembangan.php',
@@ -405,6 +456,9 @@ foreach ($timeline as $t) {
         case 'wali':
             $badge = '<span class="badge badge-primary d-block p-2">Guru Wali</span>';
             break;
+        case 'walikelas':
+	    $badge = '<span class="badge badge-success d-block p-2">Wali Kelas</span>';
+	    break;
     }
 
     echo '<tr>';
