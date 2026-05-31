@@ -1,6 +1,6 @@
 <?php
 
-require('../../config.php');
+require_once('../../config.php');
 require_once(__DIR__.'/lib.php');
 
 require_login();
@@ -149,6 +149,10 @@ echo $OUTPUT->header();
     <strong>Kelas:</strong> <?php echo s($kelasnama); ?>
 </div>
 
+<div class="text-danger mb-3">
+    <small><strong>* Wajib diisi</strong></small>
+</div>
+
 <form method="post">
 
     <input type="hidden" name="sesskey" value="<?php echo sesskey(); ?>">
@@ -182,12 +186,16 @@ echo $OUTPUT->header();
 
         <div class="form-group">
 
-            <label>Uraian Kegiatan</label>
+            <label>
+                Uraian Kegiatan
+                <span class="text-danger">*</span>
+            </label>
 
             <textarea
                 name="uraian"
                 rows="5"
                 class="form-control"
+                required
             ></textarea>
 
         </div>
@@ -198,7 +206,10 @@ echo $OUTPUT->header();
 
         <div class="form-group">
 
-            <label>Murid</label>
+            <label>
+                Murid
+                <span class="text-danger">*</span>
+            </label>
 
             <select
                 name="muridid"
@@ -227,6 +238,7 @@ echo $OUTPUT->header();
 
             <label>
                 Topik / Permasalahan
+                <span class="text-danger">*</span>
             </label>
 
             <textarea
@@ -241,6 +253,7 @@ echo $OUTPUT->header();
 
             <label>
                 Tindak Lanjut / Solusi
+                <span class="text-danger">*</span>
             </label>
 
             <textarea
@@ -253,12 +266,12 @@ echo $OUTPUT->header();
 
     </div>
 
-    <button
-        type="submit"
-        class="btn btn-primary"
-    >
-        Simpan
-    </button>
+<button
+    type="submit"
+    class="btn btn-primary mt-2"
+>
+    Simpan
+</button>
 
 </form>
 
@@ -270,20 +283,62 @@ function toggleJenis() {
             'input[name="jenis"]:checked'
         ).value;
 
-    document.getElementById(
-        'blok-umum'
-    ).style.display =
-        (jenis === 'umum')
-        ? 'block'
-        : 'none';
+    const uraian =
+        document.querySelector(
+            'textarea[name="uraian"]'
+        );
 
-    document.getElementById(
-        'blok-pembinaan'
-    ).style.display =
-        (jenis === 'pembinaan')
-        ? 'block'
-        : 'none';
+    const murid =
+        document.querySelector(
+            'select[name="muridid"]'
+        );
+
+    const topik =
+        document.querySelector(
+            'textarea[name="topik"]'
+        );
+
+    const tindaklanjut =
+        document.querySelector(
+            'textarea[name="tindaklanjut"]'
+        );
+
+    if (jenis === 'umum') {
+
+        document.getElementById(
+            'blok-umum'
+        ).style.display = 'block';
+
+        document.getElementById(
+            'blok-pembinaan'
+        ).style.display = 'none';
+
+        uraian.required = true;
+        murid.required = false;
+        topik.required = false;
+        tindaklanjut.required = false;
+
+    } else {
+
+        document.getElementById(
+            'blok-umum'
+        ).style.display = 'none';
+
+        document.getElementById(
+            'blok-pembinaan'
+        ).style.display = 'block';
+
+        uraian.required = false;
+        murid.required = true;
+        topik.required = true;
+        tindaklanjut.required = true;
+    }
 }
+
+document.addEventListener(
+    'DOMContentLoaded',
+    toggleJenis
+);
 </script>
 
 <?php
