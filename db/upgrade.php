@@ -395,5 +395,37 @@ if ($oldversion < 2026053001) {
         'jurnalmengajar'
     );
 }
+ 
+// =====================================================
+// 2026053101 - Riwayat Kelas Siswa
+// =====================================================
+if ($oldversion < 2026053101) {
+
+    $table = new xmldb_table('local_jurnalmengajar_riwayatkelas');
+
+    if (!$dbman->table_exists($table)) {
+
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '19', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '19', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('cohortid', XMLDB_TYPE_INTEGER, '19', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('tahunajaran', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '19', null, XMLDB_NOTNULL, null, null);
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+
+        $table->add_index('userid_idx', XMLDB_INDEX_NOTUNIQUE, ['userid']);
+        $table->add_index('cohortid_idx', XMLDB_INDEX_NOTUNIQUE, ['cohortid']);
+        $table->add_index('tahunajaran_idx', XMLDB_INDEX_NOTUNIQUE, ['tahunajaran']);
+
+        $dbman->create_table($table);
+    }
+
+    upgrade_plugin_savepoint(
+        true,
+        2026053101,
+        'local',
+        'jurnalmengajar'
+    );
+} 
     return true;
 }

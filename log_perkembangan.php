@@ -333,6 +333,49 @@ foreach ($walikelas as $r) {
     echo html_writer::tag('span', 'Total Log: ' . count($timeline), ['class' => 'badge badge-dark p-2']);
     echo html_writer::end_div();
 
+/* =====================================================
+RIWAYAT KELAS SISWA
+===================================================== */
+
+$riwayatkelas = $DB->get_records_sql(
+    "
+    SELECT rk.tahunajaran,
+           c.name AS namakelas
+    FROM {local_jurnalmengajar_riwayatkelas} rk
+    JOIN {cohort} c
+         ON c.id = rk.cohortid
+    WHERE rk.userid = ?
+    ORDER BY rk.tahunajaran ASC
+    ",
+    [$muridid]
+);
+
+if ($riwayatkelas) {
+
+    echo html_writer::start_div(
+        'alert alert-info mb-4'
+    );
+
+    echo html_writer::tag(
+        'h5',
+        '📚 Riwayat Kelas',
+        ['class' => 'mb-2']
+    );
+
+    foreach ($riwayatkelas as $r) {
+
+        echo html_writer::tag(
+            'div',
+            $r->tahunajaran .
+            ' → <strong>' .
+            format_string($r->namakelas) .
+            '</strong>'
+        );
+    }
+
+    echo html_writer::end_div();
+}
+
     /* =====================================================
     TAMBAHAN: COUNTER STATS CARDS (DASHBOARD MINI)
     =====================================================
@@ -438,7 +481,7 @@ foreach ($timeline as $t) {
     switch ($t['kategori']) {
 
         case 'absen':
-            $badge = '<span class="badge badge-secondary d-block p-2">Tidak hadir di kelas</span>';
+            $badge = '<span class="badge badge-secondary d-block p-2">Tidak hadir KBM</span>';
             break;
 
         case 'izin':
