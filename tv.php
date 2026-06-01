@@ -105,7 +105,7 @@ $now = date('H:i:s');
 $tanggalindo =
     tanggal_indo(time(), 'judul');
 
-// Tambahkan ini di bagian PHP
+// JAM IKUT SERVER
 $server_h = date('H');
 $server_i = date('i');
 $server_s = date('s');
@@ -172,21 +172,153 @@ TANGGAL HARI INI
 
 $tanggalhariini = date('Y-m-d');
 
-
 /*
 =====================================================
 MODE SIMULASI TANGGAL
 =====================================================
 */
 
-if ($issimulasi && !empty($_GET['tanggal'])) {
+if (!empty($_GET['tanggal'])) {
 
     $tanggalhariini = $_GET['tanggal'];
+
+    $issimulasi = true;
 }
 
 $is_tanggal_libur = false;
 
 $mode_tv = 'KBM';
+
+/*
+=====================================================
+DETEKSI BANNER
+SUPPORT:
+2026-06-01|Hari Lahir Pancasila|pancasila.png
+
+2026-06-02 s/d 2026-06-12|ASESMEN AKHIR SEMESTER|asesmen.png
+=====================================================
+*/
+
+$banneraktif = '';
+$judulbanner = '';
+
+$bannercfg = get_config(
+    'local_jurnalmengajar',
+    'banner_tv'
+);
+
+if (!empty($bannercfg)) {
+
+    foreach (explode("\n", $bannercfg) as $line) {
+
+        $line = trim($line);
+
+        if (empty($line)) {
+            continue;
+        }
+
+        $parts = explode('|', $line);
+
+        if (count($parts) != 3) {
+            continue;
+        }
+
+        $rentang = trim($parts[0]);
+
+        $judul = trim($parts[1]);
+
+        $file = trim($parts[2]);
+
+        /*
+        =============================================
+        RENTANG TANGGAL
+        =============================================
+        */
+
+        if (stripos($rentang, 's/d') !== false) {
+
+            $tanggal = explode('s/d', $rentang);
+
+            if (count($tanggal) == 2) {
+
+                $mulai = trim($tanggal[0]);
+
+                $selesai = trim($tanggal[1]);
+
+                if (
+                    $tanggalhariini >= $mulai
+                    &&
+                    $tanggalhariini <= $selesai
+                ) {
+
+                    $storedfile = $fs->get_file(
+    $context->id,
+    'local_jurnalmengajar',
+    'banner',
+    0,
+    '/',
+    $file
+);
+
+if ($storedfile) {
+
+    $judulbanner = $judul;
+
+    $banneraktif =
+        moodle_url::make_pluginfile_url(
+            $storedfile->get_contextid(),
+            $storedfile->get_component(),
+            $storedfile->get_filearea(),
+            $storedfile->get_itemid(),
+            $storedfile->get_filepath(),
+            $storedfile->get_filename()
+        )->out(false);
+
+    break;
+}
+                }
+            }
+
+        } else {
+
+            /*
+            =============================================
+            TANGGAL TUNGGAL
+            =============================================
+            */
+
+            if ($rentang == $tanggalhariini) {
+
+                $storedfile = $fs->get_file(
+    $context->id,
+    'local_jurnalmengajar',
+    'banner',
+    0,
+    '/',
+    $file
+);
+
+if ($storedfile) {
+
+    $judulbanner = $judul;
+
+    $banneraktif =
+        moodle_url::make_pluginfile_url(
+            $storedfile->get_contextid(),
+            $storedfile->get_component(),
+            $storedfile->get_filearea(),
+            $storedfile->get_itemid(),
+            $storedfile->get_filepath(),
+            $storedfile->get_filename()
+        )->out(false);
+
+    break;
+}
+            }
+        }
+    }
+}
+
 
 /*
 =====================================================
@@ -828,32 +960,35 @@ foreach ($jadwal as $j) {
 
     $kelas = trim($j['kelas']);
 
-    /*
-    =============================================
-    CEK CUTOFF KELAS
-    =============================================
-    */
+	/*
+	============================================
+	CEK CUTOFF KELAS
+	============================================
+	*/
 
-    preg_match('/^(XII|XI|X)/', $kelas, $match);
+	preg_match('/^(XII|XI|X)/', $kelas, $match);
 
-    $tingkatkelas = $match[1] ?? '';
+	$tingkatkelas = $match[1] ?? '';
 
-    if (!empty($cutoffkelas[$tingkatkelas])) {
+	if (!empty($cutoffkelas[$tingkatkelas])) {
 
-        $tanggalcutoff =
-            strtotime($cutoffkelas[$tingkatkelas]);
+	    $tanggalcutoff =
+		strtotime($cutoffkelas[$tingkatkelas]);
 
-        /*
-        =========================================
-        JIKA SUDAH LEWAT CUTOFF
-        =========================================
-        */
+	    /*
+	    =========================================
+	    JIKA SUDAH LEWAT CUTOFF
+	    =========================================
+	    */
 
-        if (time() >= $tanggalcutoff) {
-            continue;
-        }
-    }
-
+	    if (
+		strtotime($tanggalhariini)
+		>=
+		$tanggalcutoff
+	    ) {
+		continue;
+	    }
+	}
     /*
     =============================================
     INISIALISASI DATA KELAS
@@ -1080,6 +1215,30 @@ TOP PANELS
 }
 /*
 =====================================================
+BANNER
+=====================================================
+*/
+.banner-fullscreen{
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100vh;
+    background:#000;
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:99999;
+}
+
+.banner-fullscreen img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+
+/*
+=====================================================
 TABLE
 =====================================================
 */
@@ -1175,9 +1334,22 @@ RUNNING TEXT
 </style>
 
 </head>
-
 <body>
 
+<?php if (!empty($banneraktif)): ?>
+<div
+    id="specialBanner"
+    class="banner-fullscreen"
+>
+
+    <img
+        src="<?= s($banneraktif); ?>"
+        alt="<?= s($judulbanner); ?>"
+    >
+
+</div>
+
+<?php endif; ?>
 <div class="header">
 
     <div class="logo-area">
@@ -1207,15 +1379,18 @@ RUNNING TEXT
 
     <div class="datetime-box">
 
-    <div class="clock" id="clock">
-        00:00:00
-    </div>
+        <div
+            class="clock"
+            id="clock"
+        >
+            00:00:00
+        </div>
 
-    <div class="tanggalindo">
-        <?= s($tanggalindo); ?>
-    </div>
+        <div class="tanggalindo">
+            <?= s($tanggalindo); ?>
+        </div>
 
-</div>
+    </div>
 
 </div>
 
@@ -1542,11 +1717,9 @@ function updateCountdownAsesmen(){
         jam + ':' + menit + ':' + detik;
 
     if (sisaasesmen > 0) {
-    sisaasesmen--;
 
-    } else {
+        sisaasesmen--;
 
-    location.reload();
     }
 }
 
@@ -1814,5 +1987,40 @@ setTimeout(() => {
 
 </script>
 
+<?php if (!empty($banneraktif)): ?>
+
+<script>
+
+document.addEventListener(
+    'DOMContentLoaded',
+    function(){
+
+        const banner =
+            document.getElementById(
+                'specialBanner'
+            );
+
+        if (!banner) {
+            return;
+        }
+
+        banner.style.display =
+            'flex';
+
+        setTimeout(
+            function(){
+
+                banner.style.display =
+                    'none';
+
+            },
+            15000
+        );
+    }
+);
+
+</script>
+
+<?php endif; ?>
 </body>
 </html>

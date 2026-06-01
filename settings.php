@@ -155,6 +155,22 @@ Contoh:
 );
 $settings->add(
     new admin_setting_configtextarea(
+        'local_jurnalmengajar/banner_tv',
+        'Banner Hari Khusus TV',
+        'Format:
+
+Tanggal tunggal:
+2026-06-01|Hari Lahir Pancasila|pancasila.png
+
+Rentang tanggal:
+2026-06-02 s/d 2026-06-12|ASESMEN AKHIR SEMESTER|asesmen.jpeg
+
+Nama file harus sama dengan file yang diupload pada menu Kelola Banner TV.',
+        ''
+    )
+);
+$settings->add(
+    new admin_setting_configtextarea(
         'local_jurnalmengajar/tanggalasesmen',
         'Tanggal Asesmen',
         'Format:

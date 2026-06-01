@@ -999,29 +999,27 @@ function local_jurnalmengajar_pluginfile(
         return false;
     }
 
-    if ($filearea !== 'logo') {
+    if (!in_array($filearea, ['logo', 'banner'])) {
         return false;
     }
 
+    require_login();
+
     $fs = get_file_storage();
-
-    $itemid = 0;
-
-    $filepath = '/';
 
     $filename = array_pop($args);
 
     $file = $fs->get_file(
         $context->id,
         'local_jurnalmengajar',
-        'logo',
-        $itemid,
-        $filepath,
+        $filearea,
+        0,
+        '/',
         $filename
     );
 
     if (!$file || $file->is_directory()) {
-        return false;
+        send_file_not_found();
     }
 
     send_stored_file(
