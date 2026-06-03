@@ -54,12 +54,19 @@ function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari, $mode_uru
     $maxcount = 0;
     foreach ($allcohorts as $c) {
         $cid = $c->id;
-        $sql = "SELECT u.id, u.username, u.firstname, u.lastname, u.idnumber, u.password, c.name AS cohortname
-                  FROM {cohort_members} cm
-                  JOIN {user} u ON u.id = cm.userid
-                  JOIN {cohort} c ON c.id = cm.cohortid
-                 WHERE c.id = :cid
-              ORDER BY u.lastname ASC, u.firstname ASC";
+        $sql = "SELECT u.id,
+               u.username,
+               u.firstname,
+               u.lastname,
+               u.idnumber,
+               u.password,
+               c.id   AS cohortid,
+               c.name AS cohortname
+          FROM {cohort_members} cm
+          JOIN {user} u ON u.id = cm.userid
+          JOIN {cohort} c ON c.id = cm.cohortid
+         WHERE c.id = :cid
+      ORDER BY u.lastname ASC, u.firstname ASC";
         $stus = $DB->get_records_sql($sql, ['cid' => $cid]);
         $students_by_cohort[$cid] = array_values($stus);
         $cnt = count($stus);
@@ -342,9 +349,255 @@ if ($action === 'generate' && confirm_sesskey()) {
         for ($i = 0; $i < count($students_in_s); $i++) {
             $stu = $students_in_s[$i];
             $slot = $slots[$i] ?? ['room' => $rooms[0]['name'], 'meja' => ($i+1)];
-            $assignments[] = ['user' => $stu, 'session' => $s, 'room' => $slot['room'], 'meja' => $slot['meja']];
+            $assignments[] = [
+    		'user'      => $stu,
+    		'session'   => $s,
+    		'room'      => $slot['room'],
+    		'meja'      => $slot['meja'],
+    		'kelasid'   => $stu->cohortid,
+    		'kelasnama' => $stu->cohortname
+	    ];
         }
     }
+/*
+=====================================================
+SIMPAN MASTER ASESMEN & PESERTA
+=====================================================
+*/
+global $DB, $USER;
+
+$asesmenmap = [];
+
+/*
+hapus data generate lama dengan nama ujian yang sama
+agar tidak dobel saat generate ulang
+*/
+$oldasesmen = $DB->get_records(
+    'local_jurnalmengajar_asesmen',
+    [
+        'namaasesmen' => $nama_ujian,
+        'tanggal' => strtotime($tanggal_mulai)
+    ]
+);
+
+foreach ($oldasesmen as $old) {
+
+    $DB->delete_records(
+        'local_jurnalmengajar_asesmen_detail',
+        ['asesmenid' => $old->id]
+    );
+
+    $DB->delete_records(
+        'local_jurnalmengajar_asesmen_peserta',
+        ['asesmenid' => $old->id]
+    );
+
+    $DB->delete_records(
+        'local_jurnalmengajar_asesmen',
+        ['id' => $old->id]
+    );
+}
+
+/*
+buat header asesmen per sesi + ruang
+*/
+foreach ($assignments as $a) {
+
+    $key = $a['session'] . '|' . $a['room'];
+
+    if (!isset($asesmenmap[$key])) {
+
+        $now = time();
+
+        $rec = new stdClass();
+
+        $rec->namaasesmen = $nama_ujian;
+
+        $rec->tanggal = strtotime($tanggal_mulai);
+
+        // satu ruang bisa campuran banyak kelas
+        $rec->kelasid = 0;
+
+        $rec->ruang = $a['room'];
+
+        $rec->sesi = $a['session'];
+
+        // belum ada pengawas saat generate kartu
+        $rec->pengawasid = 0;
+
+        $rec->jumlahpeserta = 0;
+
+        $rec->hadir = 0;
+        $rec->sakit = 0;
+        $rec->izin  = 0;
+        $rec->alpa  = 0;
+
+        $rec->catatan = '';
+
+        $rec->gangguan = '';
+
+        $rec->timecreated = $now;
+
+        $rec->timemodified = $now;
+
+        $asesmenid = $DB->insert_record(
+            'local_jurnalmengajar_asesmen',
+            $rec
+        );
+//debugging sementara
+error_log(
+    'ASESMEN: ' .
+    $asesmenid .
+    ' sesi=' . $a['session'] .
+    ' ruang=' . $a['room']
+);
+//
+        $asesmenmap[$key] = $asesmenid;
+    }
+}
+
+/*
+simpan peserta
+*/
+foreach ($assignments as $a) {
+
+    $key = $a['session'] . '|' . $a['room'];
+
+    $asesmenid = $asesmenmap[$key];
+
+    $peserta = new stdClass();
+
+    $peserta->asesmenid = $asesmenid;
+
+    $peserta->userid = $a['user']->id;
+
+    $peserta->kelasid = $a['kelasid'];
+
+    $peserta->sesi = $a['session'];
+
+    $peserta->ruang = $a['room'];
+
+    $peserta->nomeja = $a['meja'];
+
+    $peserta->timecreated = time();
+
+    $DB->insert_record(
+        'local_jurnalmengajar_asesmen_peserta',
+        $peserta
+    );
+}
+
+/*
+update jumlah peserta
+*/
+foreach ($asesmenmap as $asesmenid) {
+
+    $jumlah = $DB->count_records(
+        'local_jurnalmengajar_asesmen_peserta',
+        ['asesmenid' => $asesmenid]
+    );
+
+    $DB->set_field(
+        'local_jurnalmengajar_asesmen',
+        'jumlahpeserta',
+        $jumlah,
+        ['id' => $asesmenid]
+    );
+}
+
+/*
+=====================================================
+SIMPAN JADWAL ASESMEN
+=====================================================
+*/
+
+$DB->delete_records('local_jurnalmengajar_asesmen_jadwal');
+
+foreach ($assignments as $a) {
+
+    $key = $a['session'] . '|' . $a['room'];
+
+    $asesmenid = $asesmenmap[$key] ?? 0;
+
+    if (!$asesmenid) {
+        continue;
+    }
+
+    $sno = (int)$a['session'];
+
+    foreach ($plan->exam_dates as $didx => $ed) {
+
+        if (empty($ed)) {
+            continue;
+        }
+
+        $tanggal = strtotime($ed);
+
+        $s_on_day =
+            ((($sno - 1) + $didx)
+            % $plan->num_sessions) + 1;
+
+        $jadwal = new stdClass();
+        $jadwal->asesmenid  = $asesmenid;
+        $jadwal->tanggal    = $tanggal;
+        $jadwal->sesiaktual = $s_on_day;
+
+        // cegah duplikat
+        if (!$DB->record_exists(
+            'local_jurnalmengajar_asesmen_jadwal',
+            [
+                'asesmenid'  => $asesmenid,
+                'tanggal'    => $tanggal,
+                'sesiaktual' => $s_on_day
+            ]
+        )) {
+            $DB->insert_record(
+                'local_jurnalmengajar_asesmen_jadwal',
+                $jadwal
+            );
+        }
+
+        /*
+         * Senin-Kamis ada gelombang kedua
+         */
+        $ts = strtotime($ed);
+
+        if ($ts !== false) {
+
+            $w = (int)date('N', $ts);
+
+            $is_last =
+                ($didx === (count($plan->exam_dates) - 1));
+
+            if (!$is_last && $w >= 1 && $w <= 4) {
+
+                $second =
+                    $s_on_day + $plan->num_sessions;
+
+                if (!$DB->record_exists(
+                    'local_jurnalmengajar_asesmen_jadwal',
+                    [
+                        'asesmenid'  => $asesmenid,
+                        'tanggal'    => $tanggal,
+                        'sesiaktual' => $second
+                    ]
+                )) {
+
+                    $jadwal2 = new stdClass();
+
+                    $jadwal2->asesmenid  = $asesmenid;
+                    $jadwal2->tanggal    = $tanggal;
+                    $jadwal2->sesiaktual = $second;
+
+                    $DB->insert_record(
+                        'local_jurnalmengajar_asesmen_jadwal',
+                        $jadwal2
+                    );
+                }
+            }
+        }
+    }
+}
 
     require_once($CFG->libdir . '/pdflib.php');
     $pdf = new pdf(PDF_PAGE_ORIENTATION, 'mm', [330, 215], true, 'UTF-8', false);
