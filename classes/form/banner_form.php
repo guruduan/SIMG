@@ -25,7 +25,8 @@ class banner_form extends \moodleform {
                     '.png',
                     '.jpg',
                     '.jpeg',
-                    '.webp'
+                    '.webp',
+                    '.mp4'
                 ]
             ]
         );

@@ -43,7 +43,8 @@ $filemanageroptions = [
         '.png',
         '.jpg',
         '.jpeg',
-        '.webp'
+        '.webp',
+        '.mp4'
     ]
 ];
 

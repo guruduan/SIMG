@@ -32,6 +32,11 @@ $tahunajaran =
         'tahun_ajaran'
     );
 
+$judulasesmen = get_config(
+    'local_jurnalmengajar',
+    'judulasesmen'
+    );
+
 /*
 =====================================================
 LOGO SEKOLAH
@@ -193,14 +198,15 @@ $mode_tv = 'KBM';
 =====================================================
 DETEKSI BANNER
 SUPPORT:
-2026-06-01|Hari Lahir Pancasila|pancasila.png
+2026-06-01|Hari Lahir Pancasila|pancasila
 
-2026-06-02 s/d 2026-06-12|ASESMEN AKHIR SEMESTER|asesmen.png
+2026-06-02 s/d 2026-06-12|ASESMEN AKHIR SEMESTER|asesmen
 =====================================================
 */
 
 $banneraktif = '';
 $judulbanner = '';
+$bannerurls = [];
 
 $bannercfg = get_config(
     'local_jurnalmengajar',
@@ -227,7 +233,9 @@ if (!empty($bannercfg)) {
 
         $judul = trim($parts[1]);
 
-        $file = trim($parts[2]);
+        $prefixbanner = trim($parts[2]);
+
+        $bannerurls = [];
 
         /*
         =============================================
@@ -251,31 +259,48 @@ if (!empty($bannercfg)) {
                     $tanggalhariini <= $selesai
                 ) {
 
-                    $storedfile = $fs->get_file(
-    $context->id,
-    'local_jurnalmengajar',
-    'banner',
-    0,
-    '/',
-    $file
-);
+                    $allfiles = $fs->get_area_files(
+                        $context->id,
+                        'local_jurnalmengajar',
+                        'banner',
+                        0,
+                        'filename',
+                        false
+                    );
 
-if ($storedfile) {
+                    foreach ($allfiles as $storedfile) {
 
-    $judulbanner = $judul;
+                        $filename =
+                            $storedfile->get_filename();
 
-    $banneraktif =
-        moodle_url::make_pluginfile_url(
-            $storedfile->get_contextid(),
-            $storedfile->get_component(),
-            $storedfile->get_filearea(),
-            $storedfile->get_itemid(),
-            $storedfile->get_filepath(),
-            $storedfile->get_filename()
-        )->out(false);
+                        if (
+                            stripos(
+                                $filename,
+                                $prefixbanner
+                            ) === 0
+                        ) {
 
-    break;
-}
+                            $bannerurls[] =
+                                moodle_url::make_pluginfile_url(
+                                    $storedfile->get_contextid(),
+                                    $storedfile->get_component(),
+                                    $storedfile->get_filearea(),
+                                    $storedfile->get_itemid(),
+                                    $storedfile->get_filepath(),
+                                    $storedfile->get_filename()
+                                )->out(false);
+                        }
+                    }
+                    sort($bannerurls);
+                    if (!empty($bannerurls)) {
+
+                        $judulbanner = $judul;
+
+                        $banneraktif =
+                            $bannerurls[0];
+
+                        break;
+                    }
                 }
             }
 
@@ -289,31 +314,48 @@ if ($storedfile) {
 
             if ($rentang == $tanggalhariini) {
 
-                $storedfile = $fs->get_file(
-    $context->id,
-    'local_jurnalmengajar',
-    'banner',
-    0,
-    '/',
-    $file
-);
+                $allfiles = $fs->get_area_files(
+                    $context->id,
+                    'local_jurnalmengajar',
+                    'banner',
+                    0,
+                    'filename',
+                    false
+                );
 
-if ($storedfile) {
+                foreach ($allfiles as $storedfile) {
 
-    $judulbanner = $judul;
+                    $filename =
+                        $storedfile->get_filename();
 
-    $banneraktif =
-        moodle_url::make_pluginfile_url(
-            $storedfile->get_contextid(),
-            $storedfile->get_component(),
-            $storedfile->get_filearea(),
-            $storedfile->get_itemid(),
-            $storedfile->get_filepath(),
-            $storedfile->get_filename()
-        )->out(false);
+                    if (
+                        stripos(
+                            $filename,
+                            $prefixbanner
+                        ) === 0
+                    ) {
 
-    break;
-}
+                        $bannerurls[] =
+                            moodle_url::make_pluginfile_url(
+                                $storedfile->get_contextid(),
+                                $storedfile->get_component(),
+                                $storedfile->get_filearea(),
+                                $storedfile->get_itemid(),
+                                $storedfile->get_filepath(),
+                                $storedfile->get_filename()
+                            )->out(false);
+                    }
+                }
+                sort($bannerurls);
+                if (!empty($bannerurls)) {
+
+                    $judulbanner = $judul;
+
+                    $banneraktif =
+                        $bannerurls[0];
+
+                    break;
+                }
             }
         }
     }
@@ -676,7 +718,7 @@ if (
 }
 
 $countdowntitle =
-    'SISA WAKTU MENUJU GANTI SESI';
+    'SISA WAKTU MULAI SESI BERIKUTNYA';
     
 /*
 =====================================================
@@ -1237,6 +1279,13 @@ BANNER
     object-fit:contain;
 }
 
+.banner-fullscreen video{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+
+
 /*
 =====================================================
 TABLE
@@ -1343,9 +1392,16 @@ RUNNING TEXT
 >
 
     <img
-        src="<?= s($banneraktif); ?>"
-        alt="<?= s($judulbanner); ?>"
+        id="bannerImage"
+        style="display:none;"
     >
+
+    <video
+        id="bannerVideo"
+        style="display:none;"
+        autoplay
+        playsinline
+    ></video>
 
 </div>
 
@@ -1437,7 +1493,41 @@ RUNNING TEXT
 
 <?php if ($mode_tv === 'ASESMEN'): ?>
 
+<div class="asesmen-header">
+
+    <div class="asesmen-header-title">
+        <?= s($judulasesmen); ?>
+    </div>
+
+    <div class="asesmen-header-subtitle">
+        <?= format_string($namasekolah); ?>
+    </div>
+
+</div>
+
 <style>
+
+.asesmen-header{
+    margin:15px 20px;
+    padding:15px;
+    border-radius:16px;
+    background:#1e293b;
+    text-align:center;
+}
+
+.asesmen-header-title{
+    font-size:42px;
+    font-weight:bold;
+    color:#facc15;
+    line-height:1.2;
+}
+
+.asesmen-header-subtitle{
+    margin-top:8px;
+    font-size:24px;
+    font-weight:bold;
+    color:#ffffff;
+}
 
 .asesmen-wrapper{
     padding:20px;
@@ -1445,7 +1535,7 @@ RUNNING TEXT
 
 .asesmen-grid{
     display:grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:1fr;
     gap:20px;
 }
 
@@ -1496,14 +1586,14 @@ RUNNING TEXT
 .ruang-label{
     background:#14b8a6;
     padding:18px;
-    font-size:28px;
+    font-size:36px;
     font-weight:bold;
     text-align:center;
 }
 
 .ruang-guru{
     padding:14px 18px;
-    font-size:22px;
+    font-size:36px;
     font-weight:bold;
 }
 
@@ -1720,6 +1810,14 @@ function updateCountdownAsesmen(){
 
         sisaasesmen--;
 
+        if (sisaasesmen === 0) {
+
+            setTimeout(() => {
+
+                location.reload();
+
+            }, 1000);
+        }
     }
 }
 
@@ -1991,30 +2089,120 @@ setTimeout(() => {
 
 <script>
 
+const bannerImages =
+<?= json_encode($bannerurls); ?>;
+
 document.addEventListener(
     'DOMContentLoaded',
     function(){
 
-        const banner =
+        const container =
             document.getElementById(
                 'specialBanner'
             );
 
-        if (!banner) {
+        const image =
+            document.getElementById(
+                'bannerImage'
+            );
+
+        const video =
+            document.getElementById(
+                'bannerVideo'
+            );
+
+        if (
+            !container ||
+            bannerImages.length === 0
+        ) {
             return;
         }
 
-        banner.style.display =
-            'flex';
+        let current = 0;
+
+        function showBanner(){
+
+    const file =
+        bannerImages[current];
+
+    container.style.display =
+        'flex';
+
+    if (
+        file.toLowerCase()
+        .endsWith('.mp4')
+    ) {
+
+        image.style.display =
+            'none';
+
+        video.style.display =
+            'block';
+
+        video.onended = null;
+        
+        video.src = file;
+
+        video.load();
+
+        video.currentTime = 0;
+
+        video.onended = function(){
+
+    container.style.display =
+        'none';
+
+    video.pause();
+
+    video.currentTime = 0;
+    };
+
+        video.play().catch(() => {});
+
+    } else {
+
+        video.pause();
+
+	video.currentTime = 0;
+
+	video.removeAttribute('src');
+
+	video.style.display =
+	    'none';
+
+        image.style.display =
+            'block';
+
+        image.src = file;
 
         setTimeout(
-            function(){
+    function(){
 
-                banner.style.display =
-                    'none';
+        container.style.display =
+            'none';
 
-            },
-            15000
+        image.src = '';
+
+        },
+        10000
+      );
+    }
+
+    current++;
+
+    if (
+        current >=
+        bannerImages.length
+    ) {
+        current = 0;
+    }
+}
+
+        showBanner();
+
+        setInterval(
+            showBanner,
+            600000
         );
     }
 );

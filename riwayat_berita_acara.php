@@ -150,9 +150,20 @@ echo '<th>Download</th>';
 echo '</tr>';
 
 $no = 1;
+
 foreach ($rows as $r) {
 
-    echo '<tr>';
+    $style = '';
+
+    if (
+        !empty($r->pengawas) &&
+        trim($r->pengawas) == trim($USER->lastname)
+    ) {
+        $style = ' style="background:#eb7734;font-weight:bold;"';
+    }
+
+    echo '<tr' . $style . '>';
+
     $hadir = $DB->count_records_select(
     'local_jurnalmengajar_asesmen_detail',
     'asesmenid = ? AND tanggal = ? AND sesiaktual = ? AND status = ?',

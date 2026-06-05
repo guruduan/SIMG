@@ -79,6 +79,99 @@ $mform->addRule('matapelajaran', null, 'required');
         $mform->addElement('textarea', 'keterangan', 'Keterangan Tambahan', 'rows="2" cols="60"');
         $mform->setType('keterangan', PARAM_RAW);
 
+/* =====================================================
+PEMBINAAN MURID
+===================================================== */
+
+$mform->addElement(
+    'header',
+    'pembinaanhdr',
+    'Pembinaan Murid'
+);
+
+/* Hidden JSON */
+$mform->addElement(
+    'hidden',
+    'pembinaanjson'
+);
+$mform->setType(
+    'pembinaanjson',
+    PARAM_RAW
+);
+
+/* Murid */
+$mform->addElement(
+    'select',
+    'murid_pembinaan',
+    'Nama Murid',
+    ['' => 'Pilih kelas terlebih dahulu']
+);
+
+/* Jenis */
+$jenispembinaan = [
+    '' => '-- Pilih Jenis --',
+    'disiplin' => 'Disiplin',
+    'sikap' => 'Sikap',
+    'akademik' => 'Akademik',
+    'kerapian' => 'Kerapian',
+    'lainnya' => 'Lainnya'
+];
+
+$mform->addElement(
+    'select',
+    'jenis_pembinaan',
+    'Jenis Pembinaan',
+    $jenispembinaan
+);
+
+/* Catatan */
+$mform->addElement(
+    'textarea',
+    'catatan_pembinaan',
+    'Catatan',
+    'rows="3" cols="60"'
+);
+$mform->setType(
+    'catatan_pembinaan',
+    PARAM_RAW
+);
+
+/* Tindak lanjut */
+$mform->addElement(
+    'textarea',
+    'tindaklanjut_pembinaan',
+    'Tindak Lanjut',
+    'rows="3" cols="60"'
+);
+$mform->setType(
+    'tindaklanjut_pembinaan',
+    PARAM_RAW
+);
+
+/* Tombol tambah */
+$mform->addElement(
+    'html',
+    '<button type="button"
+        id="tambah-pembinaan"
+        class="btn btn-info">
+        Tambah Pembinaan
+    </button>'
+);
+
+/* Daftar pembinaan */
+$mform->addElement(
+    'html',
+    '<div id="daftar-pembinaan"
+          style="
+            margin-top:10px;
+            padding:10px;
+            border:1px solid #ccc;
+            min-height:80px;
+          ">
+        Belum ada pembinaan.
+     </div>'
+);
+
         $this->add_action_buttons(true, 'Simpan Jurnal');       
         }
 } 
