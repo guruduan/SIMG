@@ -384,7 +384,7 @@ $daftarnama = empty($namatidakmengerjakan)
 $x = $pdf->GetX();
 $y = $pdf->GetY();
 
-$pdf->Cell(70, 6, 'Murid Tidak Mengerjakan');
+$pdf->Cell(70, 6, 'Peserta Tidak Mengerjakan');
 $pdf->Cell(5, 6, ':');
 
 $pdf->SetXY($x + 75, $y);
