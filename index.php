@@ -92,12 +92,88 @@ $(document).ready(function() {
         .val(JSON.stringify(dataid));
 }
 
-    $('select[name=kelas]').on('change', function() {
-        const kelas = $(this).val();
-        loadSiswa(kelas);
+	$('select[name=kelas]').on('change', function() {
+
+	    const kelas = $(this).val();
+
+	    loadSiswa(kelas);
+	    loadDropdownMurid(kelas);
+
+	});
+
+function loadDropdownMurid(kelas) {
+
+    if (!kelas) {
+        return;
+    }
+
+    $.get(
+        "/local/jurnalmengajar/get_students_dropdown.php",
+        {kelas: kelas},
+        function(data) {
+
+            $('select[name="murid_pembinaan"]').html(data);
+
+        }
+    );
+}
+
+let daftarPembinaan = [];
+
+$('#tambah-pembinaan').on('click', function() {
+
+    const muridid = $('select[name="murid_pembinaan"]').val();
+    const murid = $('select[name="murid_pembinaan"] option:selected').text();
+
+    const jenis = $('select[name="jenis_pembinaan"]').val();
+    const jenisText = $('select[name="jenis_pembinaan"] option:selected').text();
+
+    const catatan = $('textarea[name="catatan_pembinaan"]').val();
+    const tindaklanjut = $('textarea[name="tindaklanjut_pembinaan"]').val();
+
+    if (!muridid) {
+        alert('Pilih murid terlebih dahulu');
+        return;
+    }
+
+    if (!jenis) {
+        alert('Pilih jenis pembinaan');
+        return;
+    }
+
+    daftarPembinaan.push({
+        muridid: muridid,
+        murid: murid,
+        jenis: jenis,
+        catatan: catatan,
+        tindaklanjut: tindaklanjut
     });
 
-    loadSiswa($('select[name=kelas]').val());
+    $('input[name="pembinaanjson"]')
+        .val(JSON.stringify(daftarPembinaan));
+
+    let html = '';
+
+    daftarPembinaan.forEach(function(item, index) {
+
+        html += '<div style="margin-bottom:10px;">';
+        html += '<strong>' + (index + 1) + '. ' + item.murid + '</strong><br>';
+        html += 'Jenis: ' + item.jenis + '<br>';
+        html += 'Catatan: ' + item.catatan + '<br>';
+        html += 'Tindak lanjut: ' + item.tindaklanjut;
+        html += '</div><hr>';
+    });
+
+    $('#daftar-pembinaan').html(html);
+
+    $('textarea[name="catatan_pembinaan"]').val('');
+    $('textarea[name="tindaklanjut_pembinaan"]').val('');
+});
+
+    const kelasawal = $('select[name=kelas]').val();
+
+	loadSiswa(kelasawal);
+	loadDropdownMurid(kelasawal);
 
 });
 JS);
@@ -144,7 +220,42 @@ if ($mform->is_cancelled()) {
     $record->timecreated = time();
 
     // Simpan ke database
-    $DB->insert_record('local_jurnalmengajar', $record);
+	$jurnalid = $DB->insert_record(
+	    'local_jurnalmengajar',
+	    $record
+	);
+
+$pembinaan = json_decode(
+    $data->pembinaanjson ?? '[]',
+    true
+);
+
+if (!empty($pembinaan)) {
+
+    foreach ($pembinaan as $p) {
+
+        $pb = new stdClass();
+
+        $pb->jurnalid = $jurnalid;
+        $pb->userid = $USER->id;
+
+        $pb->muridid = (int)$p['muridid'];
+
+        $pb->kelas = (int)$data->kelas;
+
+        $pb->jenis = $p['jenis'] ?? '';
+        $pb->catatan = $p['catatan'] ?? '';
+        $pb->tindaklanjut = $p['tindaklanjut'] ?? '';
+
+        $pb->timecreated = time();
+        $pb->timemodified = time();
+
+        $DB->insert_record(
+            'local_jurnalmengajar_pembinaanmapel',
+            $pb
+        );
+    }
+}
 
     // ================= KIRIM NOTIF WA =================
     $kelasid = $record->kelas ?? null;

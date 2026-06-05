@@ -122,6 +122,7 @@ if ($muridid) {
     $count_bk = 0;
     $count_wali = 0;
     $count_walikelas = 0;
+    $count_mapel = 0;
 
     /* 1. ABSEN JURNAL MENGAJAR */
     $rows = $DB->get_records('local_jurnalmengajar');
@@ -322,6 +323,59 @@ foreach ($walikelas as $r) {
 
     $count_walikelas++;
 }
+		/* 7. PEMBINAAN GURU MAPEL */
+
+		$mapel = $DB->get_records_sql(
+		    "
+		    SELECT *
+		    FROM {local_jurnalmengajar_pembinaanmapel}
+		    WHERE muridid = ?
+		    ORDER BY timecreated ASC
+		    ",
+		    [$muridid]
+		);
+
+		foreach ($mapel as $r) {
+
+		    $guru = $DB->get_record(
+			'user',
+			['id' => $r->userid]
+		    );
+
+		    $kelas = $r->kelas;
+
+		    if (is_numeric($kelas)) {
+
+			$cohort = $DB->get_record(
+			    'cohort',
+			    ['id' => $kelas]
+			);
+
+			if ($cohort) {
+			    $kelas = $cohort->name;
+			}
+		    }
+
+		    $timeline[] = [
+			'time'      => $r->timecreated,
+			'kelas'     => $kelas,
+			'jenis'     => 'Pembinaan Guru Mapel',
+			'catatan'   =>
+			    '<b>Jenis:</b> ' .
+			    $r->jenis .
+			    '<br><b>Catatan:</b> ' .
+			    $r->catatan .
+			    '<br><b>Tindak Lanjut:</b> ' .
+			    $r->tindaklanjut,
+			'guru'      => $guru
+			    ? $guru->lastname
+			    : '-',
+			'kategori'  => 'mapel'
+		    ];
+
+		    $count_mapel++;
+		}
+
     /* SORT BY TIME DESCENDING */
     usort($timeline, function($a, $b) {
         return $b['time'] <=> $a['time'];
@@ -387,7 +441,8 @@ if ($riwayatkelas) {
     ['Izin Keluar/Masuk/Pulang', $count_izin, 'bg-warning text-dark', 'izin'],
     ['Layanan & Pembinaan BK', $count_bk, 'bg-info text-white', 'bk'],
     ['Pendampingan Guru Wali', $count_wali, 'bg-primary text-white', 'wali'],
-    ['Pembinaan Wali Kelas', $count_walikelas, 'bg-success text-white', 'walikelas']
+    ['Pembinaan Wali Kelas', $count_walikelas, 'bg-success text-white', 'walikelas'],
+    ['Pembinaan Guru Mapel', $count_mapel, 'text-white', 'mapel']
 ];
 
     foreach ($cards as $card) {
@@ -411,8 +466,16 @@ $activeclass = '';
 if ($filter == $card[3]) {
     $activeclass = ' border border-dark';
 }
+
+$extrastyle = '';
+
+if ($card[3] == 'mapel') {
+    $extrastyle = 'background:#6f42c1;color:white;';
+}
+
 echo html_writer::start_div(
-    'card text-center shadow-sm ' . $card[2] . $activeclass
+    'card text-center shadow-sm ' . $card[2] . $activeclass,
+    ['style' => $extrastyle]
 );
 
 echo html_writer::start_div('card-body p-2');
@@ -501,6 +564,9 @@ foreach ($timeline as $t) {
             break;
         case 'walikelas':
 	    $badge = '<span class="badge badge-success d-block p-2">Wali Kelas</span>';
+	    break;
+	case 'mapel':
+	    $badge = '<span class="badge badge-secondary d-block p-2">Guru Mapel</span>';
 	    break;
     }
 
