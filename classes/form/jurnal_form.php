@@ -108,20 +108,11 @@ $mform->addElement(
 );
 
 /* Jenis */
-$jenispembinaan = [
-    '' => '-- Pilih Jenis --',
-    'disiplin' => 'Kedisiplinan',
-    'sikap' => 'Sikap & Karakter',
-    'akademik' => 'Akademik',
-    'kerapian' => 'Kerapian',
-    'lainnya' => 'Lainnya'
-];
-
 $mform->addElement(
     'select',
     'jenis_pembinaan',
     'Jenis Pembinaan',
-    $jenispembinaan
+    ['' => '-- Pilih Jenis --'] + get_jenis_pembinaan_options()
 );
 
 /* Catatan */

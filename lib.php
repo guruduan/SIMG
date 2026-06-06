@@ -999,11 +999,15 @@ function local_jurnalmengajar_pluginfile(
         return false;
     }
 
+    /*
+    =============================================
+    HANYA FILEAREA YANG DIIZINKAN
+    =============================================
+    */
+
     if (!in_array($filearea, ['logo', 'banner'])) {
         return false;
     }
-
-    require_login();
 
     $fs = get_file_storage();
 
@@ -1029,4 +1033,22 @@ function local_jurnalmengajar_pluginfile(
         false,
         $options
     );
+}
+
+/**
+ * Daftar jenis pembinaan murid.
+ *
+ * Digunakan oleh:
+ * - jurnal_form.php
+ * - edit_pembinaan_mapel.php
+ * - all_pembinaan_mapel.php (filter)
+ */
+function get_jenis_pembinaan_options() {
+    return [
+        'Kedisiplinan'     => 'Kedisiplinan',
+        'Sikap & Karakter' => 'Sikap & Karakter',
+        'Akademik'         => 'Akademik',
+        'Kerapian'         => 'Kerapian',
+        'Lainnya'          => 'Lainnya'
+    ];
 }
