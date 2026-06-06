@@ -9,7 +9,7 @@ require_capability('local/jurnalmengajar:submit', $context);
 
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/dashboard.php'));
 $PAGE->set_context($context);
-$PAGE->set_title('Dashboard Guru');
+$PAGE->set_title('Beranda Guru');
 $PAGE->set_heading('');
 
 global $DB, $USER;
@@ -88,7 +88,7 @@ echo $OUTPUT->header();
             <div class="card text-center">
                 <div class="card-body">
                     <h1><?php echo $guruwali; ?></h1>
-                    <h5>👨‍🏫 Pendampingan Guru Wali</h5>
+                    <h5>📖 Jurnal   Guru Wali</h5>
                 </div>
             </div>
         </div>
@@ -97,7 +97,7 @@ echo $OUTPUT->header();
             <div class="card text-center">
                 <div class="card-body">
                     <h1><?php echo $bk; ?></h1>
-                    <h5>🧠 Layanan Guru BK</h5>
+                    <h5>📖 Layanan   Guru BK</h5>
                 </div>
             </div>
         </div>
@@ -106,40 +106,38 @@ echo $OUTPUT->header();
             <div class="card text-center">
                 <div class="card-body">
                     <h1><?php echo $pembinaan; ?></h1>
-                    <h5>📝 Pembinaan Guru BK</h5>
+                    <h5>📖 Pembinaan Guru BK</h5>
                 </div>
             </div>
         </div>
-        <div class="col-md-2 mb-3">
+	<div class="col">
 	    <div class="card text-center">
 		<div class="card-body">
 		    <h1><?php echo $jurnalwalikelas; ?></h1>
-		    <h5>📋 Jurnal Wali Kelas</h5>
+		    <h5>📖 Jurnal   Wali Kelas</h5>
 		</div>
 	    </div>
 	</div>
-    </div>
 
-    <div class="row">
+</div> <!-- row statistik -->
 
+</div> <!-- card-body -->
 
-    </div>
+</div> <!-- card statistik -->
 
-    <hr>
+<h3>Menu Cepat</h3>
 
-    <h3>Menu Cepat</h3>
-
-    <div class="row">
+<div class="row">
 
         <div class="col-md-3 mb-2">
-            <a class="btn btn-primary btn-block w-100"
+            <a class="btn fw-bold w-100" style="background:#7fc7f5;color:#000;"
                href="index.php">
                 📖 Input Jurnal Mengajar
             </a>
         </div>
 
         <div class="col-md-3 mb-2">
-            <a class="btn btn-secondary btn-block w-100"
+            <a class="btn fw-bold w-100" style="background:#be9ee2;color:#000;"
                href="jurnalguruwali.php">
                 👨‍🏫 Input Jurnal Guru Wali
             </a>
@@ -153,43 +151,43 @@ echo $OUTPUT->header();
         </div>
 
         <div class="col-md-3 mb-2">
-            <a class="btn btn-warning btn-block w-100"
+            <a class="btn btn-primary btn-block w-100"
                href="pembinaan.php">
                 📝 Input Pembinaan BK
             </a>
         </div>
 
         <div class="col-md-3 mb-2 mt-2">
-            <a class="btn btn-success btn-block w-100"
+            <a class="btn text-white fw-bold w-100" style="background:#0a1347;"
                href="jurnal_walikelas.php">
                 📄 Input Jurnal Wali Kelas
             </a>
         </div>
 
         <div class="col-md-3 mb-2 mt-2">
-            <a class="btn btn-dark btn-block w-100"
-               href="log_perkembangan.php">
-                👥 Log Perkembangan Murid
+            <a class="btn fw-bold w-100" style="background:#eb7734;color:#000;"
+               href="jadwal_pengawas_view.php">
+                Jadwal Pengawas Asesmen
             </a>
         </div>
 
         <div class="col-md-3 mb-2 mt-2">
-            <a class="btn btn-outline-primary btn-block w-100"
-               href="rekap_perminggu.php">
-                📊 Rekap Mingguan KBM Guru
+            <a class="btn fw-bold w-100" style="background:#eb7734;color:#000;"
+               href="berita_acara.php">
+                📊 Isi Berita Acara Asesmen
             </a>
         </div>
         
         <div class="col-md-3 mb-2 mt-2">
-            <a class="btn btn-danger btn-block w-100"
-               href="izin_murid.php">
-                📝 Isi Surat Izin Murid
+            <a class="btn fw-bold w-100" style="background:#eb7734;color:#000;"
+               href="riwayat_berita_acara.php">
+                Riwayat Berita Acara Asesmen
             </a>
         </div>
 
-    </div>
+  </div> <!-- row menu -->
 
-</div>
+</div> <!-- container-fluid -->
 
 <?php
 echo $OUTPUT->footer();
