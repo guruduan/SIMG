@@ -6,10 +6,10 @@ require_login();
 
 global $DB, $PAGE, $OUTPUT;
 
-$PAGE->set_url(new moodle_url('/local/jurnalmengajar/log_perkembangan.php'));
+$PAGE->set_url(new moodle_url('/local/jurnalmengajar/riwayat_individu.php'));
 $PAGE->set_context(context_system::instance());
-$PAGE->set_title('Log Perkembangan Murid');
-$PAGE->set_heading('Riwayat Murid');
+$PAGE->set_title('Riwayat Individu Murid');
+$PAGE->set_heading('Riwayat Individu Murid');
 
 echo $OUTPUT->header();
 
@@ -90,7 +90,7 @@ echo html_writer::tag('button', '<i class="fa fa-search"></i> Tampilkan', [
     'class' => 'btn btn-primary btn-sm flex-grow-1 mr-2'
 ]);
 echo html_writer::link(
-    new moodle_url('/local/jurnalmengajar/log_perkembangan.php'),
+    new moodle_url('/local/jurnalmengajar/riwayat_individu.php'),
     '<i class="fa fa-refresh"></i> Reset',
     ['class' => 'btn btn-secondary btn-sm']
 );
@@ -260,7 +260,7 @@ if ($muridid) {
     }
 
     /* 5. JURNAL GURU WALI */
-    $wali = $DB->get_records('local_jurnalguruwali', ['userid' => $muridid]);
+    $wali = $DB->get_records('local_jurnalguruwali',    ['muridid' => $muridid]);
     foreach ($wali as $r) {
         $guru = $DB->get_record('user', ['id' => $r->guruid]);
         $timeline[] = [
@@ -381,9 +381,11 @@ foreach ($walikelas as $r) {
         return $b['time'] <=> $a['time'];
     });
 
-    /* HEADER NAMA SISWA */
+    /* HEADER NAMA MURID */
     echo html_writer::start_div('d-flex justify-content-between align-items-center my-4 pb-2 border-bottom');
-    echo html_writer::tag('h3', '<i class="fa fa-user-circle text-muted"></i> ' . ucwords(strtolower($murid->lastname)), ['class' => 'm-0 font-weight-bold']);
+echo html_writer::tag(
+    'h3',
+    '<i class="fa fa-user-circle text-muted"></i> ' .  ucwords(strtolower($murid->lastname)),   ['class' => 'm-0 font-weight-bold'] );
     echo html_writer::tag('span', 'Total Log: ' . count($timeline), ['class' => 'badge badge-dark p-2']);
     echo html_writer::end_div();
 
@@ -449,7 +451,7 @@ if ($riwayatkelas) {
         echo html_writer::start_div('col-6 col-md mb-2');
 
 $url = new moodle_url(
-    '/local/jurnalmengajar/log_perkembangan.php',
+    '/local/jurnalmengajar/riwayat_individu.php',
     [
         'cohortid' => $cohortid,
         'muridid'  => $muridid,
@@ -588,7 +590,7 @@ echo '<td class="align-middle" style="color: #212529;">' .
     }
 
     if ($jumlahditampilkan == 0) {
-        echo '<tr><td colspan="5" class="text-center text-muted p-4"><i>Belum ada catatan log riwayat perkembangan untuk siswa ini.</i></td></tr>';
+        echo '<tr><td colspan="5" class="text-center text-muted p-4"><i>Belum ada data riwayat yang tercatat untuk murid ini.</i></td></tr>';
     }
 
     echo '</tbody>';
