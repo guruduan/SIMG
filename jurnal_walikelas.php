@@ -143,14 +143,26 @@ if (
 echo $OUTPUT->header();
 ?>
 
-<h3>Jurnal Wali Kelas</h3>
-
 <div class="alert alert-info">
     <strong>Kelas:</strong> <?php echo s($kelasnama); ?>
 </div>
 
-<div class="text-danger mb-3">
-    <small><strong>* Wajib diisi</strong></small>
+<div class="alert alert-info mb-3">
+
+    <strong>Petunjuk Pengisian</strong>
+
+    <ul class="mb-0 mt-2">
+        <li>
+            <strong><em>Umum</em></strong>
+            digunakan untuk kegiatan wali kelas yang bersifat umum dan berlaku untuk seluruh murid.
+        </li>
+
+        <li>
+            <strong><em>Pembinaan Murid</em></strong>
+            digunakan untuk mencatat pembinaan, permasalahan, dan tindak lanjut terhadap murid tertentu.
+        </li>
+    </ul>
+
 </div>
 
 <form method="post">

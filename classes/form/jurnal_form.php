@@ -86,7 +86,7 @@ PEMBINAAN MURID
 $mform->addElement(
     'header',
     'pembinaanhdr',
-    'Pembinaan Murid'
+    'Pembinaan murid tertentu oleh Guru Mata Pelajaran'
 );
 
 /* Hidden JSON */
@@ -110,8 +110,8 @@ $mform->addElement(
 /* Jenis */
 $jenispembinaan = [
     '' => '-- Pilih Jenis --',
-    'disiplin' => 'Disiplin',
-    'sikap' => 'Sikap',
+    'disiplin' => 'Kedisiplinan',
+    'sikap' => 'Sikap & Karakter',
     'akademik' => 'Akademik',
     'kerapian' => 'Kerapian',
     'lainnya' => 'Lainnya'
@@ -128,7 +128,7 @@ $mform->addElement(
 $mform->addElement(
     'textarea',
     'catatan_pembinaan',
-    'Catatan',
+    'Masalah',
     'rows="3" cols="60"'
 );
 $mform->setType(
@@ -140,7 +140,7 @@ $mform->setType(
 $mform->addElement(
     'textarea',
     'tindaklanjut_pembinaan',
-    'Tindak Lanjut',
+    'Tindak Lanjut/Solusi',
     'rows="3" cols="60"'
 );
 $mform->setType(

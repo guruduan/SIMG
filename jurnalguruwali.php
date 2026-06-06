@@ -150,14 +150,14 @@ class jw_form extends moodleform {
         }
 
 // Hapus class CSS manual dan gunakan atribut standar form Moodle
-        $m->addElement('text', 'topik', 'Topik', ['size' => 80]);
+        $m->addElement('text', 'topik', 'Topik/Masalah', ['size' => 80]);
         $m->setType('topik', PARAM_TEXT);
         $m->addRule('topik', 'Topik tidak boleh kosong', 'required', null, 'client');
 
-        $m->addElement('textarea', 'tindaklanjut', 'Tindak Lanjut', ['rows' => 3, 'cols' => 80]);
+        $m->addElement('textarea', 'tindaklanjut', 'Tindak Lanjut/Solusi', ['rows' => 3, 'cols' => 80]);
         $m->setType('tindaklanjut', PARAM_TEXT);
 
-        $m->addElement('textarea', 'keterangan', 'Keterangan', ['rows' => 3, 'cols' => 80]);
+        $m->addElement('textarea', 'keterangan', 'Keterangan Tambahan', ['rows' => 3, 'cols' => 80]);
         $m->setType('keterangan', PARAM_TEXT);
 
         $this->add_action_buttons(true, 'Simpan Data');
@@ -277,7 +277,7 @@ $rows = $DB->get_records_sql("
 
 $table = new html_table();
 $table->attributes['class'] = 'table table-bordered table-striped table-hover generic_table';
-$table->head = ['No', 'Waktu', 'Murid', 'Kelas', 'Topik', 'Tindak Lanjut', 'Keterangan', 'Aksi'];
+$table->head = ['No', 'Waktu', 'Murid', 'Kelas', 'Topik/Masalah', 'Tindak Lanjut/Solusi', 'Keterangan', 'Aksi'];
 
 $no = 1;
 foreach ($rows as $r) {
