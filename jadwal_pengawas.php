@@ -65,7 +65,7 @@ if (
         =============================================
         */
 
-        if (count($row) < 5) {
+        if (count($row) < 6) {
             continue;
         }
 
@@ -83,6 +83,9 @@ if (
 
         $guru =
             trim($row[4]);
+        
+        $username =
+	    trim($row[5]);
 
         /*
         =============================================
@@ -98,8 +101,10 @@ if (
             $data[$tanggal][$sesi] = [];
         }
 
-        $data[$tanggal][$sesi][$ruang] =
-            $guru;
+        $data[$tanggal][$sesi][$ruang] = [
+    'guru'     => $guru,
+    'username' => $username
+	];
     }
 
     fclose($handle);
@@ -167,9 +172,9 @@ Format CSV:
 </p>
 
 <pre>
-Hari;Tanggal;Sesi;Ruang;Guru
-Senin;2026-06-02;1;R1;Guru A
-Senin;2026-06-02;1;R2;Guru B
+Hari;Tanggal;Sesi;Ruang;Guru;Username
+Senin;2026-06-02;1;R1;Guru A;gurua
+Senin;2026-06-02;1;R2;Guru B;gurub
 </pre>
 
 <?php

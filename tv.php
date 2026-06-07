@@ -1675,21 +1675,21 @@ RUNNING TEXT
 
             <div class="ruang-list">
 
-                <?php foreach ($pengawasaktif as $ruang => $guru): ?>
+		<?php foreach ($pengawasaktif as $ruang => $data): ?>
 
-                    <div class="ruang-item">
+		    <div class="ruang-item">
 
-                        <div class="ruang-label">
-                            <?= s($ruang); ?>
-                        </div>
+			<div class="ruang-label">
+			    <?= s($ruang); ?>
+			</div>
 
-                        <div class="ruang-guru">
-                            <?= s($guru); ?>
-                        </div>
+			<div class="ruang-guru">
+			    <?= s($data['guru'] ?? '-'); ?>
+			</div>
 
-                    </div>
+		    </div>
 
-                <?php endforeach; ?>
+		<?php endforeach; ?>
 
             </div>
 
@@ -1739,21 +1739,21 @@ RUNNING TEXT
 
             <div class="ruang-list">
 
-                <?php foreach ($pengawasberikut as $ruang => $guru): ?>
+		<?php foreach ($pengawasberikut as $ruang => $data): ?>
 
-                    <div class="ruang-item">
+		    <div class="ruang-item">
 
-                        <div class="ruang-label">
-                            <?= s($ruang); ?>
-                        </div>
+			<div class="ruang-label">
+			    <?= s($ruang); ?>
+			</div>
 
-                        <div class="ruang-guru">
-                            <?= s($guru); ?>
-                        </div>
+			<div class="ruang-guru">
+			    <?= s($data['guru'] ?? '-'); ?>
+			</div>
 
-                    </div>
+		    </div>
 
-                <?php endforeach; ?>
+		<?php endforeach; ?>
 
             </div>
 

@@ -8,6 +8,12 @@ require_capability('local/jurnalmengajar:submit', $context);
 require_once(__DIR__ . '/jadwal_asesmen_lib.php');
 require_once(__DIR__ . '/lib.php');
 
+global $USER;
+
+$namaguru_login = trim(
+    fullname($USER)
+);
+
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/jadwal_pengawas_view.php'));
 $PAGE->set_context($context);
 $PAGE->set_title('Jadwal Pengawas');
@@ -68,6 +74,24 @@ $sesiasesmen =
         $mulaipukul
     );
 
+function tampil_pengawas($data, $userlogin) {
+
+    if (empty($data) || !is_array($data)) {
+        return '-';
+    }
+
+    $guru = $data['guru'] ?? '-';
+    $username = $data['username'] ?? '';
+
+    if ($username === $userlogin) {
+        return '<span style="color:#dc3545;font-weight:bold;">'
+            . s($guru)
+            . '</span>';
+    }
+
+    return s($guru);
+}
+
 echo $OUTPUT->header();
 
 ?>
@@ -124,9 +148,9 @@ echo $OUTPUT->header();
                         <td class="text-center"><?= $no++; ?></td>
                         <td><?= s($sesi); ?></td>
                         <td><?= s($waktu); ?></td>
-                        <td><?= s($ruang['R1'] ?? '-'); ?></td>
-                        <td><?= s($ruang['R2'] ?? '-'); ?></td>
-                        <td><?= s($ruang['R3'] ?? '-'); ?></td>
+			<td><?= tampil_pengawas($ruang['R1'] ?? null, $USER->username); ?></td>
+			<td><?= tampil_pengawas($ruang['R2'] ?? null, $USER->username); ?></td>
+			<td><?= tampil_pengawas($ruang['R3'] ?? null, $USER->username); ?></td>
                     </tr>
                     <?php
                 }
