@@ -64,7 +64,7 @@ function jm_get_namaguru($userid) {
     $u = $DB->get_record('user', ['id' => $userid]);
 
     $namagurucache[$userid] =
-        $u ? ucwords(strtolower($u->lastname)) : '-';
+        $u ? $u->lastname : '-';
 
     return $namagurucache[$userid];
 }
