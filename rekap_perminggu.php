@@ -223,22 +223,40 @@ $pengurang_libur =
 $target_final =
     max(0, $beban_minggu - $pengurang_libur);
 
-$persen = ($target_final > 0)
-    ? round(($jumlahjam / $target_final) * 100)
-    : 0;
+if ($target_final > 0) {
 
-$persen = min($persen, 100);
+    $persen = round(
+        ($jumlahjam / $target_final) * 100
+    );
+
+    $persen = min($persen, 100);
+
+} else {
+
+    $persen = null;
+}
 
         // Atur warna Badge Persentase & Soft warning di Baris Tabel
-        $tr_class = '';
-        if ($persen >= 80) {
-            $badge_class = 'badge-success';
-        } elseif ($persen >= 50) {
-            $badge_class = 'badge-info';
-        } else {
-            $badge_class = 'badge-danger';
-            $tr_class = 'table-danger-light'; // Membutuhkan CSS kustom di bawah agar soft warnanya
-        }
+	$tr_class = '';
+
+	if ($persen === null) {
+
+	    $badge_class = 'badge-secondary';
+
+	} elseif ($persen >= 80) {
+
+	    $badge_class = 'badge-success';
+
+	} elseif ($persen >= 50) {
+
+	    $badge_class = 'badge-info';
+
+	} else {
+
+	    $badge_class = 'badge-danger';
+	    $tr_class = 'table-danger-light';
+	} // Membutuhkan CSS kustom di bawah agar soft warnanya
+        
 
         echo html_writer::start_tag('tr', ['class' => $tr_class]);
             echo html_writer::tag('td', $no++, ['class' => 'text-center align-middle font-weight-bold text-muted']);
@@ -253,9 +271,9 @@ $persen = min($persen, 100);
 if ($pengurang_libur > 0) {
 
     $teks_target .=
-        '<br><small class="text-danger">-'
-        . $pengurang_libur .
-        ' JP Libur</small>';
+    '<br><small class="text-danger">-'
+    . $pengurang_libur .
+    ' JP tanpa KBM</small>';
 
     $teks_target .=
     '<br><small class="text-success font-weight-bold">'
@@ -270,8 +288,15 @@ echo html_writer::tag(
     ['class' => 'text-center align-middle text-muted']
 );
             
-            // Badge Persentase
-            $badge = html_writer::tag('span', $persen . '%', ['class' => 'badge ' . $badge_class . ' p-2 w-100', 'style' => 'font-size: 85%']);
+	// Badge Persentase
+	$badge_text = ($persen === null)
+	    ? '-'
+	    : $persen . '%';
+
+	$badge = html_writer::tag('span', $badge_text, [
+	    'class' => 'badge ' . $badge_class . ' p-2 w-100',
+	    'style' => 'font-size: 85%'
+	]);
             echo html_writer::tag('td', $badge, ['class' => 'text-center align-middle']);
 
             // Tombol Lihat Detail

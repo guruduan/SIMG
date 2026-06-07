@@ -311,9 +311,9 @@ foreach ($walikelas as $r) {
         'kelas'     => $kelas,
         'jenis'     => 'Pembinaan Wali Kelas',
         'catatan'   =>
-            '<b>Topik:</b> ' .
+            '<b>Permasalahan:</b> ' .
             $r->topik .
-            '<br><b>Tindak Lanjut:</b> ' .
+            '<br><b>Tindak Lanjut/Solusi:</b> ' .
             $r->tindaklanjut,
         'guru'      => $guru
             ? $guru->lastname

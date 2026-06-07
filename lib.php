@@ -215,7 +215,77 @@ function jurnalmengajar_cek_libur($tanggal) {
     return false;
 }
 
-// Hitung pengurang target karena libur
+// cek asesmen
+function jurnalmengajar_is_tanggal_asesmen($tanggal = null) {
+    if (!$tanggal) {
+        $tanggal = date('Y-m-d');
+    }
+
+    $config = get_config('local_jurnalmengajar');
+    $data = trim($config->tanggalasesmen ?? '');
+
+    if (empty($data)) {
+        return false;
+    }
+
+    $lines = explode("\n", $data);
+
+    foreach ($lines as $line) {
+
+        $line = trim($line);
+
+        if (preg_match('/(\d{4}-\d{2}-\d{2})\s+s\/d\s+(\d{4}-\d{2}-\d{2})/', $line, $m)) {
+
+            $mulai = strtotime($m[1]);
+            $selesai = strtotime($m[2]);
+            $cek = strtotime($tanggal);
+
+            if ($cek >= $mulai && $cek <= $selesai) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+/**
+ * Ambil cutoff berdasarkan kode kelas (VI, IX, XII)
+ */
+function jurnalmengajar_get_cutoff_by_kelas($kelas_target, $timestamp = null) {
+
+    $config = get_config('local_jurnalmengajar', 'cutoff_kelas');
+
+    if (empty($config)) return null;
+
+    if ($timestamp === null) {
+        $timestamp = time();
+    }
+
+    $tahun = date('Y', $timestamp);
+
+    $lines = preg_split('/\r\n|\r|\n/', $config);
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line == '') continue;
+
+        // Format: XII|2026-04-06
+        if (!preg_match('/^([A-Z0-9]+)\|(\d{4}-\d{2}-\d{2})$/', $line, $m)) {
+            continue;
+        }
+
+        $kelas = strtoupper($m[1]);
+        $tanggal = $m[2];
+
+        if ($kelas === strtoupper($kelas_target) && strpos($tanggal, $tahun . '-') === 0) {
+            return strtotime($tanggal);
+        }
+    }
+
+    return null;
+}
+
+// Hitung pengurang target karena libur dan asesmen
 function jurnalmengajar_get_pengurang_target_libur(
     $userid,
     $tanggal_awal,
@@ -227,20 +297,33 @@ function jurnalmengajar_get_pengurang_target_libur(
     $pengurang = 0;
 
     $tanggallibur = get_config(
-        'local_jurnalmengajar',
-        'tanggallibur'
-    );
+    'local_jurnalmengajar',
+    'tanggallibur'
+	);
 
-    if (empty($tanggallibur)) {
-        return 0;
-    }
+	$tanggalasesmen = get_config(
+	    'local_jurnalmengajar',
+	    'tanggalasesmen'
+	);
+
+	if (
+	    empty($tanggallibur)
+	    &&
+	    empty($tanggalasesmen)
+	) {
+	    return 0;
+	}
 
     $jadwal = jurnalmengajar_get_jadwal_acuan();
 
+    if (!empty($tanggallibur)) {
     $lines = preg_split(
         '/\r\n|\r|\n/',
         $tanggallibur
     );
+	} else {
+	    $lines = [];
+	}
 
     foreach ($lines as $line) {
 
@@ -367,79 +450,75 @@ function jurnalmengajar_get_pengurang_target_libur(
             }
         }
     }
+// ==========================
+// TAMBAHAN PENGURANG ASESMEN
+// ==========================
 
-    return $pengurang;
-}
+for (
+    $t = strtotime(date('Y-m-d', $tanggal_awal));
+    $t <= strtotime(date('Y-m-d', $tanggal_akhir));
+    $t += 86400
+) {
 
-// cek asesmen
-function jurnalmengajar_is_tanggal_asesmen($tanggal = null) {
-    if (!$tanggal) {
-        $tanggal = date('Y-m-d');
+    $tanggal = date('Y-m-d', $t);
+
+    if (!jurnalmengajar_is_tanggal_asesmen($tanggal)) {
+        continue;
     }
 
-    $config = get_config('local_jurnalmengajar');
-    $data = trim($config->tanggalasesmen ?? '');
+    $hari = jurnalmengajar_get_hari_by_timestamp($t);
 
-    if (empty($data)) {
-        return false;
-    }
+    foreach ($jadwal as $j) {
 
-    $lines = explode("\n", $data);
-
-    foreach ($lines as $line) {
-
-        $line = trim($line);
-
-        if (preg_match('/(\d{4}-\d{2}-\d{2})\s+s\/d\s+(\d{4}-\d{2}-\d{2})/', $line, $m)) {
-
-            $mulai = strtotime($m[1]);
-            $selesai = strtotime($m[2]);
-            $cek = strtotime($tanggal);
-
-            if ($cek >= $mulai && $cek <= $selesai) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-/**
- * Ambil cutoff berdasarkan kode kelas (VI, IX, XII)
- */
-function jurnalmengajar_get_cutoff_by_kelas($kelas_target, $timestamp = null) {
-
-    $config = get_config('local_jurnalmengajar', 'cutoff_kelas');
-
-    if (empty($config)) return null;
-
-    if ($timestamp === null) {
-        $timestamp = time();
-    }
-
-    $tahun = date('Y', $timestamp);
-
-    $lines = preg_split('/\r\n|\r|\n/', $config);
-
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if ($line == '') continue;
-
-        // Format: XII|2026-04-06
-        if (!preg_match('/^([A-Z0-9]+)\|(\d{4}-\d{2}-\d{2})$/', $line, $m)) {
+        if ($j['userid'] != $userid) {
             continue;
         }
 
-        $kelas = strtoupper($m[1]);
-        $tanggal = $m[2];
-
-        if ($kelas === strtoupper($kelas_target) && strpos($tanggal, $tahun . '-') === 0) {
-            return strtotime($tanggal);
+        if ($j['hari'] != $hari) {
+            continue;
         }
-    }
 
-    return null;
+        $kelas = isset($j['kelas'])
+            ? trim($j['kelas'])
+            : '';
+
+        $kelas_level = null;
+
+        if (
+            preg_match(
+                '/\b(VI|IX|XII)\b/i',
+                $kelas,
+                $match
+            )
+        ) {
+            $kelas_level = strtoupper($match[1]);
+        }
+
+        $cutoff = null;
+
+        if ($kelas_level) {
+            $cutoff =
+                jurnalmengajar_get_cutoff_by_kelas(
+                    $kelas_level,
+                    $t
+                );
+        }
+
+        if (
+            !empty($cutoff)
+            &&
+            $t >= $cutoff
+        ) {
+            continue;
+        }
+
+        $pengurang++;
+    }
 }
+    return $pengurang;
+}
+
+
 /**
  * Cek boleh kirim WA atau tidak
  */
