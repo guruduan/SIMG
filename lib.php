@@ -1062,6 +1062,12 @@ function jurnalmengajar_get_kelas_wali($userid) {
 
     return 0;
 }
+// fungsi wali kelas
+function is_wali_kelas($userid) {
+    $kelas = jurnalmengajar_get_kelas_wali($userid);
+
+    return !empty($kelas);
+}
 /// fungsi plugin file
 
 function local_jurnalmengajar_pluginfile(
@@ -1130,4 +1136,18 @@ function get_jenis_pembinaan_options() {
         'Kerapian'         => 'Kerapian',
         'Lainnya'          => 'Lainnya'
     ];
+}
+// MAPPRING GURU BK
+function is_guru_bk($userid) {
+    $json = get_config('local_jurnalmengajar', 'guru_bk_mapping');
+
+    $mapping = json_decode($json, true);
+
+    if (!is_array($mapping)) {
+        return false;
+    }
+
+    $mapping = array_map('intval', $mapping);
+
+    return in_array((int)$userid, $mapping, true);
 }
