@@ -18,6 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
         trim($_POST['template_jurnal']),
         'local_jurnalmengajar'
     );
+    
+    set_config(
+        'template_guru_wali',
+        trim($_POST['template_guru_wali']),
+        'local_jurnalmengajar'
+    );
 
     set_config(
         'template_izin_murid',
@@ -30,6 +36,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
     trim($_POST['template_pembinaan']),
     'local_jurnalmengajar'
     );
+
+	set_config(
+	    'template_layanan_bk',
+	    trim($_POST['template_layanan_bk']),
+	    'local_jurnalmengajar'
+	);
 
     set_config(
         'template_izin_guru',
@@ -56,6 +68,11 @@ $template_jurnal = get_config(
     'template_jurnal'
 );
 
+$template_guru_wali = get_config(
+    'local_jurnalmengajar',
+    'template_guru_wali'
+);
+
 $template_izin_murid = get_config(
     'local_jurnalmengajar',
     'template_izin_murid'
@@ -64,6 +81,11 @@ $template_izin_murid = get_config(
 $template_pembinaan = get_config(
     'local_jurnalmengajar',
     'template_pembinaan'
+);
+
+$template_layanan_bk = get_config(
+    'local_jurnalmengajar',
+    'template_layanan_bk'
 );
 
 $template_izin_guru = get_config(
@@ -96,17 +118,34 @@ Tidak Hadir :
 Tanggal : {tanggal}";
 }
 
+if (empty($template_guru_wali)) {
+    $template_guru_wali =
+"📋 Jurnal Guru Wali
+
+📅 Waktu: {waktu}
+👤 Murid: {murid}
+🏫 Kelas: {kelas}
+🧩 Topik: {topik}
+💡 Tindak Lanjut: {tindaklanjut}
+📝 Keterangan: {keterangan}
+👨‍🏫 Guru Wali: {guruwali}
+
+_Dikirim kepada Wali Kelas sebagai laporan_";
+}
+
 if (empty($template_izin_murid)) {
     $template_izin_murid =
-"📄 SURAT IZIN MURID
+"📄 Surat Izin Murid
 
-Nama : {nama}
-Kelas : {kelas}
+📅 Waktu: {waktu}
+👤 Nama: {nama}
+🏫 Kelas: {kelas}
+🎓 Guru Pengajar: {guru}
+📝 Alasan: {alasan}
+📌 Keperluan: {keperluan}
+✍️ Pengawas Hari Ini: {pengawas}
 
-Keperluan :
-{keperluan}
-
-Jam Keluar : {jamkeluar}";
+_Dikirim kepada Wali kelas sebagai laporan_";
 }
 
 if (empty($template_pembinaan)) {
@@ -134,30 +173,51 @@ if (empty($template_pembinaan)) {
 _Dikirim kepada Wali Kelas sebagai laporan_";
 }
 
+if (empty($template_layanan_bk)) {
+    $template_layanan_bk =
+"📋 LAPORAN LAYANAN BK
+
+📅 Hari :
+{waktu}
+
+👥 Murid :
+{murid}
+
+🏫 Kelas :
+{kelas}
+
+📝 Jenis Layanan :
+{jenislayanan}
+
+📌 Topik :
+{topik}
+
+🔧 Tindak Lanjut :
+{tindaklanjut}
+
+📑 Catatan :
+{catatan}
+
+👤 Guru BK :
+{gurubk}";
+}
+
 if (empty($template_izin_guru)) {
     $template_izin_guru =
 "📄 SURAT IZIN GURU/PEGAWAI
 
-👤 Nama :
-{guru}
+👤 Nama: {guru}
 
-🆔 NIP :
-{nip}
+🆔 NIP: {nip}
 
-📝 Alasan :
-{alasan}
+📝 Alasan: {alasan}
 
-📌 Keperluan :
-{keperluan}
+📌 Keperluan: {keperluan}
 
-📅 Tanggal :
-{tanggal}
+📅 Tanggal: {tanggal}
 
-🕒 Pukul :
-{jam}
-
-📝 Diinput oleh :
-{penginput}";
+🕒 Pukul: {jam}
+📝 Diinput oleh: {penginput}";
 }
 
 if (empty($template_reminder_jurnal)) {
@@ -215,6 +275,32 @@ echo $OUTPUT->header();
         </div>
     </div>
 
+	<div class="card mb-4">
+	    <div class="card-header">
+		<strong>Jurnal Guru Wali</strong>
+	    </div>
+
+	    <div class="card-body">
+
+		<p>
+		    Placeholder:
+		    <code>{waktu}</code>
+		    <code>{murid}</code>
+		    <code>{kelas}</code>
+		    <code>{topik}</code>
+		    <code>{tindaklanjut}</code>
+		    <code>{keterangan}</code>
+		    <code>{guruwali}</code>
+		</p>
+
+		<textarea
+		    name="template_guru_wali"
+		    class="form-control"
+		    rows="12"><?php echo s($template_guru_wali); ?></textarea>
+
+	    </div>
+	</div>
+	
     <div class="card mb-4">
         <div class="card-header">
             <strong>Surat Izin Murid</strong>
@@ -242,7 +328,7 @@ echo $OUTPUT->header();
 
 	<div class="card mb-4">
 	    <div class="card-header">
-		<strong>Laporan Pembinaan Siswa</strong>
+		<strong>Laporan Pembinaan Siswa oleh BK</strong>
 	    </div>
 
 	    <div class="card-body">
@@ -261,6 +347,32 @@ echo $OUTPUT->header();
 		    name="template_pembinaan"
 		    class="form-control"
 		    rows="12"><?php echo s($template_pembinaan); ?></textarea>
+
+	    </div>
+	</div>
+	<div class="card mb-4">
+	    <div class="card-header">
+		<strong>Laporan Layanan BK</strong>
+	    </div>
+
+	    <div class="card-body">
+
+		<p>
+		    Placeholder:
+		    <code>{waktu}</code>
+		    <code>{murid}</code>
+		    <code>{kelas}</code>
+		    <code>{jenislayanan}</code>
+		    <code>{topik}</code>
+		    <code>{tindaklanjut}</code>
+		    <code>{catatan}</code>
+		    <code>{gurubk}</code>
+		</p>
+
+		<textarea
+		    name="template_layanan_bk"
+		    class="form-control"
+		    rows="12"><?php echo s($template_layanan_bk); ?></textarea>
 
 	    </div>
 	</div>
@@ -291,7 +403,7 @@ echo $OUTPUT->header();
     </div>
 	<div class="card mb-4">
 	    <div class="card-header">
-		<strong>Reminder Jurnal Mengajar</strong>
+		<strong>Notifikasi Reminder Jurnal Mengajar</strong>
 	    </div>
 
 	    <div class="card-body">

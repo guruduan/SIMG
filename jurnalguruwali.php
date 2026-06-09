@@ -1,8 +1,9 @@
 <?php
 require('../../config.php');
 require_once($CFG->libdir.'/formslib.php');
-require_once($CFG->dirroot.'/local/jurnalmengajar/lib.php');
 
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib_notifikasi.php');
 require_login();
 
 $context = context_system::instance();
@@ -99,8 +100,8 @@ function jw_get_kelas_siswa($userid) {
     return $DB->get_field_sql("
         SELECT c.name
         FROM {cohort} c
-        JOIN {cohort_members} cm ON cm.cohortid=c.id
-        WHERE cm.userid=?
+        JOIN {cohort_members} cm ON cm.cohortid = c.id
+        WHERE cm.userid = ?
         ORDER BY c.name ASC
     ", [$userid]);
 }
@@ -201,25 +202,36 @@ if ($data = $mform->get_data()) {
 
     $now = time();
 
-    // Jika bernilai editid > 0, kita perbarui record tunggal saja
-    if ($data->editid > 0) {
-        foreach ($muridids as $muridid) { // Umumnya hanya 1 yang dicentang saat edit
-            $kelas = jw_get_kelas_siswa($muridid);
-            $update = new stdClass();
-            $update->id = $data->editid;
-	    $update->userid = $muridid;
-            $update->muridid = $muridid;
-            $update->kelas = $kelas;
-            $update->topik = $data->topik;
-            $update->tindaklanjut = $data->tindaklanjut;
-            $update->keterangan = $data->keterangan;
-            
-            $DB->update_record('local_jurnalguruwali', $update);
-        }
-        redirect($PAGE->url, 'Data berhasil diperbarui', null, \core\output\notification::NOTIFY_SUCCESS);
-    } else {
-        // Mode Insert Baru (Bisa banyak murid sekaligus)
-        foreach ($muridids as $muridid) {
+   // Jika bernilai editid > 0, kita perbarui record tunggal saja
+if ($data->editid > 0) {
+
+    $muridid = reset($muridids); // ambil murid pertama yang dicentang
+
+    $kelas = jw_get_kelas_siswa($muridid);
+
+    $update = new stdClass();
+    $update->id = $data->editid;
+    $update->userid = $muridid;
+    $update->muridid = $muridid;
+    $update->kelas = $kelas;
+    $update->topik = $data->topik;
+    $update->tindaklanjut = $data->tindaklanjut;
+    $update->keterangan = $data->keterangan;
+
+    $DB->update_record('local_jurnalguruwali', $update);
+
+    redirect(
+        $PAGE->url,
+        'Data berhasil diperbarui',
+        null,
+        \core\output\notification::NOTIFY_SUCCESS
+    );
+} else {
+
+    $notifkelas = [];
+
+    // Mode Insert Baru (Bisa banyak murid sekaligus)
+    foreach ($muridids as $muridid) {
             $murid = $DB->get_record('user', ['id' => $muridid], 'lastname');
             $kelas = jw_get_kelas_siswa($muridid);
             
@@ -236,22 +248,52 @@ if ($data = $mform->get_data()) {
             $DB->insert_record('local_jurnalguruwali', $record);
 
             // ===== KIRIM NOTIFIKASI WA =====
-            $pesan = "*📋 Jurnal Guru Wali*\n\n"
-                   . "📅 Waktu: ".tanggal_indo($now)."\n"
-                   . "👤 Murid: ".format_nama_siswa($murid->lastname)."\n"
-                   . "🏫 Kelas: ".$kelas."\n"
-                   . "🧩 Topik: ".$data->topik."\n"
-                   . "💡 Tindak lanjut: ".$data->tindaklanjut."\n"
-                   . "📝 Keterangan: ".$data->keterangan."\n"
-                   . "👨‍🏫 Guru Wali: ".$USER->lastname;
 
-            $tujuan = [get_nomor_wali_kelas($kelas)];
-            jurnalmengajar_kirim_wa($tujuan, $pesan);
-        }
-        redirect($PAGE->url, 'Data berhasil disimpan', null, \core\output\notification::NOTIFY_SUCCESS);
-    }
+if (!isset($notifkelas[$kelas])) {
+    $notifkelas[$kelas] = [
+        'kelas' => get_nama_kelas($kelas),
+        'murid' => []
+    ];
 }
 
+$notifkelas[$kelas]['murid'][] = format_nama_siswa($murid->lastname);
+
+} // end foreach
+
+foreach ($notifkelas as $kelasid => $info) {
+
+    $nomorwa = get_nomor_wali_kelas($kelasid);
+
+    if (!$nomorwa) {
+        continue;
+    }
+
+    $datawa = [
+        '{waktu}'        => tanggal_indo($now),
+        '{murid}'        => implode(', ', $info['murid']),
+        '{kelas}'        => $info['kelas'],
+        '{topik}'        => $data->topik,
+        '{tindaklanjut}' => $data->tindaklanjut,
+        '{keterangan}'   => $data->keterangan,
+        '{guruwali}'     => $USER->lastname
+    ];
+
+    jm_kirim_template(
+        'guru_wali',
+        [$nomorwa],
+        $datawa
+    );
+}
+
+redirect(
+$PAGE->url, 
+'Data berhasil disimpan', 
+null,
+\core\output\notification::NOTIFY_SUCCESS
+);
+            
+} // end else
+} // end if get_data
 /* ======================= TAMPILAN PAGE ======================= */
 
 echo $OUTPUT->header();

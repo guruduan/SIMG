@@ -31,15 +31,25 @@ function get_user_nowa($userid) {
 /**
  * Ambil nomor wali kelas dari mapping
  */
-function get_nomor_wali_kelas($kelasid) {
+function get_nomor_wali_kelas($kelas) {
+    global $DB;
+
+    if (!is_numeric($kelas)) {
+        $kelas = $DB->get_field(
+            'cohort',
+            'id',
+            ['name' => $kelas]
+        );
+    }
+
     $json = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
     $mapping = json_decode($json, true);
 
-    if (empty($mapping[$kelasid])) {
+    if (empty($mapping[$kelas])) {
         return null;
     }
 
-    return get_user_nowa($mapping[$kelasid]);
+    return get_user_nowa($mapping[$kelas]);
 }
 
 /**
