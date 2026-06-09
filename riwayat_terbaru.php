@@ -250,7 +250,7 @@ foreach ($rows as $r) {
             'time' => $r->timecreated,
             'muridid' => $muridid,
             'murid' => jm_get_namamurid($muridid),
-            'kelas' => $r->kelas,
+            'kelas' => get_nama_kelas($r->kelas),
             'kategori' => 'pembinaan',
             'ringkasan' => shorten_text(
                 $r->permasalahan,
