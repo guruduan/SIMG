@@ -1,12 +1,15 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
-require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
+
 require_login();
 
 use local_jurnalmengajar\form\pembinaan_form;
 
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:view', $context);
+
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib_notifikasi.php');
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/pembinaan.php'));
@@ -103,17 +106,22 @@ if ($mform->is_cancelled()) {
             $peserta_str = '-';
         }
 
-        $pesan = "*📋 Laporan Pembinaan Siswa*\n\n"
-               . "📅 Waktu: $waktu\n"
-               . "👥 Murid: $peserta_str\n"
-               . "🏫 Kelas: $kelasnama\n"
-               . "📌 Permasalahan: {$record->permasalahan}\n"
-               . "🔧 Upaya: {$record->tindakan}\n"
-               . "👤 Guru BK: $nama\n\n"
-               . "_Dikirim kepada Wali kelas sebagai laporan_";
+	$datawa = [
+	    '{waktu}'        => $waktu,
+	    '{murid}'        => $peserta_str,
+	    '{kelas}'        => $kelasnama,
+	    '{permasalahan}' => $record->permasalahan,
+	    '{upaya}'        => $record->tindakan,
+	    '{gurubk}'       => $nama
+	];
 
-        $tujuan = [$nomorwa];
-        jurnalmengajar_kirim_wa($tujuan, $pesan);
+	$tujuan = [$nomorwa];
+
+jm_kirim_template(
+    'pembinaan',
+    $tujuan,
+    $datawa
+);
 
     } else {
         debugging("Nomor WA wali kelas tidak ditemukan untuk kelas ID: {$record->kelas}", DEBUG_DEVELOPER);

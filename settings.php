@@ -179,6 +179,16 @@ $settings->add(
     )
 );
 
+$settings->add(
+    new admin_setting_configtext(
+        'local_jurnalmengajar/judulasesmen',
+        'Judul Asesmen TV',
+        'Contoh: ASESMEN AKHIR TAHUN',
+        'ASESMEN AKHIR TAHUN',
+        PARAM_TEXT
+    )
+);
+
 // ==============================
 // CUT OFF MULTI KELAS
 // ==============================
@@ -294,4 +304,13 @@ $settings->add(new admin_setting_configtextarea(
         new moodle_url('/local/jurnalmengajar/wali_kelas.php'),
         'moodle/site:config'
     ));
+    // =========================
+// TEMPLATE NOTIFIKASI
+// =========================
+$ADMIN->add('local_jurnalmengajar_cat', new admin_externalpage(
+    'local_jurnalmengajar_template',
+    'Template Notifikasi',
+    new moodle_url('/local/jurnalmengajar/template_notifikasi.php'),
+    'moodle/site:config'
+));
 }

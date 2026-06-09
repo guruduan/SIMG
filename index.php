@@ -13,6 +13,7 @@ $PAGE->set_title('Isi Jurnal Mengajar');
 $PAGE->set_heading('Jurnal Mengajar');
 
 require_once(__DIR__ . '/lib.php');
+require_once(__DIR__ . '/lib_notifikasi.php');
 
 // ================= JS (Tetap dipertahankan, namun disarankan pindah ke AMD) =================
 $PAGE->requires->jquery();
@@ -287,18 +288,19 @@ if (!empty($pembinaan)) {
         $tanggal = tanggal_indo(time(), 'judul');
         $jam = tanggal_indo(time(), 'jam');
 
-        $pesan = "*📘 Jurnal KBM _{$tanggal}_*\n\n"
-               . "👤 Guru: $namaguru\n"
-               . "🏫 Kelas: $kelas\n"
-               . "⏰ Jam ke: $jamke\n"
-               . "📚 Mata Pelajaran: $mapel\n"
-               . "📒 Materi: $materi\n"
-               . "📝 Aktivitas:\n$aktivitas\n\n"
-               . "🔴 Murid tidak hadir:\n$absen\n\n"
-               . "Keterangan tambahan:\n$keterangan\n\n"
-               . "🕒 Waktu: $jam WITA\n"
-               . "📌 Tercatat di eJurnal KBM $sekolah\n\n"
-               . "_Dikirim ke Wali kelas dan Guru ybs sebagai laporan_";
+       $datawa = [
+    '{guru}'       => $namaguru,
+    '{kelas}'      => $kelas,
+    '{jamke}'      => $jamke,
+    '{mapel}'      => $mapel,
+    '{materi}'     => $materi,
+    '{aktivitas}'  => $aktivitas,
+    '{absen}'      => $absen,
+    '{keterangan}' => $keterangan,
+    '{tanggal}'    => $tanggal,
+    '{jam}'        => $jam,
+    '{sekolah}'    => $sekolah
+	];
 
         // Tujuan
         $tujuan = [];
@@ -309,7 +311,11 @@ if (!empty($pembinaan)) {
         if (!empty($nowawali)) { $tujuan[] = $nowawali; }
 
         // Kirim WA
-        jurnalmengajar_kirim_wa($tujuan, $pesan);
+        jm_kirim_template(
+    'jurnal',
+    $tujuan,
+    $datawa
+	);
     }
 
     redirect(

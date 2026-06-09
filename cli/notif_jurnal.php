@@ -4,7 +4,8 @@ require_once(__DIR__.'/../../../config.php');
 
 require_once(__DIR__.'/../jam_pelajaran_lib.php');
 require_once(__DIR__.'/../jadwal_acuan_lib.php');
-require_once(__DIR__.'/../lib.php'); // fungsi kirim WA
+require_once(__DIR__.'/../lib.php'); 
+require_once(__DIR__.'/../lib_notifikasi.php');// fungsi kirim WA
 
 global $DB;
 
@@ -17,10 +18,15 @@ foreach ($cohorts as $c) {
 $today = date('Y-m-d');
 $hariIndo = jurnalmengajar_get_hari_ini();
 $current = time();
-$todayLabel = date('d-m-Y');
+$todayLabel = tanggal_indo(time());
 
 // ===== Cek hari sekolah =====
 $hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
+
+if (empty($hariSekolah)) {
+    $hariSekolah = 'Senin,Selasa,Rabu,Kamis,Jumat';
+}
+
 $hariSekolah = array_map('trim', explode(',', $hariSekolah));
 
 if (!in_array($hariIndo, $hariSekolah)) {
@@ -32,6 +38,26 @@ if (!in_array($hariIndo, $hariSekolah)) {
 if (jurnalmengajar_cek_libur($today)) {
     mtrace("Hari ini tanggal libur.");
     exit(0);
+}
+
+// ===== Cek tanggal asesmen =====
+$tanggalasesmen = trim(get_config('local_jurnalmengajar', 'tanggalasesmen'));
+
+if (!empty($tanggalasesmen)) {
+
+    if (preg_match('/(\d{4}-\d{2}-\d{2})\s*s\/d\s*(\d{4}-\d{2}-\d{2})/i',
+        $tanggalasesmen,
+        $match)) {
+
+        $mulai  = strtotime($match[1]);
+        $selesai = strtotime($match[2]);
+        $hariini = strtotime($today);
+
+        if ($hariini >= $mulai && $hariini <= $selesai) {
+            mtrace("Hari ini berada dalam rentang asesmen.");
+            exit(0);
+        }
+    }
 }
 
 mtrace("=== Notifikasi Jurnal Rekap ===");
@@ -175,7 +201,7 @@ $mengirim = 0;
 
 foreach ($pending as $userid => $info) {
 
-    $user = $DB->get_record('user', ['id'=>$userid], 'id, firstname, lastname');
+//    $user = $DB->get_record('user', ['id'=>$userid], 'id, firstname, lastname');
 
     // Ambil nomor WA
     $nowa = $DB->get_field_sql("
@@ -216,27 +242,37 @@ foreach ($urut as $kelas => $jamlist) {
 
     $ringkas = implode('; ', $ringkasParts);
 
-    $pesan = "Notifikasi SiM ❗\n"
-           . "Bpk/Ibu Guru {$info['lastname']}, mohon mengisi jurnal mengajar hari ini ($todayLabel) untuk:\n"
-           . $listkelas
-           . "\nTerima kasih.\n_abaikan jika sudah mengisi_";
+	$datawa = [
+	    '{guru}'     => $info['lastname'],
+	    '{tanggal}'  => $todayLabel,
+	    '{kelasjam}' => trim($listkelas)
+	];
 
-    $res = jurnalmengajar_kirim_wa($nomor, $pesan);
+	    $res = jm_kirim_template(
+	    'reminder_jurnal',
+	    $nomor,
+	    $datawa
+	);
+
 
     mtrace("Kirim ke $nomor ({$info['lastname']}) -> $res");
+    if ($res) {
     $mengirim++;
+}
 
     // ===== Log TXT =====
-    $logtxt = __DIR__ . '/notif_log_' . date('Y-m-d') . '.txt';
+$logtxt = __DIR__ . '/notif_log_' . date('Y-m-d') . '.txt';
 
-    $line = date('Y-m-d H:i:s')
-          . " | Guru: {$info['lastname']}"
-          . " | Nomor: $nomor"
-          . " | Kelas/Jam: $ringkas"
-          . " | Status: " . preg_replace("/\r|\n/", " ", (string)$res)
-          . "\n";
+$status = $res ? 'BERHASIL' : 'GAGAL';
 
-    file_put_contents($logtxt, $line, FILE_APPEND);
+$line = date('Y-m-d H:i:s')
+      . " | Guru: {$info['lastname']}"
+      . " | Nomor: $nomor"
+      . " | Kelas/Jam: $ringkas"
+      . " | Status: $status"
+      . "\n";
+
+file_put_contents($logtxt, $line, FILE_APPEND);
 }
 
 mtrace("Selesai. Total notifikasi dikirim: $mengirim");

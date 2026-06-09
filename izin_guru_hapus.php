@@ -1,6 +1,6 @@
 <?php
 require('../../config.php');
-require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php'); // ✅ WA + waktu global
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php'); 
 require_once($CFG->dirroot . '/local/jurnalmengajar/classes/form/suratiguru_form.php');
 require_once($CFG->libdir.'/pdflib.php');
 
@@ -79,29 +79,12 @@ if ($mform->is_cancelled()) {
     $record->userinput   = $USER->id; // ✅ Penginput: Admin / Guru Piket / Diri Sendiri
 
     $insertid = $DB->insert_record('local_jurnalmengajar_suratizinguru', $record);
-
-    // ================= WA KE KEPALA SEKOLAH =================
-    $kepsek = get_nomor_kepala_sekolah();
-
-    if ($kepsek) {
-        $waktu = tanggal_indo(time(), 'judul');
-        $jam = date('H:i');
-        $penginput = $USER->lastname; // Mengambil nama yang sedang login
-
-        $pesan = "*📄 Surat Izin Guru/Pegawai*\n\n"
-               . "📅 Hari, tanggal: $waktu\n"
-               . "👤 Nama: {$choices[$data->userid]}\n"
-               . "🆔 NIP: {$data->nip}\n"
-               . "📝 Alasan: {$data->alasan}\n"
-               . "📌 Keperluan: {$data->keperluan}\n\n"
-               . "🕒 Pukul: $jam WITA\n"
-               . "📝 Diinput oleh: $penginput";
-
-        $tujuan = [$kepsek];
-        jurnalmengajar_kirim_wa($tujuan, $pesan);
-    }
-
-    redirect(new moodle_url('/local/jurnalmengajar/cetak_surat_izin_guru.php', ['id' => $insertid]));
+redirect(
+    new moodle_url('/local/jurnalmengajar/input_surat_izin_guru.php'),
+    'Surat izin berhasil disimpan',
+    null,
+    \core\output\notification::NOTIFY_SUCCESS
+);
 }
 
 // ================= TAMPILAN =================

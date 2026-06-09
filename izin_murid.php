@@ -14,6 +14,7 @@ global $DB, $USER, $CFG;
 $pengawas = $USER->lastname;
 
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib_notifikasi.php');
 
 // ================= DATA AWAL =================
 $cohorts = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
@@ -109,21 +110,25 @@ if (($do_submit || $do_save) && confirm_sesskey()) {
         $gurunama = $DB->get_field('user', 'lastname', ['id' => $record->guru_pengajar]);
         $waktu_full = tanggal_indo($record->timecreated);
 
-        $pesan = "*📄 Surat Izin Murid*\n\n"
-               . "📅 Waktu: $waktu_full\n"
-               . "👤 Nama: $nama\n"
-               . "🏫 Kelas: $kelas\n"
-               . "🎓 Guru Pengajar: $gurunama\n"
-               . "📝 Alasan: {$record->alasan}\n"
-               . "📌 Keperluan: {$record->keperluan}\n"
-               . "✍️ Pengawas Hari ini: $pengawas\n\n"
-               . "_Dikirim kepada Wali kelas sebagai laporan_";
-
         $tujuan = [
-            get_nomor_wali_kelas($record->kelasid)
-        ];
+    get_nomor_wali_kelas($record->kelasid)
+];
 
-        jurnalmengajar_kirim_wa($tujuan, $pesan);
+$datawa = [
+    '{waktu}'     => $waktu_full,
+    '{nama}'      => $nama,
+    '{kelas}'     => $kelas,
+    '{guru}'      => $gurunama,
+    '{alasan}'    => $record->alasan,
+    '{keperluan}' => $record->keperluan,
+    '{pengawas}'  => $pengawas
+];
+
+jm_kirim_template(
+    'izin_murid',
+    $tujuan,
+    $datawa
+);
     }
 
     // ================= REDIRECT =================

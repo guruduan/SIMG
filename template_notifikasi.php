@@ -1,0 +1,324 @@
+<?php
+
+require('../../config.php');
+
+require_login();
+require_capability('moodle/site:config', context_system::instance());
+
+
+$PAGE->set_url(new moodle_url('/local/jurnalmengajar/template_notifikasi.php'));
+$PAGE->set_context(context_system::instance());
+$PAGE->set_title('Template Notifikasi');
+$PAGE->set_heading('Template Notifikasi');
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
+
+    set_config(
+        'template_jurnal',
+        trim($_POST['template_jurnal']),
+        'local_jurnalmengajar'
+    );
+
+    set_config(
+        'template_izin_murid',
+        trim($_POST['template_izin_murid']),
+        'local_jurnalmengajar'
+    );
+    
+    set_config(
+    'template_pembinaan',
+    trim($_POST['template_pembinaan']),
+    'local_jurnalmengajar'
+    );
+
+    set_config(
+        'template_izin_guru',
+        trim($_POST['template_izin_guru']),
+        'local_jurnalmengajar'
+    );
+    
+	set_config(
+	    'template_reminder_jurnal',
+	    trim($_POST['template_reminder_jurnal']),
+	    'local_jurnalmengajar'
+	);
+
+    redirect(
+        new moodle_url('/local/jurnalmengajar/template_notifikasi.php'),
+        'Template berhasil disimpan',
+        null,
+        \core\output\notification::NOTIFY_SUCCESS
+    );
+}
+
+$template_jurnal = get_config(
+    'local_jurnalmengajar',
+    'template_jurnal'
+);
+
+$template_izin_murid = get_config(
+    'local_jurnalmengajar',
+    'template_izin_murid'
+);
+
+$template_pembinaan = get_config(
+    'local_jurnalmengajar',
+    'template_pembinaan'
+);
+
+$template_izin_guru = get_config(
+    'local_jurnalmengajar',
+    'template_izin_guru'
+);
+
+$template_reminder_jurnal = get_config(
+    'local_jurnalmengajar',
+    'template_reminder_jurnal'
+);
+
+if (empty($template_jurnal)) {
+    $template_jurnal =
+"📘 JURNAL KBM
+
+Guru : {guru}
+Kelas : {kelas}
+Jam Ke : {jamke}
+
+Materi :
+{materi}
+
+Aktivitas :
+{aktivitas}
+
+Tidak Hadir :
+{absen}
+
+Tanggal : {tanggal}";
+}
+
+if (empty($template_izin_murid)) {
+    $template_izin_murid =
+"📄 SURAT IZIN MURID
+
+Nama : {nama}
+Kelas : {kelas}
+
+Keperluan :
+{keperluan}
+
+Jam Keluar : {jamkeluar}";
+}
+
+if (empty($template_pembinaan)) {
+    $template_pembinaan =
+"📋 LAPORAN PEMBINAAN SISWA
+
+📅 Waktu :
+{waktu}
+
+👥 Murid :
+{murid}
+
+🏫 Kelas :
+{kelas}
+
+📌 Permasalahan :
+{permasalahan}
+
+🔧 Upaya :
+{upaya}
+
+👤 Guru BK :
+{gurubk}
+
+_Dikirim kepada Wali Kelas sebagai laporan_";
+}
+
+if (empty($template_izin_guru)) {
+    $template_izin_guru =
+"📄 SURAT IZIN GURU/PEGAWAI
+
+👤 Nama :
+{guru}
+
+🆔 NIP :
+{nip}
+
+📝 Alasan :
+{alasan}
+
+📌 Keperluan :
+{keperluan}
+
+📅 Tanggal :
+{tanggal}
+
+🕒 Pukul :
+{jam}
+
+📝 Diinput oleh :
+{penginput}";
+}
+
+if (empty($template_reminder_jurnal)) {
+    $template_reminder_jurnal =
+"Notifikasi SiM ❗
+
+Bpk/Ibu Guru {guru},
+mohon mengisi jurnal mengajar hari ini ({tanggal}) untuk:
+
+{kelasjam}
+
+Terima kasih.
+_abaikan jika sudah mengisi_";
+}
+
+echo $OUTPUT->header();
+
+?>
+
+<div class="container-fluid">
+
+
+<h3>Template Notifikasi WhatsApp</h3>
+
+<form method="post">
+
+    <input type="hidden" name="sesskey" value="<?php echo sesskey(); ?>">
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Jurnal Mengajar</strong>
+        </div>
+        <div class="card-body">
+
+            <p>
+                Placeholder:
+                <code>{guru}</code>
+                <code>{kelas}</code>
+                <code>{jamke}</code>
+                <code>{materi}</code>
+                <code>{aktivitas}</code>
+                <code>{absen}</code>
+                <code>{tanggal}</code>
+                <code>{mapel}</code>
+		<code>{keterangan}</code>
+		<code>{jam}</code>
+		<code>{sekolah}</code>
+            </p>
+
+            <textarea
+                name="template_jurnal"
+                class="form-control"
+                rows="12"><?php echo s($template_jurnal); ?></textarea>
+
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Surat Izin Murid</strong>
+        </div>
+        <div class="card-body">
+
+            <p>
+                Placeholder:
+                <code>{waktu}</code>
+		<code>{nama}</code>
+		<code>{kelas}</code>
+		<code>{guru}</code>
+		<code>{alasan}</code>
+		<code>{keperluan}</code>
+		<code>{pengawas}</code>
+            </p>
+
+            <textarea
+                name="template_izin_murid"
+                class="form-control"
+                rows="10"><?php echo s($template_izin_murid); ?></textarea>
+
+        </div>
+    </div>
+
+	<div class="card mb-4">
+	    <div class="card-header">
+		<strong>Laporan Pembinaan Siswa</strong>
+	    </div>
+
+	    <div class="card-body">
+
+		<p>
+		    Placeholder:
+		    <code>{waktu}</code>
+		    <code>{murid}</code>
+		    <code>{kelas}</code>
+		    <code>{permasalahan}</code>
+		    <code>{upaya}</code>
+		    <code>{gurubk}</code>
+		</p>
+
+		<textarea
+		    name="template_pembinaan"
+		    class="form-control"
+		    rows="12"><?php echo s($template_pembinaan); ?></textarea>
+
+	    </div>
+	</div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Surat Izin Guru</strong>
+        </div>
+        <div class="card-body">
+
+            <p>
+                Placeholder:
+                <code>{guru}</code>
+		<code>{nip}</code>
+		<code>{alasan}</code>
+		<code>{keperluan}</code>
+		<code>{tanggal}</code>
+		<code>{jam}</code>
+		<code>{penginput}</code>
+            </p>
+
+            <textarea
+                name="template_izin_guru"
+                class="form-control"
+                rows="10"><?php echo s($template_izin_guru); ?></textarea>
+
+        </div>
+    </div>
+	<div class="card mb-4">
+	    <div class="card-header">
+		<strong>Reminder Jurnal Mengajar</strong>
+	    </div>
+
+	    <div class="card-body">
+
+		<p>
+		    Placeholder:
+		    <code>{guru}</code>
+		    <code>{tanggal}</code>
+		    <code>{kelasjam}</code>
+		</p>
+
+		<textarea
+		    name="template_reminder_jurnal"
+		    class="form-control"
+		    rows="10"><?php echo s($template_reminder_jurnal); ?></textarea>
+
+	    </div>
+	</div>
+
+    <button type="submit" class="btn btn-primary">
+        Simpan Template
+    </button>
+
+</form>
+
+
+</div>
+
+<?php
+echo $OUTPUT->footer();
