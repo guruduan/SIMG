@@ -212,23 +212,23 @@ echo $OUTPUT->header();
 
 
         <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
-            <a class="btn fw-bold w-100" style="background:#eb7734;color:#000;"
-               href="jadwal_pengawas_view.php">
-                Jadwal Pengawas Asesmen
+            <a class="btn fw-bold w-100" style="background:#9adca6;color:#000;"
+               href="rekap_kehadiran.php">
+                📊 Rekap Kehadiran Murid
             </a>
         </div>
 
         <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
-            <a class="btn fw-bold w-100" style="background:#eb7734;color:#000;"
-               href="berita_acara.php">
-                📊 Isi Berita Acara Asesmen
+            <a class="btn fw-bold w-100" style="background:#1976d2;color:#fcfcfc;"
+               href="riwayat_pembinaan.php">
+                📊 Riwayat Pembinaan BK
             </a>
         </div>
         
         <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
-            <a class="btn fw-bold w-100" style="background:#eb7734;color:#000;"
-               href="riwayat_berita_acara.php">
-                Riwayat Berita Acara Asesmen
+            <a class="btn fw-bold w-100" style="background:#fde668;color:#000;"
+               href="ekstra_input.php">
+                📝 Isi Jurnal Ekstra
             </a>
         </div>
 
