@@ -1,14 +1,11 @@
 <?php
 require_once('../../config.php');
+//require_once($_SERVER['DOCUMENT_ROOT'] . '/config.php');
+
 require_once(__DIR__.'/lib.php');
 
 require_login();
 require_capability('moodle/site:config', context_system::instance());
-
-header('Content-Type: text/csv');
-header('Content-Disposition: attachment;filename="format_acuan.csv"');
-
-echo "hari,userid,lastname,kelas,jamke\n";
 
 global $DB;
 
@@ -27,14 +24,30 @@ $sql = "SELECT u.id, u.lastname
 
 $users = $DB->get_records_sql($sql, ['roleid' => $role->id]);
 
-// Ambil hari sekolah dari setting plugin
+// Ambil hari sekolah
 $hari_list = jurnalmengajar_get_hari_sekolah();
 
-// Loop
+header('Content-Type: text/csv; charset=UTF-8');
+header('Content-Disposition: attachment; filename="format_acuan.csv"');
+
+echo "\xEF\xBB\xBF";
+
+$out = fopen('php://output', 'w');
+
+// Header CSV
+fputcsv($out, ['hari', 'userid', 'lastname', 'kelas', 'jamke']);
+
 foreach ($users as $u) {
     foreach ($hari_list as $hari) {
-        echo $hari . ',' .
-             $u->id . ',"' .
-             $u->lastname . '",,' . "\n";
+        fputcsv($out, [
+            $hari,
+            $u->id,
+            $u->lastname,
+            '',
+            ''
+        ]);
     }
 }
+
+fclose($out);
+exit;
