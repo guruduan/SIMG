@@ -18,19 +18,43 @@ echo $OUTPUT->header();
 PARAMETER
 =====================================================
 */
-$cohortid = optional_param('cohortid', 0, PARAM_INT);
-$muridid  = optional_param('muridid', 0, PARAM_INT);
-$filter = optional_param('filter', '', PARAM_TEXT);
+$tahunajaran = optional_param('tahunajaran', '', PARAM_TEXT);
+$cohortid    = optional_param('cohortid', 0, PARAM_INT);
+$muridid     = optional_param('muridid', 0, PARAM_INT);
+$filter      = optional_param('filter', '', PARAM_TEXT);
 /*
 =====================================================
 AMBIL COHORT
 =====================================================
 */
-$cohorts = $DB->get_records_sql("
-    SELECT id, name
-    FROM {cohort}
-    ORDER BY name ASC
+$tahunoptions = [];
+
+$tahuns = $DB->get_records_sql("
+    SELECT DISTINCT tahunajaran
+    FROM {local_jurnalmengajar_riwayatkelas}
+    ORDER BY tahunajaran DESC
 ");
+
+foreach ($tahuns as $t) {
+    $tahunoptions[$t->tahunajaran] = $t->tahunajaran;
+}
+
+$cohorts = [];
+
+if (!empty($tahunajaran)) {
+
+    $cohorts = $DB->get_records_sql(
+        "
+        SELECT DISTINCT c.id, c.name
+        FROM {local_jurnalmengajar_riwayatkelas} rk
+        JOIN {cohort} c
+             ON c.id = rk.cohortid
+        WHERE rk.tahunajaran = ?
+        ORDER BY c.name ASC
+        ",
+        [$tahunajaran]
+    );
+}
 
 /*
 =====================================================
@@ -44,8 +68,30 @@ echo html_writer::start_tag('form', [
 
 echo html_writer::start_div('row align-items-end'); // Menjajarkan dropdown dan tombol di bawah
 
+/* FILTER TAHUN AJARAN */
+echo html_writer::start_div('col-md-3 mb-2 mb-md-0');
+
+echo html_writer::tag(
+    'label',
+    'Tahun Ajaran',
+    ['class' => 'font-weight-bold mb-1']
+);
+
+echo html_writer::select(
+    ['' => 'Pilih Tahun Ajaran'] + $tahunoptions,
+    'tahunajaran',
+    $tahunajaran,
+    false,
+    [
+        'class'    => 'form-control form-control-sm',
+        'onchange' => 'this.form.submit()'
+    ]
+);
+
+echo html_writer::end_div();
+
 /* FILTER KELAS */
-echo html_writer::start_div('col-md-4 mb-2 mb-md-0');
+echo html_writer::start_div('col-md-3 mb-2 mb-md-0');
 echo html_writer::tag('label', 'Kelas', ['class' => 'font-weight-bold mb-1']);
 
 $options = [0 => 'Pilih Kelas'];
@@ -60,18 +106,29 @@ echo html_writer::select($options, 'cohortid', $cohortid, false, [
 echo html_writer::end_div();
 
 /* FILTER SISWA */
-echo html_writer::start_div('col-md-4 mb-2 mb-md-0');
+echo html_writer::start_div('col-md-3 mb-2 mb-md-0');
 echo html_writer::tag('label', 'Nama Murid', ['class' => 'font-weight-bold mb-1']);
 
 $siswaoptions = [0 => 'Pilih Murid'];
-if ($cohortid) {
-    $siswas = $DB->get_records_sql("
-        SELECT u.id, u.firstname, u.lastname
-        FROM {cohort_members} cm
-        JOIN {user} u ON u.id = cm.userid
-        WHERE cm.cohortid = ?
+if ($cohortid && !empty($tahunajaran)) {
+
+    $siswas = $DB->get_records_sql(
+        "
+        SELECT DISTINCT u.id,
+               u.firstname,
+               u.lastname
+        FROM {local_jurnalmengajar_riwayatkelas} rk
+        JOIN {user} u
+             ON u.id = rk.userid
+        WHERE rk.cohortid = ?
+          AND rk.tahunajaran = ?
         ORDER BY u.lastname ASC
-    ", [$cohortid]);
+        ",
+        [
+            $cohortid,
+            $tahunajaran
+        ]
+    );
 
     foreach ($siswas as $s) {
         $siswaoptions[$s->id] = ucwords(strtolower($s->lastname));
@@ -84,7 +141,7 @@ echo html_writer::select($siswaoptions, 'muridid', $muridid, false, [
 echo html_writer::end_div();
 
 /* TOMBOL AKSI */
-echo html_writer::start_div('col-md-4 d-flex');
+echo html_writer::start_div('col-md-3 d-flex');
 echo html_writer::tag('button', '<i class="fa fa-search"></i> Tampilkan', [
     'type'  => 'submit',
     'class' => 'btn btn-primary btn-sm flex-grow-1 mr-2'
@@ -463,8 +520,9 @@ if ($riwayatkelas) {
 $url = new moodle_url(
     '/local/jurnalmengajar/riwayat_individu.php',
     [
-        'cohortid' => $cohortid,
-        'muridid'  => $muridid,
+        'tahunajaran' => $tahunajaran,
+        'cohortid'    => $cohortid,
+        'muridid'     => $muridid,
         'filter' => ($filter == $card[3]) ? '' : $card[3]
     ]
 );
