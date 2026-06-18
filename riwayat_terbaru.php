@@ -97,15 +97,24 @@ foreach ($rows as $r) {
         }
     }
 
-    $timeline[] = [
-        'time' => $r->timecreated,
-        'muridid' => $r->userid,
-        'murid' => $murid,
-        'kelas' => $kelas,
-        'kategori' => 'izin',
-        'ringkasan' => $r->keperluan,
-        'guru' => jm_get_namaguru($r->penginput)
-    ];
+	$ringkasan =
+    '<div><b>Keperluan:</b> ' . s($r->keperluan) . '</div>' .
+    '<div><b>Alasan:</b> ' . s($r->alasan) . '</div>';
+
+	if (!empty($r->catatan)) {
+    $ringkasan .=
+        '<div><b>Pembinaan:</b> ' . s($r->catatan) . '</div>';
+}
+
+	$timeline[] = [
+	    'time' => $r->timecreated,
+	    'muridid' => $r->userid,
+	    'murid' => $murid,
+	    'kelas' => $kelas,
+	    'kategori' => 'izin',
+	    'ringkasan' => $ringkasan,
+	    'guru' => jm_get_namaguru($r->penginput)
+	];
 }
 
 // 2 PEMBINAAN GURU MAPEL
@@ -150,7 +159,13 @@ foreach ($rows as $r) {
         'murid' => jm_get_namamurid($r->muridid),
         'kelas' => get_nama_kelas($r->kelas),
         'kategori' => 'walikelas',
-        'ringkasan' => $r->topik,
+        'ringkasan' =>
+            '<div><b>Permasalahan:</b> ' .
+            s($r->topik) .
+            '</div>' .
+            '<div><b>Tindak Lanjut/Solusi:</b> ' .
+            s($r->tindaklanjut) .
+            '</div>',
         'guru' => jm_get_namaguru($r->userid)
     ];
 }
@@ -173,7 +188,8 @@ foreach ($rows as $r) {
         'murid' => jm_get_namamurid($r->muridid),
         'kelas' => $r->kelas,
         'kategori' => 'wali',
-        'ringkasan' => $r->topik,
+        'ringkasan' => '<div><b>Topik:</b> ' . $r->topik . '</div>' .
+               '<div><b>Tindak Lanjut:</b> ' . $r->tindaklanjut . '</div>',
         'guru' => jm_get_namaguru($r->guruid)
     ];
 }
@@ -246,19 +262,22 @@ foreach ($rows as $r) {
 
     foreach ($peserta as $muridid) {
 
-        $timeline[] = [
-            'time' => $r->timecreated,
-            'muridid' => $muridid,
-            'murid' => jm_get_namamurid($muridid),
-            'kelas' => get_nama_kelas($r->kelas),
-            'kategori' => 'pembinaan',
-            'ringkasan' => shorten_text(
-                $r->permasalahan,
-                80
-            ),
-            'guru' => jm_get_namaguru($r->userid)
-        ];
-    }
+    $timeline[] = [
+        'time' => $r->timecreated,
+        'muridid' => $muridid,
+        'murid' => jm_get_namamurid($muridid),
+        'kelas' => get_nama_kelas($r->kelas),
+        'kategori' => 'pembinaan',
+        'ringkasan' =>
+            '<div><b>Permasalahan:</b> ' .
+            s($r->permasalahan) .
+            '</div>' .
+            '<div><b>Tindakan:</b> ' .
+            s($r->tindakan) .
+            '</div>',
+        'guru' => jm_get_namaguru($r->userid)
+    ];
+}
 }
 
 /* 7. TIDAK HADIR KBM */
@@ -446,8 +465,8 @@ foreach ($timeline as $t) {
         '</td>';
 
     echo '<td>' .
-        format_string($t['ringkasan']) .
-        '</td>';
+    	format_text($t['ringkasan'], FORMAT_HTML) .
+	 '</td>';
 
     echo '<td>' .
         format_string($t['guru']) .

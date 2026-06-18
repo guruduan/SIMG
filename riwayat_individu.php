@@ -178,14 +178,24 @@ if ($muridid) {
             $cohort = $DB->get_record('cohort', ['id' => $r->kelasid]);
             if ($cohort) { $kelas = $cohort->name; }
         }
-        $timeline[] = [
-            'time'      => $r->timecreated,
-            'kelas'     => $kelas,
-            'jenis'     => 'Surat Izin',
-            'catatan'   => '<b>Alasan:</b> ' . $r->alasan . '<br><b>Keperluan:</b> ' . $r->keperluan,
-            'guru'      => $penginput ? $penginput->lastname : '-',
-            'kategori'  => 'izin'
-        ];
+        $catatanizin =
+    '<b>Alasan:</b> ' . s($r->alasan) .
+    '<br><b>Keperluan:</b> ' . s($r->keperluan);
+
+if (!empty($r->catatan)) {
+    $catatanizin .=
+        '<br><b>Catatan Pembinaan:</b> ' .
+        format_string($r->catatan);
+}
+
+$timeline[] = [
+    'time'      => $r->timecreated,
+    'kelas'     => $kelas,
+    'jenis'     => 'Surat Izin',
+    'catatan'   => $catatanizin,
+    'guru'      => $penginput ? $penginput->lastname : '-',
+    'kategori'  => 'izin'
+];
         $count_izin++;
     }
 

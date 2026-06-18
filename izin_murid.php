@@ -79,6 +79,7 @@ if (($do_submit || $do_save) && confirm_sesskey()) {
     $record->guru_pengajar = required_param('guru_pengajar', PARAM_INT);
     $record->alasan        = required_param('alasan', PARAM_TEXT);
     $record->keperluan     = required_param('keperluan', PARAM_TEXT);
+    $record->catatan       = optional_param('catatan', '', PARAM_TEXT);
     $record->penginput     = $USER->id;
     $record->timecreated   = time();
 
@@ -99,7 +100,9 @@ if (($do_submit || $do_save) && confirm_sesskey()) {
     if ($cek) {
         $id = $cek->id;
     } else {
-        $id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
+
+$id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
+
     }
 
     // ================= KIRIM WA =================
@@ -207,9 +210,27 @@ if ($kelasid) {
         'rows' => 3,
         'class' => 'form-control',
         'required' => 'required',
-        'placeholder' => 'Contoh: Sakit kepala perlu ke UKS, Orang tua menjemput karena acara keluarga, dll...'
+        'placeholder' => 'Contoh: Sakit kepala berobat ke Puskesmas, Orang tua menjemput karena acara keluarga, dll...'
     ]);
     echo html_writer::end_div();
+
+	// Row 4: Catatan Pembinaan
+	echo html_writer::start_div('form-group mb-4');
+	echo html_writer::tag(
+	    'label',
+	    'Catatan Pembinaan',
+	    ['class' => 'font-weight-bold', 'for' => 'catatan']
+	);
+
+	echo html_writer::tag('textarea', '', [
+	    'name' => 'catatan',
+	    'id' => 'catatan',
+	    'rows' => 3,
+	    'class' => 'form-control',
+	    'placeholder' => 'Catatan pembinaan atau tindak lanjut oleh Guru Pengawas khusus bagi murid yang terlambat (izin masuk)'
+	]);
+
+	echo html_writer::end_div();
 
     // Baris Tombol Submit Aksi
     echo html_writer::start_div('d-flex gap-2');
@@ -282,8 +303,8 @@ if ($riwayatsurat) {
     // Memberikan style class Bootstrap modern ke komponen table Moodle core
     $table->attributes['class'] = 'table table-striped table-hover generaltable mb-0';
 
-    $table->head = ['No', 'Tanggal & Waktu', 'Nama Murid', 'Kelas', 'Guru Pengajar', 'Alasan', 'Keperluan', 'Guru Pengawas'];
-    $table->align = ['center', 'left', 'left', 'center', 'left', 'left', 'left', 'left'];
+    $table->head = ['No', 'Tanggal & Waktu', 'Nama Murid', 'Kelas', 'Guru Pengajar', 'Alasan', 'Keperluan', 'Catatan Pembinaan', 'Guru Pengawas'];
+    $table->align = ['center', 'left', 'left', 'center', 'left', 'left', 'left', 'left', 'left'];
 
     $no = 1;
     foreach ($riwayatsurat as $s) {
@@ -305,6 +326,7 @@ if ($riwayatsurat) {
             $s->guru_nama,
             shorten_text($s->alasan, 40),
             $keperluan_badge,
+            shorten_text($s->catatan ?? '', 40),
             $s->pengawas_nama
         ];
     }
