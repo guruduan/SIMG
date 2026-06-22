@@ -3,6 +3,7 @@ namespace local_jurnalmengajar\form;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/formslib.php');
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
 
 class jurnal_form extends \moodleform {
     public function definition() {
@@ -106,13 +107,22 @@ $mform->addElement(
     'Nama Murid',
     ['' => 'Pilih kelas terlebih dahulu']
 );
+$mform->setType(
+    'murid_pembinaan',
+    PARAM_INT
+);
 
 /* Jenis */
 $mform->addElement(
     'select',
     'jenis_pembinaan',
     'Jenis Pembinaan',
-    ['' => '-- Pilih Jenis --'] + get_jenis_pembinaan_options()
+    ['' => '-- Pilih Jenis --'] + \get_jenis_pembinaan_options()
+);
+
+$mform->setType(
+    'jenis_pembinaan',
+    PARAM_TEXT
 );
 
 /* Catatan */

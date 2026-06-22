@@ -34,18 +34,20 @@ function loadSiswa(kelas, absenData = {}) {
 
         // 🔥 PRELOAD DATA LAMA
         $('.absen-checkbox').each(function() {
-            const nama = $(this).data('nama');
 
-            if (absenData[nama]) {
-                $(this).prop('checked', true);
+    const userid = $(this).data('userid');
 
-                const parent = $(this).closest('.absen-item');
-                const dropdown = parent.find('.absen-alasan');
+    if (absenData[userid]) {
 
-                dropdown.prop('disabled', false);
-                dropdown.val(absenData[nama]);
-            }
-        });
+        $(this).prop('checked', true);
+
+        const parent = $(this).closest('.absen-item');
+        const dropdown = parent.find('.absen-alasan');
+
+        dropdown.prop('disabled', false);
+        dropdown.val(absenData[userid]);
+        }
+     });
 
         bindAbsenEvent();
         updateAbsenField();
@@ -70,18 +72,32 @@ function bindAbsenEvent() {
 }
 
 function updateAbsenField() {
+
     const hasil = {};
+    const hasilid = {};
 
     $('.absen-checkbox:checked').each(function() {
+
         const nama = $(this).data('nama');
-        const alasan = $(this).closest('.absen-item').find('.absen-alasan').val();
+        const userid = $(this).data('userid');
+
+        const alasan = $(this)
+            .closest('.absen-item')
+            .find('.absen-alasan')
+            .val();
 
         if (alasan) {
-            hasil[nama] = alasan;
+
+            hasil[nama] = alasan;       // untuk tampilan manusia
+            hasilid[userid] = alasan;   // untuk preload yang akurat
         }
     });
 
-    $('#id_absen').val(JSON.stringify(hasil));
+    $('#id_absen')
+        .val(JSON.stringify(hasil));
+
+    $('#id_absenid')
+        .val(JSON.stringify(hasilid));
 }
 
 // 🔥 load pertama (setelah form benar-benar siap)
@@ -90,9 +106,9 @@ $(window).on('load', function() {
     let absenData = {};
 
     try {
-        absenData = JSON.parse($('#id_absen').val() || '{}');
+      absenData = JSON.parse($('#id_absenid').val() || '{}');
     } catch(e) {
-        absenData = {};
+      absenData = {};
     }
 
     const kelas = $('select[name=kelas]').val();
@@ -121,6 +137,7 @@ $record = $DB->get_record('local_jurnalmengajar', [
 $record->tanggaldibuat = $record->timecreated;
 
 // Hindari null
+$record->absenid = $record->absenid ?? '{}';
 $record->aktivitas = $record->aktivitas ?? '';
 $record->id = $id;
 
@@ -137,13 +154,14 @@ if ($mform->is_cancelled()) {
         print_error('Isian "Jam Pelajaran Ke" hanya boleh angka dan koma, contoh: 2,3');
     }
 
-    $record->kelas = $data->kelas;
-$record->jamke = $data->jamke;
-$record->matapelajaran = $data->matapelajaran;
-$record->materi = $data->materi;
-$record->aktivitas = $data->aktivitas;
-$record->absen = $data->absen;
-$record->keterangan = $data->keterangan;
+	$record->kelas = $data->kelas;
+	$record->jamke = $data->jamke;
+	$record->matapelajaran = $data->matapelajaran;
+	$record->materi = $data->materi;
+	$record->aktivitas = $data->aktivitas;
+	$record->absen = $data->absen;
+	$record->absenid = $data->absenid ?? '{}';
+	$record->keterangan = $data->keterangan;
 
 // 🔥 tanggal jurnal dari form edit
 $record->timecreated = $data->tanggaldibuat;
