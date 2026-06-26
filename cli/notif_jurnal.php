@@ -254,7 +254,8 @@ foreach ($urut as $kelas => $jamlist) {
 	    $datawa
 	);
 
-
+	$pending[$userid]['ringkas'] = $ringkas;
+	
     mtrace("Kirim ke $nomor ({$info['lastname']}) -> $res");
     if ($res) {
     $mengirim++;
@@ -273,6 +274,32 @@ $line = date('Y-m-d H:i:s')
       . "\n";
 
 file_put_contents($logtxt, $line, FILE_APPEND);
+}
+
+$jamsekarang = date('H:i');
+
+if ($jamsekarang >= '19:50') {
+
+    $daftar = '';
+
+    foreach ($pending as $info) {
+        $daftar .= "• {$info['lastname']} - {$info['ringkas']}\n";
+    }
+
+    $datawa = [
+        '{tanggal}' => $todayLabel,
+        '{daftar}'  => trim($daftar),
+        '{jumlah}'  => count($pending)
+    ];
+
+	$res = jm_kirim_template_auto(
+	    'rekap_reminder',
+	    $datawa
+	);
+
+	mtrace($res
+	    ? "Rekap reminder dikirim."
+	    : "Gagal mengirim rekap reminder.");
 }
 
 mtrace("Selesai. Total notifikasi dikirim: $mengirim");

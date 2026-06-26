@@ -1,6 +1,8 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
+require_once($CFG->dirroot . '/local/jurnalmengajar/lib_notifikasi.php');
+
 require_login();
 
 use local_jurnalmengajar\form\layananbk_form;
@@ -79,34 +81,35 @@ if ($mform->is_cancelled()) {
     $DB->insert_record('local_jurnallayananbk', $record);
 
     // ================= WA =================
-    $guru = $DB->get_record('user', ['id' => $record->userid], 'lastname');
-    $kelasnama = get_nama_kelas($record->kelas);
-    $nama = $guru ? $guru->lastname : '-';
+$guru = $DB->get_record('user', ['id' => $record->userid], 'lastname');
+$kelasnama = get_nama_kelas($record->kelas);
+$nama = $guru ? $guru->lastname : '-';
 
-    $nomorwa = get_nomor_wali_kelas($record->kelas);
+$waktu = tanggal_indo($record->timecreated);
 
-    if ($nomorwa) {
-        $waktu = tanggal_indo($record->timecreated);
-        $peserta = json_decode($record->peserta, true);
-        $peserta_str = is_array($peserta) && !empty($peserta) ? implode(', ', $peserta) : '-';
+$peserta = json_decode($record->peserta, true);
+$peserta_str = is_array($peserta) && !empty($peserta)
+    ? implode(', ', $peserta)
+    : '-';
 
-        $pesan = "*📋 Laporan Layanan BK*\n\n"
-               . "📅 Hari: $waktu\n"
-               . "👥 Murid: $peserta_str\n"
-               . "🏫 Kelas: $kelasnama\n"
-               . "📝 Jenis Layanan: {$record->jenislayanan}\n"
-               . "📌 Topik: {$record->topik}\n"
-               . "🔧 Tindak lanjut: {$record->tindaklanjut}\n"
-               . "📑 Catatan: {$record->catatan}\n"
-               . "👤 Guru BK: $nama\n\n"
-               . "_Dikirim kepada Wali kelas sebagai laporan_";
+$datawa = [
+    '{waktu}'         => $waktu,
+    '{murid}'         => $peserta_str,
+    '{kelas}'         => $kelasnama,
+    '{jenislayanan}'  => $record->jenislayanan,
+    '{topik}'         => $record->topik,
+    '{tindaklanjut}'  => $record->tindaklanjut,
+    '{catatan}'       => $record->catatan,
+    '{gurubk}'        => $nama,
 
-        $tujuan = [$nomorwa];
-        jurnalmengajar_kirim_wa($tujuan, $pesan);
+    // dipakai resolver tujuan
+    'kelas'           => $record->kelas
+];
 
-    } else {
-        debugging("Nomor WA wali kelas tidak ditemukan untuk kelas ID: {$record->kelas}", DEBUG_DEVELOPER);
-    }
+jm_kirim_template_auto(
+    'layanan_bk',
+    $datawa
+);
 
     redirect(new moodle_url('/local/jurnalmengajar/layananbk.php'), 'Data berhasil disimpan', null, \core\output\notification::NOTIFY_SUCCESS);
 }

@@ -113,25 +113,23 @@ $id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
         $gurunama = $DB->get_field('user', 'lastname', ['id' => $record->guru_pengajar]);
         $waktu_full = tanggal_indo($record->timecreated);
 
-        $tujuan = [
-    get_nomor_wali_kelas($record->kelasid)
-];
+	$datawa = [
+	    '{waktu}'     => $waktu_full,
+	    '{nama}'      => $nama,
+	    '{kelas}'     => $kelas,
+	    '{guru}'      => $gurunama,
+	    '{alasan}'    => $record->alasan,
+	    '{keperluan}' => $record->keperluan,
+	    '{pengawas}'  => $pengawas,
 
-$datawa = [
-    '{waktu}'     => $waktu_full,
-    '{nama}'      => $nama,
-    '{kelas}'     => $kelas,
-    '{guru}'      => $gurunama,
-    '{alasan}'    => $record->alasan,
-    '{keperluan}' => $record->keperluan,
-    '{pengawas}'  => $pengawas
-];
+	    // dipakai resolver tujuan
+	    'kelas'       => $record->kelasid
+	];
 
-jm_kirim_template(
-    'izin_murid',
-    $tujuan,
-    $datawa
-);
+	jm_kirim_template_auto(
+	    'izin_murid',
+	    $datawa
+	);
     }
 
     // ================= REDIRECT =================

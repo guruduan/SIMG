@@ -54,6 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
 	    trim($_POST['template_reminder_jurnal']),
 	    'local_jurnalmengajar'
 	);
+	
+	set_config(
+	    'template_rekap_reminder',
+	    trim($_POST['template_rekap_reminder']),
+	    'local_jurnalmengajar'
+    );
 
     redirect(
         new moodle_url('/local/jurnalmengajar/template_notifikasi.php'),
@@ -96,6 +102,11 @@ $template_izin_guru = get_config(
 $template_reminder_jurnal = get_config(
     'local_jurnalmengajar',
     'template_reminder_jurnal'
+);
+
+$template_rekap_reminder = get_config(
+    'local_jurnalmengajar',
+    'template_rekap_reminder'
 );
 
 if (empty($template_jurnal)) {
@@ -231,6 +242,19 @@ mohon mengisi jurnal mengajar hari ini ({tanggal}) untuk:
 
 Terima kasih.
 _abaikan jika sudah mengisi_";
+}
+
+if (empty($template_rekap_reminder)) {
+    $template_rekap_reminder =
+"📋 REKAP GURU BELUM MENGISI JURNAL
+
+📅 Tanggal:
+{tanggal}
+
+{daftar}
+
+📊 Total Guru:
+{jumlah}";
 }
 
 echo $OUTPUT->header();
@@ -422,6 +446,29 @@ echo $OUTPUT->header();
 
 	    </div>
 	</div>
+
+	<div class="card mb-4">
+	    <div class="card-header">
+		<strong>Rekap Guru Belum Mengisi Jurnal</strong>
+	    </div>
+
+	    <div class="card-body">
+
+		<p>
+		    Placeholder:
+		    <code>{tanggal}</code>
+		    <code>{daftar}</code>
+		    <code>{jumlah}</code>
+		</p>
+
+		<textarea
+		    name="template_rekap_reminder"
+		    class="form-control"
+		    rows="12"><?php echo s($template_rekap_reminder); ?></textarea>
+
+	    </div>
+	</div>
+
 
     <button type="submit" class="btn btn-primary">
         Simpan Template

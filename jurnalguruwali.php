@@ -262,27 +262,23 @@ $notifkelas[$kelas]['murid'][] = format_nama_siswa($murid->lastname);
 
 foreach ($notifkelas as $kelasid => $info) {
 
-    $nomorwa = get_nomor_wali_kelas($kelasid);
+	    $datawa = [
+	    '{waktu}'        => tanggal_indo($now),
+	    '{murid}'        => implode(', ', $info['murid']),
+	    '{kelas}'        => $info['kelas'],
+	    '{topik}'        => $data->topik,
+	    '{tindaklanjut}' => $data->tindaklanjut,
+	    '{keterangan}'   => $data->keterangan,
+	    '{guruwali}'     => $USER->lastname,
 
-    if (!$nomorwa) {
-        continue;
-    }
+	    // dipakai resolver tujuan
+	    'kelas'          => $kelasid
+	];
 
-    $datawa = [
-        '{waktu}'        => tanggal_indo($now),
-        '{murid}'        => implode(', ', $info['murid']),
-        '{kelas}'        => $info['kelas'],
-        '{topik}'        => $data->topik,
-        '{tindaklanjut}' => $data->tindaklanjut,
-        '{keterangan}'   => $data->keterangan,
-        '{guruwali}'     => $USER->lastname
-    ];
-
-    jm_kirim_template(
-        'guru_wali',
-        [$nomorwa],
-        $datawa
-    );
+	jm_kirim_template_auto(
+	    'guru_wali',
+	    $datawa
+	);
 }
 
 redirect(

@@ -301,20 +301,11 @@ if (!empty($pembinaan)) {
     '{jam}'        => $jam,
     '{sekolah}'    => $sekolah
 	];
+	$datawa['kelas'] = $kelasid;
 
-        // Tujuan
-        $tujuan = [];
-        $nowaguru = get_user_nowa($USER->id);
-        $nowawali = get_nomor_wali_kelas($kelasid);
-
-        if (!empty($nowaguru)) { $tujuan[] = $nowaguru; }
-        if (!empty($nowawali)) { $tujuan[] = $nowawali; }
-
-        // Kirim WA
-        jm_kirim_template(
-    'jurnal',
-    $tujuan,
-    $datawa
+	jm_kirim_template_auto(
+	    'jurnal',
+	    $datawa
 	);
     }
 

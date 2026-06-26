@@ -278,3 +278,257 @@ function jm_preview_template(
         $data
     );
 }
+
+/**
+ * Ambil daftar tujuan notifikasi dari config
+ */
+function jm_get_tujuan_notifikasi($kode) {
+
+    $config = get_config(
+        'local_jurnalmengajar',
+        'tujuan_' . $kode
+    );
+
+    if (empty($config)) {
+        return [];
+    }
+
+    return array_filter(array_map('trim', explode(',', $config)));
+}
+
+/**
+ * Mengubah tujuan menjadi daftar nomor WA
+ */
+function jm_get_nomor_tujuan($kode, array $data = []) {
+
+    $nomor = [];
+
+    $tujuan = jm_get_tujuan_notifikasi($kode);
+
+    foreach ($tujuan as $role) {
+
+        switch ($role) {
+
+            case 'kepsek':
+                $wa = get_nomor_kepala_sekolah();
+                if ($wa) {
+                    $nomor[] = $wa;
+                }
+                break;
+
+            case 'wakasek_kesiswaan':
+                $wa = get_nomor_wakasek_kesiswaan();
+                if ($wa) {
+                    $nomor[] = $wa;
+                }
+                break;
+
+	   case 'wakasek_kurikulum':
+	        $wa = get_nomor_wakasek_kurikulum();
+     	        if ($wa) {
+		    $nomor[] = $wa;
+	        }
+	        break;
+    
+            case 'walikelas':
+                if (!empty($data['kelas'])) {
+                    $wa = get_nomor_wali_kelas($data['kelas']);
+                    if ($wa) {
+                        $nomor[] = $wa;
+                    }
+                }
+                break;
+
+	case 'guruwali':
+	    if (!empty($data['kelas'])) {
+
+		$list = get_nomor_guru_wali($data['kelas']);
+
+		if (!empty($list)) {
+		    $nomor = array_merge($nomor, $list);
+		}
+	    }
+	    break;
+
+	case 'gurubk':
+	    $list = get_nomor_guru_bk();
+
+	    if (!empty($list)) {
+		$nomor = array_merge($nomor, $list);
+	    }
+	    break;
+    
+	    default:
+	    break;
+        }
+    }
+
+    return array_unique(array_filter($nomor));
+}
+
+function jm_kirim_template_auto(
+    $kode,
+    array $data
+) {
+
+    $nomor = jm_get_nomor_tujuan(
+        $kode,
+        $data
+    );
+
+    if (empty($nomor)) {
+        return false;
+    }
+
+    return jm_kirim_template(
+        $kode,
+        $nomor,
+        $data
+    );
+}
+
+//fungsi nomor jabatan
+function get_nomor_jabatan($configkey) {
+
+    $userid = get_config(
+        'local_jurnalmengajar',
+        $configkey
+    );
+
+    if (empty($userid)) {
+        return null;
+    }
+
+    return get_user_nowa($userid);
+}
+
+// fungsi baru
+function get_nomor_wakasek_kesiswaan() {
+    return get_nomor_jabatan(
+        'wakasek_kesiswaan_userid'
+    );
+}
+
+function get_nomor_wakasek_kurikulum() {
+    return get_nomor_jabatan(
+        'wakasek_kurikulum_userid'
+    );
+}
+
+// get nomor bk
+function get_nomor_guru_bk($kelas = null) {
+
+    $json = get_config(
+        'local_jurnalmengajar',
+        'guru_bk_mapping'
+    );
+
+    $mapping = json_decode($json, true);
+
+    if (!is_array($mapping)) {
+        return [];
+    }
+
+    $nomor = [];
+
+    foreach ($mapping as $userid) {
+
+        $wa = get_user_nowa($userid);
+
+        if (!empty($wa)) {
+            $nomor[] = $wa;
+        }
+    }
+
+    return array_unique($nomor);
+}
+
+/**
+ * Ambil nomor WA Guru Wali berdasarkan kelas
+ */
+function get_nomor_guru_wali($kelas) {
+    global $CFG, $DB;
+
+    if (is_numeric($kelas)) {
+
+    $namakelas = $DB->get_field(
+        'cohort',
+        'name',
+        ['id' => $kelas]
+    );
+
+    if (!empty($namakelas)) {
+        $kelas = $namakelas;
+    }
+}
+
+    $file = $CFG->dataroot . '/binaan.csv';
+
+    if (!file_exists($file)) {
+        return [];
+    }
+
+    $nomor = [];
+
+    if (($handle = fopen($file, 'r')) !== false) {
+
+        fgetcsv($handle); // Header
+
+        while (($row = fgetcsv($handle)) !== false) {
+
+            if (count($row) < 5) {
+                continue;
+            }
+
+            if (trim($row[4]) !== trim($kelas)) {
+                continue;
+            }
+
+            $wa = get_user_nowa((int)$row[0]);
+
+            if (!empty($wa)) {
+                $nomor[] = $wa;
+            }
+        }
+
+        fclose($handle);
+    }
+
+    return array_unique($nomor);
+}
+
+function jm_kirim_rekap_pending($pending, $tanggal) {
+
+    if (empty($pending)) {
+        return;
+    }
+
+    $isi = "";
+    $no  = 1;
+
+    foreach ($pending as $guru) {
+
+        $isi .= $no++ . ". {$guru['lastname']}\n";
+
+        foreach ($guru['kelasjam'] as $kelas => $jam) {
+
+            sort($jam);
+
+            $isi .= "   - {$kelas} jam " .
+                implode(',', $jam) . "\n";
+        }
+
+        $isi .= "\n";
+    }
+
+    $data = [
+        '{tanggal}' => $tanggal,
+        '{jumlah}'  => count($pending),
+        '{daftar}'  => trim($isi)
+    ];
+
+    return jm_kirim_template_auto(
+        'rekap_reminder',
+        $data
+    );
+}

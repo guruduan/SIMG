@@ -87,45 +87,38 @@ if ($mform->is_cancelled()) {
 
     $DB->insert_record('local_jurnalpembinaan', $record);
 
-    // ================= WA =================
-    $guru = $DB->get_record('user', ['id' => $record->userid], 'lastname');
-    $kelasnama = get_nama_kelas($record->kelas);
-    $nama = $guru ? $guru->lastname : '-';
+// ================= WA =================
+$guru = $DB->get_record('user', ['id' => $record->userid], 'lastname');
+$kelasnama = get_nama_kelas($record->kelas);
+$nama = $guru ? $guru->lastname : '-';
 
-    // ✅ FIX: pakai kelasid
-    $nomorwa = get_nomor_wali_kelas($record->kelas);
+$waktu = tanggal_indo($record->timecreated);
 
-    if ($nomorwa) {
-        $waktu = tanggal_indo($record->timecreated);
-        $peserta = json_decode($record->peserta, true);
-        
-        if (is_array($peserta) && !empty($peserta)) {
-            $peserta = array_map('format_nama_siswa', $peserta);
-            $peserta_str = implode(', ', $peserta);
-        } else {
-            $peserta_str = '-';
-        }
+$peserta = json_decode($record->peserta, true);
 
-	$datawa = [
-	    '{waktu}'        => $waktu,
-	    '{murid}'        => $peserta_str,
-	    '{kelas}'        => $kelasnama,
-	    '{permasalahan}' => $record->permasalahan,
-	    '{upaya}'        => $record->tindakan,
-	    '{gurubk}'       => $nama
-	];
+if (is_array($peserta) && !empty($peserta)) {
+    $peserta = array_map('format_nama_siswa', $peserta);
+    $peserta_str = implode(', ', $peserta);
+} else {
+    $peserta_str = '-';
+}
 
-	$tujuan = [$nomorwa];
+$datawa = [
+    '{waktu}'        => $waktu,
+    '{murid}'        => $peserta_str,
+    '{kelas}'        => $kelasnama,
+    '{permasalahan}' => $record->permasalahan,
+    '{upaya}'        => $record->tindakan,
+    '{gurubk}'       => $nama,
 
-jm_kirim_template(
+    // dipakai resolver tujuan
+    'kelas'          => $record->kelas
+];
+
+jm_kirim_template_auto(
     'pembinaan',
-    $tujuan,
     $datawa
 );
-
-    } else {
-        debugging("Nomor WA wali kelas tidak ditemukan untuk kelas ID: {$record->kelas}", DEBUG_DEVELOPER);
-    }
 
     redirect(new moodle_url('/local/jurnalmengajar/pembinaan.php'), 'Data berhasil disimpan', null, \core\output\notification::NOTIFY_SUCCESS);
 }
