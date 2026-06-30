@@ -1,5 +1,6 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
+//require_once($_SERVER['DOCUMENT_ROOT'] . '/config.php');
 require_login();
 
 use local_jurnalmengajar\form\jurnal_form;
@@ -288,27 +289,29 @@ if (!empty($pembinaan)) {
         $tanggal = tanggal_indo(time(), 'judul');
         $jam = tanggal_indo(time(), 'jam');
 
-       $datawa = [
-    '{guru}'       => $namaguru,
-    '{kelas}'      => $kelas,
-    '{jamke}'      => $jamke,
-    '{mapel}'      => $mapel,
-    '{materi}'     => $materi,
-    '{aktivitas}'  => $aktivitas,
-    '{absen}'      => $absen,
-    '{keterangan}' => $keterangan,
-    '{tanggal}'    => $tanggal,
-    '{jam}'        => $jam,
-    '{sekolah}'    => $sekolah
+	$datawa = [
+	    '{guru}'       => $namaguru,
+	    '{kelas}'      => $kelas,
+	    '{jamke}'      => $jamke,
+	    '{mapel}'      => $mapel,
+	    '{materi}'     => $materi,
+	    '{aktivitas}'  => $aktivitas,
+	    '{absen}'      => $absen,
+	    '{keterangan}' => $keterangan,
+	    '{tanggal}'    => $tanggal,
+	    '{jam}'        => $jam,
+	    '{sekolah}'    => $sekolah,
+
+	    // Data internal (bukan placeholder template)
+	    'kelas'        => $kelasid,
+	    'userid'       => $USER->id
 	];
-	$datawa['kelas'] = $kelasid;
 
 	jm_kirim_template_auto(
 	    'jurnal',
 	    $datawa
 	);
-    }
-
+}
     redirect(
         new moodle_url('/local/jurnalmengajar/index.php'),
         '✅ Jurnal berhasil disimpan. Cek Riwayat Jurnal di bawah.',

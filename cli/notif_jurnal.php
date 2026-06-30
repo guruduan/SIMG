@@ -20,6 +20,10 @@ $hariIndo = jurnalmengajar_get_hari_ini();
 $current = time();
 $todayLabel = tanggal_indo(time());
 
+$jamrekap = '19:50';
+$jamsekarang = date('H:i');
+$isrekap = ($jamsekarang >= $jamrekap);
+
 // ===== Cek hari sekolah =====
 $hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
 
@@ -199,7 +203,11 @@ if (empty($pending)) {
 // ===== Kirim WA per guru =====
 $mengirim = 0;
 
-foreach ($pending as $userid => $info) {
+if (!$isrekap) {
+
+	mtrace("Mode: Reminder Guru");
+
+	foreach ($pending as $userid => $info) {
 
 //    $user = $DB->get_record('user', ['id'=>$userid], 'id, firstname, lastname');
 
@@ -276,9 +284,37 @@ $line = date('Y-m-d H:i:s')
 file_put_contents($logtxt, $line, FILE_APPEND);
 }
 
-$jamsekarang = date('H:i');
+} else {
 
-if ($jamsekarang >= '19:50') {
+    // Mode rekap: tidak kirim WA ke guru,
+    // hanya membuat ringkasan.
+    mtrace("Mode: Rekap Admin");
+
+    foreach ($pending as $userid => $info) {
+
+        $urut = [];
+
+        foreach ($info['kelasjam'] as $kelas => $jamlist) {
+            $jamlist = array_unique($jamlist);
+            sort($jamlist);
+            $urut[$kelas] = $jamlist;
+        }
+
+        uasort($urut, function($a, $b) {
+            return $a[0] <=> $b[0];
+        });
+
+        $ringkasParts = [];
+
+        foreach ($urut as $kelas => $jamlist) {
+            $ringkasParts[] = $kelas . ':' . implode(',', $jamlist);
+        }
+
+        $pending[$userid]['ringkas'] = implode('; ', $ringkasParts);
+    }
+}
+
+if ($isrekap) {
 
     $daftar = '';
 
@@ -297,9 +333,11 @@ if ($jamsekarang >= '19:50') {
 	    $datawa
 	);
 
-	mtrace($res
-	    ? "Rekap reminder dikirim."
-	    : "Gagal mengirim rekap reminder.");
+	if ($res) {
+	    mtrace("Rekap reminder dikirim.");
+	} else {
+	    mtrace("Rekap reminder dilewati (tidak ada tujuan notifikasi atau pengiriman gagal).");
+	}
 }
 
 mtrace("Selesai. Total notifikasi dikirim: $mengirim");

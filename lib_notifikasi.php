@@ -27,6 +27,17 @@ function get_user_nowa($userid) {
 
     return preg_replace('/[^0-9]/', '', $nowa);
 }
+/**
+ * Ambil nomor WA guru penginput jurnal
+ */
+function get_nomor_guru_penginput($userid) {
+
+    if (empty($userid)) {
+        return null;
+    }
+
+    return get_user_nowa($userid);
+}
 
 /**
  * Ambil nomor wali kelas dari mapping
@@ -357,8 +368,21 @@ function jm_get_nomor_tujuan($kode, array $data = []) {
 		$nomor = array_merge($nomor, $list);
 	    }
 	    break;
-    
-	    default:
+
+	case 'guru_penginput':
+
+	    if (!empty($data['userid'])) {
+
+		$wa = get_nomor_guru_penginput($data['userid']);
+
+		if (!empty($wa)) {
+		    $nomor[] = $wa;
+		}
+	    }
+
+	    break;
+
+	default:
 	    break;
         }
     }

@@ -1,5 +1,7 @@
 <?php
+
 require_once(__DIR__ . '/../../config.php');
+//require_once($_SERVER['DOCUMENT_ROOT'] . '/config.php');
 
 require_login();
 
@@ -20,6 +22,7 @@ $jenis = [
     'izinguru'      => 'Surat Izin Guru',
     'layanan_bk'    => 'Layanan BK',
     'pembinaan'     => 'Laporan Pembinaan BK',
+    'rekap_reminder'    => 'Rekap Guru Belum Mengisi Jurnal',
 ];
 
 $roles = [
@@ -29,6 +32,7 @@ $roles = [
     'walikelas'             => 'Wali Kelas',
     'guruwali'              => 'Guru Wali',
     'gurubk'                => 'Guru BK',
+    'guru_penginput'        => 'Guru yang Mengisi Jurnal',
 ];
 
 if (optional_param('save', 0, PARAM_BOOL) && confirm_sesskey()) {
@@ -94,7 +98,13 @@ foreach ($jenis as $kode => $judul) {
 
     echo html_writer::start_div('card-body');
 
-    foreach ($roles as $value => $label) {
+	$roles_display = $roles;
+
+	if ($kode !== 'jurnal') {
+	    unset($roles_display['guru_penginput']);
+	}
+
+	foreach ($roles_display as $value => $label) {
 
         $checked = in_array($value, $selected, true);
 
