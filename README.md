@@ -128,8 +128,8 @@ local/jurnalmengajar/
 
 ## Author
 
-**Noor Ridhwan**
-SMAN 2 Kandangan
+**Noor Ridhwan, S.Pd., M.A.**
+Guru SMAN 2 Kandangan
 Kalimantan Selatan
 Indonesia
 
