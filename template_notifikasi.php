@@ -9,7 +9,7 @@ require_capability('moodle/site:config', context_system::instance());
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/template_notifikasi.php'));
 $PAGE->set_context(context_system::instance());
 $PAGE->set_title('Template Notifikasi');
-$PAGE->set_heading('Template Notifikasi');
+$PAGE->set_heading('Template Notifikasi WhatsApp');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
 
@@ -246,15 +246,25 @@ _abaikan jika sudah mengisi_";
 
 if (empty($template_rekap_reminder)) {
     $template_rekap_reminder =
-"📋 REKAP GURU BELUM MENGISI JURNAL
+"📋 REKAP JURNAL MENGAJAR
 
 📅 Tanggal:
 {tanggal}
 
+━━━━━━━━━━━━━━
+📌 BELUM MENGISI JURNAL
+━━━━━━━━━━━━━━
+
 {daftar}
 
 📊 Total Guru:
-{jumlah}";
+{jumlah}
+
+━━━━━━━━━━━━━━
+🚫 GURU TIDAK HADIR
+━━━━━━━━━━━━━━
+
+{tidakhadir}";
 }
 
 echo $OUTPUT->header();
@@ -264,15 +274,13 @@ echo $OUTPUT->header();
 <div class="container-fluid">
 
 
-<h3>Template Notifikasi WhatsApp</h3>
-
 <form method="post">
 
     <input type="hidden" name="sesskey" value="<?php echo sesskey(); ?>">
 
     <div class="card mb-4">
         <div class="card-header">
-            <strong>Jurnal Mengajar</strong>
+            <strong>Template Notif Jurnal Mengajar</strong>
         </div>
         <div class="card-body">
 
@@ -301,7 +309,7 @@ echo $OUTPUT->header();
 
 	<div class="card mb-4">
 	    <div class="card-header">
-		<strong>Jurnal Guru Wali</strong>
+		<strong>Template Notif Jurnal Guru Wali</strong>
 	    </div>
 
 	    <div class="card-body">
@@ -327,7 +335,7 @@ echo $OUTPUT->header();
 	
     <div class="card mb-4">
         <div class="card-header">
-            <strong>Surat Izin Murid</strong>
+            <strong>Template Notif Surat Izin Murid</strong>
         </div>
         <div class="card-body">
 
@@ -352,7 +360,7 @@ echo $OUTPUT->header();
 
 	<div class="card mb-4">
 	    <div class="card-header">
-		<strong>Laporan Pembinaan Siswa oleh BK</strong>
+		<strong>Template Notif Laporan Pembinaan Siswa oleh BK</strong>
 	    </div>
 
 	    <div class="card-body">
@@ -376,7 +384,7 @@ echo $OUTPUT->header();
 	</div>
 	<div class="card mb-4">
 	    <div class="card-header">
-		<strong>Laporan Layanan BK</strong>
+		<strong>Template Notif Laporan Layanan BK</strong>
 	    </div>
 
 	    <div class="card-body">
@@ -403,7 +411,7 @@ echo $OUTPUT->header();
 
     <div class="card mb-4">
         <div class="card-header">
-            <strong>Surat Izin Guru</strong>
+            <strong>Template Notif Surat Izin Guru</strong>
         </div>
         <div class="card-body">
 
@@ -427,7 +435,7 @@ echo $OUTPUT->header();
     </div>
 	<div class="card mb-4">
 	    <div class="card-header">
-		<strong>Notifikasi Reminder Jurnal Mengajar</strong>
+		<strong>Template Notifikasi Reminder Jurnal Mengajar</strong>
 	    </div>
 
 	    <div class="card-body">
@@ -449,7 +457,7 @@ echo $OUTPUT->header();
 
 	<div class="card mb-4">
 	    <div class="card-header">
-		<strong>Rekap Guru Belum Mengisi Jurnal</strong>
+		<strong>Template Notif Rekap Guru Belum Mengisi Jurnal Mengajar</strong>
 	    </div>
 
 	    <div class="card-body">
@@ -459,6 +467,7 @@ echo $OUTPUT->header();
 		    <code>{tanggal}</code>
 		    <code>{daftar}</code>
 		    <code>{jumlah}</code>
+		    <code>{tidakhadir}</code>
 		</p>
 
 		<textarea

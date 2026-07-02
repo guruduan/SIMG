@@ -23,6 +23,7 @@ $todayLabel = tanggal_indo(time());
 $jamrekap = '19:50';
 $jamsekarang = date('H:i');
 $isrekap = ($jamsekarang >= $jamrekap);
+//$isrekap = true; //test mode rekap
 
 // ===== Cek hari sekolah =====
 $hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
@@ -152,6 +153,7 @@ foreach ($jadwal as $j) {
 
 // ===== Group jurnal yang belum diisi =====
 $pending = [];
+$tidakhadir = [];
 $cutoff_cache = [];
 foreach ($jadwal as $j) {
 
@@ -176,8 +178,37 @@ if ($kelas_level) {
     }
 }
 
-    if (!in_array((int)$j['jamke'], $jam_terlewat)) continue;
+// ===== Lewati jika jam belum selesai =====
+if (!in_array((int)$j['jamke'], $jam_terlewat)) {
+    continue;
+}
+
+// ===== Cek Guru Tidak Hadir =====
+$status = jurnalmengajar_get_status_takhadir(
+    $j['userid'],
+    $today
+);
+
+if ($status !== false) {
+
+    if (!isset($tidakhadir[$j['userid']])) {
+
+        $tidakhadir[$j['userid']] = [
+            'lastname' => $j['lastname'],
+            'status'   => $status
+        ];
+    }
+
+    // Debug: tampilkan semua kelas yang sudah terlewat
+    mtrace(
+        "TAKHADIR: {$j['lastname']} | {$j['kelas']} | " .
+        ucfirst($status)
+    );
+
+    continue;
+}
     $key = $j['userid'] . '-' . $j['kelas'] . '-' . (int)$j['jamke'];
+
 if (isset($filled[$key])) {
     continue;
 }
@@ -196,7 +227,7 @@ if (isset($filled[$key])) {
     $pending[$j['userid']]['kelasjam'][$j['kelas']][] = (int)$j['jamke'];
 }
 
-if (empty($pending)) {
+if (empty($pending) && empty($tidakhadir)) {
     mtrace("Semua jurnal sudah diisi.");
     exit(0);
 }
@@ -272,13 +303,13 @@ foreach ($urut as $kelas => $jamlist) {
     // ===== Log TXT =====
 $logtxt = __DIR__ . '/notif_log_' . date('Y-m-d') . '.txt';
 
-$status = $res ? 'BERHASIL' : 'GAGAL';
+$logstatus = $res ? 'BERHASIL' : 'GAGAL';
 
 $line = date('Y-m-d H:i:s')
       . " | Guru: {$info['lastname']}"
       . " | Nomor: $nomor"
       . " | Kelas/Jam: $ringkas"
-      . " | Status: $status"
+      . " | Status: $logstatus"
       . "\n";
 
 file_put_contents($logtxt, $line, FILE_APPEND);
@@ -316,16 +347,30 @@ file_put_contents($logtxt, $line, FILE_APPEND);
 
 if ($isrekap) {
 
-    $daftar = '';
+$daftar = '';
+$daftartakhadir = '';
 
+if (empty($tidakhadir)) {
+    $daftartakhadir = '-';
+}
+    
     foreach ($pending as $info) {
         $daftar .= "• {$info['lastname']} - {$info['ringkas']}\n";
     }
 
+foreach ($tidakhadir as $info) {
+
+    $daftartakhadir .=
+        "• {$info['lastname']} - " .
+        ucfirst($info['status']) .
+        "\n";
+}
+
     $datawa = [
         '{tanggal}' => $todayLabel,
         '{daftar}'  => trim($daftar),
-        '{jumlah}'  => count($pending)
+        '{jumlah}'  => count($pending),
+        '{tidakhadir}'  => trim($daftartakhadir)
     ];
 
 	$res = jm_kirim_template_auto(

@@ -80,15 +80,10 @@ if ($mform->is_cancelled()) {
 
     $insertid = $DB->insert_record('local_jurnalmengajar_suratizinguru', $record);
 
-    // ================= WA KE KEPALA SEKOLAH =================
-    $kepsek = get_nomor_kepala_sekolah();
-
-    if ($kepsek) {
-        $waktu = tanggal_indo(time(), 'judul');
-        $jam = date('H:i');
-        $penginput = $USER->lastname; // Mengambil nama yang sedang login
-
-        $tujuan = [$kepsek];
+// ================= KIRIM NOTIFIKASI WA SESUAI TUJUAN=================
+$waktu = tanggal_indo(time(), 'judul');
+$jam = date('H:i');
+$penginput = $USER->lastname;
 
 $datawa = [
     '{guru}'      => $choices[$data->userid],
@@ -97,15 +92,15 @@ $datawa = [
     '{keperluan}' => $data->keperluan,
     '{tanggal}'   => $waktu,
     '{jam}'       => $jam . ' WITA',
-    '{penginput}' => $penginput
+    '{penginput}' => $penginput,
+        // data untuk resolver tujuan
+    'userid'      => $USER->id,
 ];
 
-jm_kirim_template(
-    'izin_guru',
-    $tujuan,
+jm_kirim_template_auto(
+    'izinguru',
     $datawa
 );
-    }
 
     redirect(new moodle_url('/local/jurnalmengajar/cetak_surat_izin_guru.php', ['id' => $insertid]));
 }

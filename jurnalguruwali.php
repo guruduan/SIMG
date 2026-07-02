@@ -1,5 +1,6 @@
 <?php
 require('../../config.php');
+//require_once($_SERVER['DOCUMENT_ROOT'] . '/config.php');
 require_once($CFG->libdir.'/formslib.php');
 
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
@@ -276,7 +277,7 @@ foreach ($notifkelas as $kelasid => $info) {
 	];
 
 	jm_kirim_template_auto(
-	    'guru_wali',
+	    'guruwali',
 	    $datawa
 	);
 }

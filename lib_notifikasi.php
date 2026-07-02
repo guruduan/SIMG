@@ -224,9 +224,22 @@ return true;
  */
 function jm_get_template($kode) {
 
+    $map = [
+        'jurnal'           => 'template_jurnal',
+        'guruwali'         => 'template_guru_wali',
+        'izinmurid'        => 'template_izin_murid',
+        'izinguru'         => 'template_izin_guru',
+        'pembinaan'        => 'template_pembinaan',
+        'layanan_bk'       => 'template_layanan_bk',
+        'reminder_jurnal'  => 'template_reminder_jurnal',
+        'rekap_reminder'   => 'template_rekap_reminder',
+    ];
+
+    $configkey = $map[$kode] ?? ('template_' . $kode);
+
     $template = get_config(
         'local_jurnalmengajar',
-        'template_' . $kode
+        $configkey
     );
 
     return $template ?: '';

@@ -127,7 +127,7 @@ $id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
 	];
 
 	jm_kirim_template_auto(
-	    'izin_murid',
+	    'izinmurid',
 	    $datawa
 	);
     }

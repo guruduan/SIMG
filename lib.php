@@ -966,3 +966,42 @@ function is_guru_bk($userid) {
 
     return in_array((int)$userid, $mapping, true);
 }
+
+/**
+ * Ambil status guru tidak hadir.
+ *
+ * Return:
+ * false              -> guru hadir
+ * sakit
+ * izin
+ * cuti
+ * tugasluar
+ */
+function jurnalmengajar_get_status_takhadir($userid, $tanggal = null) {
+
+    global $DB;
+
+    if (empty($tanggal)) {
+        $tanggal = date('Y-m-d');
+    }
+
+    $timestamp = strtotime($tanggal . ' 12:00:00');
+
+$sql = "
+    SELECT status
+    FROM {local_jurnalmengajar_kehadiran}
+    WHERE userid = :userid
+      AND tanggalmulai <= :tsmulai
+      AND tanggalselesai >= :tsselesai
+    ORDER BY id DESC
+";
+
+return $DB->get_field_sql(
+    $sql,
+    [
+        'userid'    => $userid,
+        'tsmulai'   => $timestamp,
+        'tsselesai' => $timestamp
+    ]
+) ?: false;
+}
