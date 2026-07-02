@@ -7,16 +7,30 @@ defined('MOODLE_INTERNAL') || die();
 function tanggal_indo($timestamp = null, $mode = 'full') {
     $timestamp = $timestamp ?: time();
 
-    $hari = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    $bulan = [
-        1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',
-        7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'
+    $hari = [
+        'Minggu', 'Senin', 'Selasa', 'Rabu',
+        'Kamis', 'Jumat', 'Sabtu'
     ];
 
-$hariIndex = (int) date('w', $timestamp);
-$tgl = date('d', $timestamp);
-$bulanIdx  = (int) date('m', $timestamp);
-$tahun     = date('Y', $timestamp);
+    $bulan = [
+        1 => 'Januari',
+        2 => 'Februari',
+        3 => 'Maret',
+        4 => 'April',
+        5 => 'Mei',
+        6 => 'Juni',
+        7 => 'Juli',
+        8 => 'Agustus',
+        9 => 'September',
+        10 => 'Oktober',
+        11 => 'November',
+        12 => 'Desember'
+    ];
+
+    $hariIndex = (int) date('w', $timestamp);
+    $tgl       = date('d', $timestamp);
+    $bulanIdx  = (int) date('m', $timestamp);
+    $tahun     = date('Y', $timestamp);
 
     if ($mode == 'judul') {
         return $hari[$hariIndex] . ' ' . $tgl . ' ' . $bulan[$bulanIdx] . ' ' . $tahun;
@@ -30,13 +44,18 @@ $tahun     = date('Y', $timestamp);
         return $tgl . ' ' . $bulan[$bulanIdx] . ' ' . $tahun;
     }
 
+    if ($mode == 'hari') {
+        return $hari[$hariIndex];
+    }
+
     if ($mode == 'jam') {
         return date('H:i', $timestamp);
-}
+    }
 
-if ($mode == 'tglbulan') {
-    return $tgl . ' ' . $bulan[$bulanIdx];
-}
+    if ($mode == 'tglbulan') {
+        return $tgl . ' ' . $bulan[$bulanIdx];
+    }
+
     return $hari[$hariIndex] . ', ' .
            $tgl . ' ' .
            $bulan[$bulanIdx] . ' ' .
@@ -522,6 +541,174 @@ function jurnalmengajar_get_beban_jam_guru_by_date($timestamp) {
 
     return $beban;
 }
+
+/**
+ * Hitung beban mengajar guru selama 1 bulan.
+ *
+ * Return:
+ * [
+ *   userid => total JP target bulan
+ * ]
+ */
+function jurnalmengajar_get_beban_jam_guru_bulan(
+    $bulan,
+    $tahun
+) {
+
+    require_once(__DIR__ . '/jadwal_acuan_lib.php');
+
+    $jadwal = jurnalmengajar_get_jadwal_acuan();
+
+    $beban = [];
+
+    list(
+        $awal,
+        $akhir
+    ) = jurnalmengajar_get_range_bulan(
+        $bulan,
+        $tahun
+    );
+
+    // cache cutoff agar tidak query berulang
+    $cutoff_cache = [];
+
+    for (
+        $ts = $awal;
+        $ts <= $akhir;
+        $ts += 86400
+    ) {
+
+        $tanggal = date('Y-m-d', $ts);
+
+        // -----------------------------
+        // hari sekolah
+        // -----------------------------
+        $hari = jurnalmengajar_get_hari_by_timestamp(
+            $ts
+        );
+
+        if (
+            !array_key_exists(
+                $hari,
+                jurnalmengajar_get_hari_sekolah()
+            )
+        ) {
+            continue;
+        }
+
+        // -----------------------------
+        // libur nasional / sekolah
+        // -----------------------------
+        if (
+            jurnalmengajar_cek_libur(
+                $tanggal
+            )
+        ) {
+            continue;
+        }
+
+        // -----------------------------
+        // asesmen
+        // -----------------------------
+        if (
+            jurnalmengajar_is_tanggal_asesmen(
+                $tanggal
+            )
+        ) {
+            continue;
+        }
+
+        // -----------------------------
+        // hitung seluruh jadwal hari itu
+        // -----------------------------
+        foreach ($jadwal as $j) {
+
+            if ($j['hari'] != $hari) {
+                continue;
+            }
+
+            $userid = $j['userid'];
+
+            if (empty($userid)) {
+                continue;
+            }
+
+            // -----------------------------
+            // cek cutoff kelas
+            // -----------------------------
+
+            $kelas =
+                trim(
+                    $j['kelas'] ?? ''
+                );
+
+            $kelas_level = null;
+
+            if (
+                preg_match(
+                    '/\b(VI|IX|XII)\b/i',
+                    $kelas,
+                    $m
+                )
+            ) {
+                $kelas_level =
+                    strtoupper($m[1]);
+            }
+
+            if ($kelas_level) {
+
+                if (
+                    !isset(
+                        $cutoff_cache[
+                            $kelas_level
+                        ]
+                    )
+                ) {
+
+                    $cutoff_cache[
+                        $kelas_level
+                    ] =
+                    jurnalmengajar_get_cutoff_by_kelas(
+                        $kelas_level,
+                        $ts
+                    );
+                }
+
+                $cutoff =
+                    $cutoff_cache[
+                        $kelas_level
+                    ];
+
+                if (
+                    !empty($cutoff)
+                    &&
+                    $ts >= $cutoff
+                ) {
+                    continue;
+                }
+
+            }
+
+            if (
+                !isset(
+                    $beban[$userid]
+                )
+            ) {
+
+                $beban[$userid] = 0;
+
+            }
+
+            $beban[$userid]++;
+
+        }
+
+    }
+
+    return $beban;
+
+}
+
 // ======================================
 // Load snapshot beban mengajar semester
 // ======================================
