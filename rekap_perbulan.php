@@ -171,44 +171,6 @@ echo html_writer::div(
 
 echo html_writer::end_div();
 
-// ===============================
-// WARNING CUTOFF
-// ===============================
-
-$daftar_kelas = [
-    'VI',
-    'IX',
-    'XII'
-];
-
-$ada_yang_sudah_set = false;
-
-foreach ($daftar_kelas as $kelas_level) {
-
-    if (
-        jurnalmengajar_get_cutoff_by_kelas(
-            $kelas_level,
-            $tanggal_awal_bulan
-        )
-    ) {
-
-        $ada_yang_sudah_set = true;
-        break;
-    }
-}
-
-if (!$ada_yang_sudah_set) {
-
-    echo html_writer::div(
-
-        '⚠️ <strong>Perhatian:</strong>
-        Tanggal berhenti KBM
-        belum diatur.',
-
-        'alert alert-warning mb-4'
-
-    );
-}
 
 // ===============================
 // CARD FILTER
