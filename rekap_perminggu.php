@@ -88,21 +88,6 @@ echo html_writer::start_div('d-flex justify-content-between align-items-center m
     );
 echo html_writer::end_div();
 
-// --- WARNING CUTOFF KBM ---
-$daftar_kelas = ['VI', 'IX', 'XII'];
-$ada_yang_sudah_set = false;
-foreach ($daftar_kelas as $kelas_level) {
-    if (jurnalmengajar_get_cutoff_by_kelas($kelas_level, $tanggal_awal_minggu_ini)) {
-        $ada_yang_sudah_set = true;
-        break;
-    }
-}
-if (!$ada_yang_sudah_set) {
-    echo html_writer::div(
-        '⚠️ <strong>Perhatian:</strong> Tanggal berhenti KBM di kelas VI, IX, atau XII belum diatur di pengaturan awal.',
-        'alert alert-warning mb-4 shadow-sm'
-    );
-}
 
 // --- CARD FILTER & PERIODE ---
 echo html_writer::start_div('card mb-4 shadow-sm border-0 bg-light');
