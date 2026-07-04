@@ -178,6 +178,19 @@ if ($kelas_level) {
     }
 }
 
+// ===== FILTER KBM DITIADAKAN =====
+if (
+    jurnalmengajar_is_kbm_ditiadakan(
+        $j['kelas'],
+        $today
+    )
+) {
+    mtrace(
+        "KBM DITIADAKAN: {$j['lastname']} | {$j['kelas']} | Jam {$j['jamke']}"
+    );
+    continue;
+}
+
 // ===== Lewati jika jam belum selesai =====
 if (!in_array((int)$j['jamke'], $jam_terlewat)) {
     continue;

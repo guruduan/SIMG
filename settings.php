@@ -180,6 +180,26 @@ $settings->add(
 );
 
 $settings->add(
+    new admin_setting_configtextarea(
+        'local_jurnalmengajar/kbm_ditiadakan_kelas',
+        'KBM Ditiadakan untuk Kelas Tertentu',
+        'Digunakan jika KBM pada kelas tertentu ditiadakan sementara,
+misalnya MPLS, class meeting, gladi, ANBK, ujian praktik, atau kegiatan sekolah lainnya.
+
+Format:
+KELAS|YYYY-MM-DD
+atau
+KELAS|YYYY-MM-DD s/d YYYY-MM-DD
+
+Contoh:
+X|2026-07-13 s/d 2026-07-17
+XI|2026-09-15
+XII|2027-03-08 s/d 2027-03-12',
+        ''
+    )
+);
+
+$settings->add(
     new admin_setting_configtext(
         'local_jurnalmengajar/judulasesmen',
         'Judul Asesmen TV',
@@ -290,6 +310,14 @@ $settings->add(new admin_setting_configtextarea(
 $settings->add(new admin_setting_configtextarea(
     'local_jurnalmengajar/guru_piket_jumat',
     'Guru Piket Jumat',
+    'Satu nama per baris',
+    '',
+    PARAM_TEXT
+));
+
+$settings->add(new admin_setting_configtextarea(
+    'local_jurnalmengajar/guru_piket_sabtu',
+    'Guru Piket Sabtu',
     'Satu nama per baris',
     '',
     PARAM_TEXT

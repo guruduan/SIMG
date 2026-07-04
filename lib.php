@@ -217,6 +217,87 @@ function jurnalmengajar_is_tanggal_asesmen($tanggal = null) {
 
     return false;
 }
+
+/**
+ * Cek apakah KBM ditiadakan untuk kelas tertentu.
+ *
+ * Format setting:
+ * X|2026-07-13
+ * X|2026-07-13 s/d 2026-07-17
+ * XI|2026-09-15
+ */
+function jurnalmengajar_is_kbm_ditiadakan($kelas, $tanggal = null) {
+
+    if (empty($tanggal)) {
+        $tanggal = date('Y-m-d');
+    }
+
+    $config = get_config(
+        'local_jurnalmengajar',
+        'kbm_ditiadakan_kelas'
+    );
+
+    if (empty($config)) {
+        return false;
+    }
+
+    // Ambil jenjang kelas (X, XI, XII, dst)
+    if (!preg_match('/^(XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)/i',
+        trim($kelas),
+        $m
+    )) {
+        return false;
+    }
+
+    $jenjang = strtoupper($m[1]);
+
+    $lines = preg_split('/\r\n|\r|\n/', $config);
+
+    foreach ($lines as $line) {
+
+        $line = trim($line);
+
+        if ($line === '') {
+            continue;
+        }
+
+        if (!str_contains($line, '|')) {
+            continue;
+        }
+
+        list($kelasconfig, $tanggalconfig) = explode('|', $line, 2);
+
+        if (strtoupper(trim($kelasconfig)) !== $jenjang) {
+            continue;
+        }
+
+        $tanggalconfig = trim($tanggalconfig);
+
+        if (stripos($tanggalconfig, 's/d') !== false) {
+
+            list($awal, $akhir) = explode('s/d', $tanggalconfig);
+
+            $awal  = trim($awal);
+            $akhir = trim($akhir);
+
+            if (
+                strtotime($tanggal) >= strtotime($awal) &&
+                strtotime($tanggal) <= strtotime($akhir)
+            ) {
+                return true;
+            }
+
+        } else {
+
+            if ($tanggal === $tanggalconfig) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 /**
  * Ambil cutoff berdasarkan kode kelas (VI, IX, XII)
  */
@@ -264,24 +345,30 @@ function jurnalmengajar_get_pengurang_target_libur(
     require_once(__DIR__.'/jadwal_acuan_lib.php');
 
     $pengurang = 0;
-
-    $tanggallibur = get_config(
+$tanggallibur = get_config(
     'local_jurnalmengajar',
     'tanggallibur'
-	);
+);
 
-	$tanggalasesmen = get_config(
-	    'local_jurnalmengajar',
-	    'tanggalasesmen'
-	);
+$tanggalasesmen = get_config(
+    'local_jurnalmengajar',
+    'tanggalasesmen'
+);
 
-	if (
-	    empty($tanggallibur)
-	    &&
-	    empty($tanggalasesmen)
-	) {
-	    return 0;
-	}
+$kbmditiadakan = get_config(
+    'local_jurnalmengajar',
+    'kbm_ditiadakan_kelas'
+);
+
+if (
+    empty($tanggallibur)
+    &&
+    empty($tanggalasesmen)
+    &&
+    empty($kbmditiadakan)
+) {
+    return 0;
+}
 
     $jadwal = jurnalmengajar_get_jadwal_acuan();
 
@@ -410,6 +497,15 @@ function jurnalmengajar_get_pengurang_target_libur(
                 ) {
                     continue;
                 }
+// jika KBM kelas ditiadakan (misal MPLS)
+if (
+    jurnalmengajar_is_kbm_ditiadakan(
+        $kelas,
+        date('Y-m-d', $timestamp)
+    )
+) {
+    continue;
+}
 
                 // ==========================
                 // HITUNG PENGURANG
@@ -473,15 +569,24 @@ for (
                 );
         }
 
-        if (
-            !empty($cutoff)
-            &&
-            $t >= $cutoff
-        ) {
-            continue;
-        }
+if (
+    !empty($cutoff)
+    &&
+    $t >= $cutoff
+) {
+    continue;
+}
 
-        $pengurang++;
+if (
+    jurnalmengajar_is_kbm_ditiadakan(
+        $kelas,
+        $tanggal
+    )
+) {
+    continue;
+}
+
+$pengurang++;
     }
 }
     return $pengurang;
@@ -500,8 +605,16 @@ function jurnalmengajar_get_beban_jam_guru_by_date($timestamp) {
         $timestamp = time();
     }
 
-    // 👉 TARUH DI SINI (sekali saja)
-    $cutoff_cache = [];
+    // MAP HARI
+$maphari = [
+    'Senin' => 0,
+    'Selasa' => 1,
+    'Rabu' => 2,
+    'Kamis' => 3,
+    'Jumat' => 4,
+    'Sabtu' => 5,
+    'Minggu' => 6,
+];
 
     foreach ($jadwal as $j) {
 
@@ -518,21 +631,32 @@ function jurnalmengajar_get_beban_jam_guru_by_date($timestamp) {
             $kelas_level = strtoupper($match[1]);
         }
 
-        // 🔥 GANTI bagian cutoff LAMA dengan ini
-        $cutoff = null;
-        if ($kelas_level) {
-            if (!isset($cutoff_cache[$kelas_level])) {
-                $cutoff_cache[$kelas_level] = jurnalmengajar_get_cutoff_by_kelas($kelas_level, $timestamp);
-            }
-            $cutoff = $cutoff_cache[$kelas_level];
-        }
+        // Hitung tanggal sesuai hari pada minggu yang dipilih.
+$offset = $maphari[$j['hari']] ?? 0;
+$timestampjadwal = strtotime("+$offset day", $timestamp);
 
-        // 🔥 Filter
-        if (!empty($cutoff) && $timestamp >= $cutoff) {
-            continue;
-        }
+// Cek cutoff.
+$cutoff = null;
+if ($kelas_level) {
+    $cutoff = jurnalmengajar_get_cutoff_by_kelas(
+        $kelas_level,
+        $timestampjadwal
+    );
 
-        if (!isset($beban[$userid])) {
+    if (!empty($cutoff) && $timestampjadwal >= $cutoff) {
+        continue;
+    }
+}
+
+// Cek KBM ditiadakan.
+if (
+    jurnalmengajar_is_kbm_ditiadakan(
+        $kelas,
+        date('Y-m-d', $timestampjadwal)
+    )
+) {
+    continue;
+}        if (!isset($beban[$userid])) {
             $beban[$userid] = 0;
         }
 
@@ -689,6 +813,14 @@ function jurnalmengajar_get_beban_jam_guru_bulan(
 
             }
 
+if (
+    jurnalmengajar_is_kbm_ditiadakan(
+        $kelas,
+        $tanggal
+    )
+) {
+    continue;
+}
             if (
                 !isset(
                     $beban[$userid]
@@ -1192,3 +1324,4 @@ return $DB->get_field_sql(
     ]
 ) ?: false;
 }
+
