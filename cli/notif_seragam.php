@@ -31,7 +31,7 @@ $WABLAS_URL    = $config->wablas_url;
 $GROUP_ID      = $groupOverride ?: $config->wablas_group;
 
 /* ======================= Tentukan target (H) ============================ */
-$now = new DateTime('now', core_date::get_user_timezone_object());
+$now = new DateTimeImmutable('now', core_date::get_user_timezone_object());
 if ($targetOverride) {
     $target = DateTime::createFromFormat('Y-m-d', $targetOverride, core_date::get_user_timezone_object());
     if (!$target) { mtrace("[ERR] Format --target harus YYYY-MM-DD"); exit(1); }
@@ -62,33 +62,7 @@ $tanggal = tanggal_indo($target->getTimestamp(), 'judul');
 $label   = label_waktu($now, $target);
 
 
-/* ====================== Cek Hari Sekolah ====================== */
-$hariIndoList = [
-    1 => 'Senin',
-    2 => 'Selasa',
-    3 => 'Rabu',
-    4 => 'Kamis',
-    5 => 'Jumat',
-    6 => 'Sabtu',
-    7 => 'Minggu'
-];
 
-$hariIndo = $hariIndoList[(int)$target->format('N')];
-
-$hariSekolah = jurnalmengajar_get_hari_sekolah();
-
-if (!isset($hariSekolah[$hariIndo])) {
-    mtrace("Hari $hariIndo bukan hari sekolah.");
-    exit(0);
-}
-
-/* ====================== Cek Tanggal Libur ====================== */
-$targetDate = $target->format('Y-m-d');
-
-if (jurnalmengajar_cek_libur($targetDate)) {
-    mtrace("Tanggal $targetDate adalah hari libur.");
-    exit(0);
-}
 
 if ($debug) {
     mtrace("DEBUG now     : ".$now->format('Y-m-d H:i:s'));
@@ -105,17 +79,17 @@ $pesan = [];
 if ($dowN === 3 && $wom === 1) {
     $pesan[] = "Pengingat seragam $label $tanggal: Rabu Minggu Pertama — *Baju PDL Bungas*.";
 }
-// 2) KORPRI tiap tgl 17 bila Sen–Jum
-if ($dayNum === 17 && $dowN >= 1 && $dowN <= 5) {
+// 2) KORPRI tiap tanggal 17
+if ($dayNum === 17) {
     $pesan[] = "Pengingat seragam $label $tanggal: *Baju KORPRI*";
 }
 // 3a) eDialog SKP tgl 1
-if ($dayNum == 1) {
+if ($dayNum === 1) {
     $pesan[] = "Pengingat $label $tanggal: untuk *mengisi e-Dialog* (periode tanggal 1–5).";
 }
 
 // 3b) eDialog SKP tgl 5
-if ($dayNum == 5) {
+if ($dayNum === 5) {
     $pesan[] = "Pengingat $label $tanggal: jangan lupa *mengisi eDialog* (periode tanggal 1–5). Abaikan bila sudah";
 }
 // 4) Kamis: Sasirangan (M1 hitam, M2 biru motif ketupat, M3 hijau tua, M4 ungu)
@@ -130,6 +104,42 @@ if (empty($pesan)) {
     mtrace("[INFO] Tidak ada notifikasi untuk $label ($tanggal).");
     if (!$debug) mtrace("      (Gunakan --debug, atau --mode=before / --target=YYYY-MM-DD)");
     exit(0);
+}
+
+/* ====================== Filter Hari Sekolah ====================== */
+
+$hariIndoList = [
+    1 => 'Senin',
+    2 => 'Selasa',
+    3 => 'Rabu',
+    4 => 'Kamis',
+    5 => 'Jumat',
+    6 => 'Sabtu',
+    7 => 'Minggu'
+];
+
+$hariIndo = $hariIndoList[(int)$target->format('N')];
+$targetDate = $target->format('Y-m-d');
+
+/*
+ * Pengingat administrasi (e-Dialog)
+ * tidak mengikuti aturan hari sekolah maupun hari libur.
+ */
+$isAdministrasi = in_array($dayNum, [1, 5], true);
+
+if (!$isAdministrasi) {
+
+    $hariSekolah = jurnalmengajar_get_hari_sekolah();
+
+    if (!isset($hariSekolah[$hariIndo])) {
+        mtrace("Hari $hariIndo bukan hari sekolah.");
+        exit(0);
+    }
+
+    if (jurnalmengajar_cek_libur($targetDate)) {
+        mtrace("Tanggal $targetDate adalah hari libur.");
+        exit(0);
+    }
 }
 
 $header = "📣 *Pengumuman Pengingat*\n";
