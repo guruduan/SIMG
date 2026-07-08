@@ -21,78 +21,42 @@ global $DB, $USER, $OUTPUT, $PAGE;
 $editid = optional_param('editid', 0, PARAM_INT);
 
 /* ======================= HELPERS ======================= */
+function jw_get_murid_options($guruid): array {
 
-function jw_load_binaan_csv(): array {
-    global $CFG;
-    $csvpath = $CFG->dataroot . '/binaan.csv';
-    if (!file_exists($csvpath)) return [];
-
-    $content = file_get_contents($csvpath);
-    $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-
-    $lines = preg_split("/\r\n|\n|\r/", trim($content));
-    if (count($lines) < 2) return [];
-
-    $delimiter = (substr_count($lines[0], ';') > substr_count($lines[0], ',')) ? ';' : ',';
-
-    $header = str_getcsv(array_shift($lines), $delimiter);
-
-    $idx = [
-        'userid' => array_search('userid', $header),
-        'nis'    => array_search('nis', $header),
-        'murid'  => array_search('murid', $header),
-        'kelas'  => array_search('kelas', $header),
-    ];
-
-    $rows = [];
-    foreach ($lines as $line) {
-        $r = str_getcsv($line, $delimiter);
-        if (count($r) < max($idx)) continue;
-        $rows[] = [
-            'guruid' => (int)$r[$idx['userid']],
-            'nis'    => $r[$idx['nis']],
-            'murid'  => $r[$idx['murid']],
-            'kelas'  => $r[$idx['kelas']],
-        ];
-    }
-    return $rows;
-}
-
-function jw_find_user_by_nis($nis) {
-    global $DB;
-    return $DB->get_field_sql("
-        SELECT u.id FROM {user} u
-        JOIN {user_info_data} d ON d.userid=u.id
-        JOIN {user_info_field} f ON f.id=d.fieldid
-        WHERE f.shortname='nis' AND d.data=?
-    ", [$nis]);
-}
-
-function jw_get_murid_options_from_csv($guruid): array {
     global $DB;
 
-    $rows = jw_load_binaan_csv();
-    $ids = [];
+    $sql = "
+        SELECT
+            u.id,
+            u.lastname,
+            c.name AS kelas
+        FROM {local_jurnalmengajar_guruwali} gw
+        JOIN {user} u
+             ON u.id = gw.muridid
+        LEFT JOIN {cohort_members} cm
+             ON cm.userid = u.id
+        LEFT JOIN {cohort} c
+             ON c.id = cm.cohortid
+        WHERE gw.guruid = ?
+        ORDER BY
+            CASE WHEN c.name IS NULL THEN 1 ELSE 0 END,
+            c.name ASC,
+            u.lastname ASC
+    ";
+
+    $rows = $DB->get_records_sql($sql, [$guruid]);
+
+    $options = [];
 
     foreach ($rows as $r) {
-        if ($r['guruid'] != $guruid) continue;
 
-        $id = jw_find_user_by_nis($r['nis']);
-        if ($id) $ids[$id] = true;
+        $nama = format_nama_siswa($r->lastname);
+        $kelas = !empty($r->kelas) ? $r->kelas : 'Belum ada kelas';
+
+        $options[$r->id] = '[' . $kelas . '] ' . $nama;
     }
 
-    if (!$ids) return [];
-
-    list($in, $params) = $DB->get_in_or_equal(array_keys($ids));
-
-    $users = $DB->get_records_select('user', "id $in", $params, 'lastname ASC', 'id,firstname,lastname');
-
-    $opts = [];
-    foreach ($users as $u) {
-        $opts[$u->id] = trim($u->firstname.' '.$u->lastname);
-    }
-
-    return $opts;
+    return $options;
 }
 
 function jw_get_kelas_siswa($userid) {
@@ -104,6 +68,7 @@ function jw_get_kelas_siswa($userid) {
         JOIN {cohort_members} cm ON cm.cohortid = c.id
         WHERE cm.userid = ?
         ORDER BY c.name ASC
+        LIMIT 1
     ", [$userid]);
 }
 
@@ -148,7 +113,15 @@ class jw_form extends moodleform {
             $m->addElement('html', '</div>'); // Tutup col-md-9
             $m->addElement('html', '</div>'); // Tutup form-group row
         } else {
-            $m->addElement('static', 'emptymurid', 'Pilih Murid', '<span class="text-danger">Tidak ada data murid binaan ditemukan di binaan.csv</span>');
+            $m->addElement(
+    'static',
+    'emptymurid',
+    'Pilih Murid',
+    '<span class="text-danger">
+    Tidak ada data murid binaan.
+    Hubungi administrator.
+    </span>'
+);
         }
 
 // Hapus class CSS manual dan gunakan atribut standar form Moodle
@@ -168,7 +141,7 @@ class jw_form extends moodleform {
 
 /* ======================= PROCESS CRUD ======================= */
 
-$murid_options = jw_get_murid_options_from_csv($USER->id);
+$murid_options = jw_get_murid_options($USER->id);
 $mform = new jw_form(null, ['murid_options' => $murid_options]);
 
 // Set default data jika dalam mode EDIT

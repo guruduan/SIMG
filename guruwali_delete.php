@@ -1,47 +1,37 @@
 <?php
 require('../../config.php');
-require_once(__DIR__.'/lib.php');
 
 require_login();
+require_sesskey();
+
 $context = context_system::instance();
 require_capability('moodle/site:config', $context);
 
-global $CFG;
+$id = required_param('id', PARAM_INT);
 
-$userid = required_param('userid', PARAM_INT);
-$nis    = required_param('nis', PARAM_TEXT);
+global $DB;
 
-$file = $CFG->dataroot . '/binaan.csv';
-$data = [];
+// Pastikan data ada.
+if (!$DB->record_exists(
+    'local_jurnalmengajar_guruwali',
+    ['id' => $id]
+)) {
 
-// ======================
-// Load CSV
-// ======================
-if (file_exists($file)) {
-    if (($handle = fopen($file, 'r')) !== false) {
-        $header = fgetcsv($handle);
-        while (($row = fgetcsv($handle)) !== false) {
-            if (!($row[0] == $userid && $row[2] == $nis)) {
-                $data[] = $row;
-            }
-        }
-        fclose($handle);
-    }
+    throw new moodle_exception(
+        'Data Guru Wali tidak ditemukan.'
+    );
 }
 
-// ======================
-// Simpan kembali CSV
-// ======================
-$handle = fopen($file, 'w');
-fputcsv($handle, ['userid','lastname','nis','murid','kelas']);
-foreach ($data as $d) {
-    fputcsv($handle, $d);
-}
-fclose($handle);
+// Hapus relasi guru wali.
+$DB->delete_records(
+    'local_jurnalmengajar_guruwali',
+    ['id' => $id]
+);
 
-// Redirect
+// Kembali ke halaman daftar.
 redirect(
     new moodle_url('/local/jurnalmengajar/guruwali_manage.php'),
-    'Data siswa binaan dihapus',
-    2
+    'Data Guru Wali berhasil dihapus.',
+    null,
+    \core\output\notification::NOTIFY_SUCCESS
 );

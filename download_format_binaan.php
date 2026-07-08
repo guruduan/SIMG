@@ -1,37 +1,51 @@
 <?php
 require_once('../../config.php');
-require_once(__DIR__.'/lib.php');
 
 require_login();
+
 $context = context_system::instance();
 require_capability('moodle/site:config', $context);
 
-header('Content-Type: text/csv');
+header('Content-Type: text/csv; charset=UTF-8');
 header('Content-Disposition: attachment; filename="format_binaan.csv"');
 
-echo "userid,lastname,nis,murid,kelas\n";
+// BOM UTF-8 agar Excel membuka karakter dengan benar.
+echo "\xEF\xBB\xBF";
+
+echo "userid,nama guru,nis\n";
 
 global $DB;
 
-// Ambil role gurujurnal
-$role = $DB->get_record('role', ['shortname' => 'gurujurnal']);
-if (!$role) {
-    die('Role gurujurnal tidak ditemukan');
-}
+// Ambil role guru jurnal.
+$role = $DB->get_record(
+    'role',
+    ['shortname' => 'gurujurnal'],
+    'id',
+    MUST_EXIST
+);
 
-// Ambil semua user dengan role gurujurnal
-$sql = "SELECT u.id, u.lastname
-        FROM {role_assignments} ra
-        JOIN {user} u ON u.id = ra.userid
-        WHERE ra.roleid = :roleid
-        ORDER BY u.lastname";
+// Ambil seluruh guru jurnal.
+$sql = "
+    SELECT
+        u.id,
+        u.lastname
+    FROM {role_assignments} ra
+    JOIN {user} u
+         ON u.id = ra.userid
+    WHERE ra.roleid = :roleid
+    ORDER BY u.lastname
+";
 
-$users = $DB->get_records_sql($sql, ['roleid' => $role->id]);
+$users = $DB->get_records_sql($sql, [
+    'roleid' => $role->id
+]);
 
-// Tampilkan satu baris kosong per guru (untuk template)
+// Satu baris kosong untuk setiap guru.
 foreach ($users as $u) {
+
     echo $u->id . ',' .
-         '"' . $u->lastname . '",,,,' . "\n";
+         '"' . str_replace('"', '""', $u->lastname) . '",' .
+         "\n";
 }
 
 exit;
