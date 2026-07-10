@@ -329,7 +329,7 @@ $settings->add(new admin_setting_configtextarea(
     $ADMIN->add('local_jurnalmengajar_cat', new admin_externalpage(
         'local_jurnalmengajar_walikelas',
         'Manajemen Wali Kelas',
-        new moodle_url('/local/jurnalmengajar/wali_kelas.php'),
+        new moodle_url('/local/jurnalmengajar/walikelas_manage.php'),
         'moodle/site:config'
     ));
     // =========================
