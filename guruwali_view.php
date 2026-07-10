@@ -16,56 +16,80 @@ $PAGE->set_heading('Data Murid Binaan Guru Wali');
 
 echo $OUTPUT->header();
 
-global $USER;
-
-// ============================
-// Load binaan.csv
-// ============================
-$binaanfile = $CFG->dataroot . '/binaan.csv';
-$data = [];
-
-if (file_exists($binaanfile)) {
-    if (($handle = fopen($binaanfile, 'r')) !== false) {
-        $header = fgetcsv($handle);
-        while (($row = fgetcsv($handle)) !== false) {
-            // Cek jumlah kolom untuk mencegah error 'undefined offset' pada baris kosong
-            if (count($row) >= 5) {
-                $data[] = [
-                    'userid'   => $row[0],
-                    'lastname' => $row[1],
-                    'nis'      => $row[2],
-                    'murid'    => $row[3],
-                    'kelas'    => $row[4]
-                ];
-            }
-        }
-        fclose($handle);
-    }
-}
+global $DB, $USER;
 
 // ============================
 // List guru wali
 // ============================
 $listguru = [];
-foreach ($data as $d) {
-    $listguru[$d['userid']] = $d['lastname'];
+
+$sqlguru = "
+SELECT DISTINCT
+    gw.guruid,
+    u.lastname
+FROM {local_jurnalmengajar_guruwali} gw
+JOIN {user} u
+     ON u.id = gw.guruid
+ORDER BY u.lastname
+";
+
+$rowsguru = $DB->get_records_sql($sqlguru);
+
+foreach ($rowsguru as $g) {
+    $listguru[$g->guruid] = $g->lastname;
 }
-// Hapus duplikat dan urutkan abjad
-$listguru = array_unique($listguru);
-asort($listguru);
 
 // Default = guru login
 $filterguru = optional_param('guru', $USER->id, PARAM_INT);
 
-// ============================
-// Filter data
-// ============================
-$filtered = [];
-foreach ($data as $d) {
-    if ($d['userid'] == $filterguru) {
-        $filtered[] = $d;
-    }
-}
+$sql = "
+SELECT
+
+    gw.id,
+
+    murid.lastname AS namamurid,
+
+    guru.lastname AS namaguru,
+
+    uid.data AS nis,
+
+    c.name AS kelas
+
+FROM {local_jurnalmengajar_guruwali} gw
+
+JOIN {user} guru
+ON guru.id=gw.guruid
+
+JOIN {user} murid
+ON murid.id=gw.muridid
+
+LEFT JOIN {user_info_field} uif
+ON uif.shortname='nis'
+
+LEFT JOIN {user_info_data} uid
+ON uid.userid=murid.id
+AND uid.fieldid=uif.id
+
+LEFT JOIN {cohort_members} cm
+ON cm.userid=murid.id
+
+LEFT JOIN {cohort} c
+ON c.id=cm.cohortid
+
+WHERE gw.guruid=:guruid
+
+ORDER BY
+
+c.name,
+murid.lastname
+";
+
+$filtered = $DB->get_records_sql(
+    $sql,
+    [
+        'guruid' => $filterguru
+    ]
+);
 
 // ============================
 // UI: Tampilan Card Bootstrap
@@ -101,36 +125,58 @@ echo html_writer::end_div();
 echo html_writer::end_tag('form');
 
 // ============================
-// Tabel binaan
+// Tabel Murid Binaan
 // ============================
 if (!empty($filtered)) {
-    // Gunakan html_table bawaan Moodle
+
     $table = new html_table();
-    $table->head = ['No', 'NIS', 'Nama Murid', 'Kelas', 'Guru Wali'];
-    // Tambahkan class tabel bawaan Bootstrap agar ada efek garis & hover
-    $table->attributes['class'] = 'generaltable table table-striped table-hover table-bordered mt-3';
+
+    $table->head = [
+        'No',
+        'NIS',
+        'Nama Murid',
+        'Kelas',
+        'Guru Wali'
+    ];
+
+    $table->attributes['class'] =
+        'generaltable table table-striped table-hover table-bordered mt-3';
 
     $no = 1;
-    foreach ($filtered as $d) {
+
+    foreach ($filtered as $r) {
+
+        $kelas = !empty($r->kelas)
+            ? s($r->kelas)
+            : 'Belum ada kelas';
+
         $row = new html_table_row([
             $no,
-            $d['nis'],
-            $d['murid'],
-            $d['kelas'],
-            $d['lastname']
+            s($r->nis),
+            format_nama_siswa($r->namamurid),
+            $kelas,
+            s($r->namaguru)
         ]);
+
         $table->data[] = $row;
+
         $no++;
     }
-    
-    // Render tabel
+
     echo html_writer::table($table);
+
 } else {
-    // Tampilkan notifikasi biru (Alert) jika tidak ada murid yang ditemukan
-    echo html_writer::start_div('alert alert-info mt-3', ['role' => 'alert']);
-    echo "Tidak ada data murid binaan untuk guru yang dipilih.";
+
+    echo html_writer::start_div(
+        'alert alert-info mt-3',
+        ['role' => 'alert']
+    );
+
+    echo 'Tidak ada data murid binaan untuk guru yang dipilih.';
+
     echo html_writer::end_div();
 }
+
 
 echo html_writer::end_div(); // End card-body
 echo html_writer::end_div(); // End card

@@ -12,7 +12,7 @@ $PAGE->set_pagelayout('standard');
 $PAGE->set_title('Tambah Murid Binaan');
 $PAGE->set_heading('Tambah Murid Binaan');
 
-global $DB, $CFG;
+global $DB;
 
 // ======================
 // Ambil daftar guru
@@ -53,85 +53,53 @@ if ($kelas) {
         $listsiswa[$s->id] = $s->lastname;
     }
 }
-
 // ======================
-// Simpan CSV
+// Simpan ke Database
 // ======================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     require_sesskey();
 
-    $userid  = required_param('userid', PARAM_INT);
-    $kelas   = required_param('kelas', PARAM_TEXT);
+    $guruid  = required_param('userid', PARAM_INT);
     $muridid = required_param('muridid', PARAM_INT);
 
-    $muriduser = $DB->get_record('user', ['id'=>$muridid], 'lastname');
-    $nis = jurnalmengajar_get_nis_user($muridid);
+    $existing = $DB->get_record(
+        'local_jurnalmengajar_guruwali',
+        ['muridid' => $muridid]
+    );
 
-    if (!$nis) {
-        print_error('NIS siswa belum diisi di profile.');
+    $time = time();
+
+    if ($existing) {
+
+        // Update guru wali.
+        $existing->guruid = $guruid;
+        $existing->timemodified = $time;
+
+        $DB->update_record(
+            'local_jurnalmengajar_guruwali',
+            $existing
+        );
+
+    } else {
+
+        // Tambah relasi baru.
+        $record = new stdClass();
+
+        $record->guruid       = $guruid;
+        $record->muridid      = $muridid;
+        $record->timecreated  = $time;
+        $record->timemodified = $time;
+
+        $DB->insert_record(
+            'local_jurnalmengajar_guruwali',
+            $record
+        );
     }
-
-    $namaguru = $listguru[$userid];
-
-    $file = $CFG->dataroot . '/binaan.csv';
-    $data = [];
-
-    // Load CSV lama
-    if (file_exists($file)) {
-        if (($handle = fopen($file, 'r')) !== false) {
-            $header = fgetcsv($handle);
-            if ($header) {
-                while (($row = fgetcsv($handle)) !== false) {
-                    $data[] = $row;
-                }
-            }
-            fclose($handle);
-        }
-    }
-
-    // Update atau tambah
-    $newdata = [];
-    $found = false;
-
-    foreach ($data as $d) {
-        if ($d[2] == $nis) {
-            $newdata[] = [
-                $userid,
-                $namaguru,
-                $nis,
-                $muriduser->lastname,
-                $kelas
-            ];
-            $found = true;
-        } else {
-            $newdata[] = $d;
-        }
-    }
-
-    if (!$found) {
-        $newdata[] = [
-            $userid,
-            $namaguru,
-            $nis,
-            $muriduser->lastname,
-            $kelas
-        ];
-    }
-
-    // Simpan ulang CSV
-    $handle = fopen($file, 'w');
-    fputcsv($handle, ['userid','lastname','nis','murid','kelas']);
-
-    foreach ($newdata as $d) {
-        fputcsv($handle, $d);
-    }
-
-    fclose($handle);
 
     redirect(
         new moodle_url('/local/jurnalmengajar/guruwali_manage.php'),
-        'Murid binaan berhasil disimpan',
+        'Data Guru Wali berhasil disimpan.',
         2
     );
 }
@@ -170,12 +138,6 @@ if ($kelas && $listsiswa && $userid) {
         'type'=>'hidden',
         'name'=>'sesskey',
         'value'=>sesskey()
-    ]);
-
-    echo html_writer::empty_tag('input', [
-        'type'=>'hidden',
-        'name'=>'kelas',
-        'value'=>$kelas
     ]);
 
     echo html_writer::empty_tag('input', [

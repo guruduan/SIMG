@@ -1,6 +1,6 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
-require_once($CFG->dirroot.'/local/jurnalmengajar/csv_helper.php');
+require_once(__DIR__ . '/lib.php');
 
 require_login();
 
@@ -50,38 +50,31 @@ $priority = [
     'alpa'       => 4,
 ];
 
-// Ambil kelas utama siswa (cohort)
-function jw_get_kelas_siswa(int $userid): ?string {
-    global $DB;
-    $rows = $DB->get_records_sql(
-        "SELECT c.name
-           FROM {cohort} c
-           JOIN {cohort_members} cm ON cm.cohortid = c.id
-          WHERE cm.userid = :uid
-       ORDER BY c.name ASC",
-        ['uid'=>$userid]
-    );
-    if (!$rows) return null;
-    foreach ($rows as $r) {
-        if (preg_match('~^(X|XI|XII)[A-Z0-9\-]*~', $r->name)) {
-            return $r->name;
-        }
-    }
-    return reset($rows)->name ?? null;
-}
-
-// Ambil id cohort dari nama kelas
-function jw_get_kelasid_by_name(string $kelasname): int {
-    global $DB;
-    $rec = $DB->get_record('cohort', ['name'=>$kelasname], 'id', IGNORE_MISSING);
-    return $rec->id ?? 0;
-}
 
 /* ==========================
- * AMBIL MURID BINAAN (CSV)
+ * AMBIL MURID BINAAN
  * ========================== */
-$muridopts = jw_get_murid_options_from_csv($USER->id);
-$userids   = array_keys($muridopts);
+
+$sql = "
+SELECT
+    muridid
+FROM {local_jurnalmengajar_guruwali}
+WHERE guruid = :guruid
+ORDER BY muridid
+";
+
+$rows = $DB->get_records_sql(
+    $sql,
+    [
+        'guruid' => $USER->id
+    ]
+);
+
+$userids = [];
+
+foreach ($rows as $r) {
+    $userids[] = $r->muridid;
+}
 
 if (empty($userids)) {
     echo html_writer::div(
@@ -94,30 +87,48 @@ if (empty($userids)) {
 }
 
 list($in_sql, $paramsin) = $DB->get_in_or_equal($userids);
-$users = $DB->get_records_sql(
-    "SELECT id, firstname, lastname
-       FROM {user}
-      WHERE id $in_sql",
-    $paramsin
-);
+$users = $DB->get_records_sql("
+SELECT
+
+u.id,
+u.firstname,
+u.lastname,
+
+c.id AS kelasid,
+c.name AS kelas
+
+FROM {user} u
+
+LEFT JOIN {cohort_members} cm
+ON cm.userid=u.id
+
+LEFT JOIN {cohort} c
+ON c.id=cm.cohortid
+
+WHERE u.id $in_sql
+
+ORDER BY
+c.name,
+u.lastname
+",$paramsin);
 
 // Gabungkan user + kelas
 $users_with_class = [];
 foreach ($users as $u) {
-    $kelas = jw_get_kelas_siswa($u->id) ?? 'ZZZ';
-    $users_with_class[] = (object)[
-        'id'       => $u->id,
-        'firstname'=> $u->firstname,
-        'lastname' => $u->lastname,
-        'kelas'    => $kelas
-    ];
+
+$users_with_class[] = (object)[
+    'id'        => $u->id,
+    'firstname' => $u->firstname,
+    'lastname'  => $u->lastname,
+
+    // Nama kelas.
+    'kelas'     => $u->kelas ?: 'Belum ada kelas',
+
+    // Id cohort.
+    'kelasid'   => $u->kelasid
+];
 }
 
-// Cache kelasid siswa
-$kelasid_siswa = [];
-foreach ($users_with_class as $u) {
-    $kelasid_siswa[$u->id] = jw_get_kelasid_by_name($u->kelas);
-}
 
 // Urutkan: kelas → nama
 usort($users_with_class, function($a, $b) {
@@ -210,9 +221,10 @@ if ($dari && $sampai) {
             }
 
             foreach ($users_with_class as $u) {
-                if (empty($kelasid_siswa[$u->id]) || (int)$j->kelas !== (int)$kelasid_siswa[$u->id]) {
-                    continue;
-                }
+if (empty($u->kelasid) ||
+    (int)$j->kelas !== (int)$u->kelasid) {
+    continue;
+}
 
                 $tgl = date('Y-m-d', $j->timecreated);
                 $all_dates[$u->id][$tgl] = true;
@@ -255,9 +267,10 @@ if ($dari && $sampai) {
             $absen = json_decode($j->absen, true) ?? [];
 
             foreach ($users_with_class as $u) {
-                if (empty($kelasid_siswa[$u->id]) || (int)$j->kelas !== (int)$kelasid_siswa[$u->id]) {
-                    continue;
-                }
+if (empty($u->kelasid) ||
+    (int)$j->kelas !== (int)$u->kelasid) {
+    continue;
+}
 
                 $found = false;
                 foreach ($absen as $nama => $alasan) {
@@ -301,7 +314,7 @@ if ($dari && $sampai) {
         $d = $data[$u->id];
 
         $detailurl = new moodle_url('/local/jurnalmengajar/rekap_permurid.php', [
-            'kelas'  => $kelasid_siswa[$u->id],
+            'kelas' => $u->kelasid,
             'siswa'  => $u->id,
             'dari'   => date('Y-m-d',$dari),
             'sampai' => date('Y-m-d',$sampai),
@@ -310,7 +323,9 @@ if ($dari && $sampai) {
 
         echo html_writer::tag('tr',
             '<td>'.$no++.'</td>'.
-            '<td class="text-left font-weight-bold">'.s(ucwords(strtolower($u->lastname))).'</td>'.
+            '<td class="text-left font-weight-bold">' .
+format_nama_siswa($u->lastname) .
+'</td>'.
             '<td><span class="badge badge-secondary bg-secondary">'.s($u->kelas).'</span></td>'.
            '<td class="text-success font-weight-bold">'.$d['hadir'].'</td>'.
            '<td class="text-warning font-weight-bold">'.$d['sakit'].'</td>'.

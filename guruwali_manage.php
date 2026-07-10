@@ -74,6 +74,28 @@ foreach ($rowsguru as $g) {
     $listguru[$g->guruid] = $g->lastname;
 }
 
+// ======================================================
+// Statistik Guru Wali
+// ======================================================
+
+// Jumlah murid yang menjadi anggota cohort.
+$jumlahcohort = $DB->count_records_sql("
+    SELECT COUNT(DISTINCT userid)
+    FROM {cohort_members}
+");
+
+// Jumlah murid di cohort yang sudah memiliki Guru Wali.
+$jumlahguruwali = $DB->count_records_sql("
+    SELECT COUNT(DISTINCT cm.userid)
+    FROM {cohort_members} cm
+    JOIN {local_jurnalmengajar_guruwali} gw
+         ON gw.muridid = cm.userid
+");
+
+// Selisih = murid belum memiliki Guru Wali.
+$belumguruwali = max(0, $jumlahcohort - $jumlahguruwali);
+
+
 /* ==========================================================
    Filter Guru
 ========================================================== */
@@ -160,6 +182,35 @@ $rows = $DB->get_records_sql(
     ]
 );
 
+echo html_writer::start_div('alert alert-info');
+
+echo html_writer::tag('h5', 'Statistik Guru Wali');
+
+$table = new html_table();
+
+$table->attributes['class'] = 'table table-sm table-bordered';
+
+$table->data[] = [
+    'Murid di Cohort',
+    $jumlahcohort
+];
+
+$table->data[] = [
+    'Sudah Punya Guru Wali',
+    $jumlahguruwali
+];
+
+$table->data[] = [
+    'Belum Punya Guru Wali',
+    $belumguruwali == 0
+        ? '<span class="text-success"><b>0 ✅</b></span>'
+        : '<span class="text-danger"><b>'.$belumguruwali.' ⚠️</b></span>'
+];
+
+echo html_writer::table($table);
+
+echo html_writer::end_div();
+
 /* ==========================================================
    Tabel Murid Binaan
 ========================================================== */
@@ -238,4 +289,3 @@ if ($no == 1) {
 }
 
 echo html_writer::table($table);
-
