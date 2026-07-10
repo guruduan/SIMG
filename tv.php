@@ -100,9 +100,6 @@ DATA DASAR
 $jadwal =
     jurnalmengajar_get_jadwal_acuan();
 
-$jam_pelajaran =
-    jurnalmengajar_generate_jam();
-
 $hari_ini =
     jurnalmengajar_get_hari_ini();
 
@@ -134,6 +131,9 @@ if (!empty($_GET['jam'])) {
     $issimulasi = true;
 }
 
+$jam_pelajaran =
+    jurnalmengajar_generate_jam_hari($hari_ini);
+    
 /*
 =====================================================
 VALIDASI HARI SEKOLAH
@@ -951,7 +951,7 @@ foreach ($jam_pelajaran as $j => $w) {
     if (
         $now >= $w['mulai']
         &&
-        $now <= $w['selesai']
+        $now < $w['selesai']
     ) {
 
         $jamaktif = (int)$j;

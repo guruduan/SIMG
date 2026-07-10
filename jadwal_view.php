@@ -19,7 +19,7 @@ global $USER;
 
 // Ambil jadwal dan jam pelajaran
 $jadwal = jurnalmengajar_get_jadwal_acuan();
-$jam_pelajaran = jurnalmengajar_generate_jam();
+
 
 // Ambil daftar guru unik
 $daftarguru = [];
@@ -148,6 +148,7 @@ foreach ($grouped as $g) {
 
     $jamawal = min($g['jamke']);
     $jamakhir = max($g['jamke']);
+    $jam_pelajaran = jurnalmengajar_generate_jam_hari($g['hari']);
 
     $mulai = $jam_pelajaran[$jamawal]['mulai'] ?? '';
     $selesai = $jam_pelajaran[$jamakhir]['selesai'] ?? '';

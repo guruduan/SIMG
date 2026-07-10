@@ -95,8 +95,6 @@ function jurnalmengajar_get_jam_ke() {
 
     foreach ($jam as $nomor => $w) {
 
-
-
 $mulai = strtotime($hariini . ' ' . $w['mulai']);
 $selesai = strtotime($hariini . ' ' . $w['selesai']);
 
@@ -139,7 +137,8 @@ function jurnalmengajar_is_istirahat() {
 
     return false;
 }
-function jurnalmengajar_generate_jam() {
+
+function jurnalmengajar_generate_jam_hari($hari) {
 
     $config = jurnalmengajar_get_config_jam();
 
@@ -149,10 +148,24 @@ function jurnalmengajar_generate_jam() {
 
     $mode = $config['mode_aktif'] ?? 'normal';
 
-    // 1=Senin ... 7=Minggu
+    if ($hari == 'Jumat') {
+        $cfg = $config['normal']['jumat'] ?? [];
+    } else {
+        if ($mode == 'rapat') {
+            $cfg = $config['rapat']['senin_kamis'] ?? [];
+        } else {
+            $cfg = $config['normal']['senin_kamis'] ?? [];
+        }
+    }
+
+    return jurnalmengajar_generate_jam_preview($cfg);
+}
+
+function jurnalmengajar_generate_jam() {
+
+    // 1 = Senin ... 7 = Minggu
     $hari = (int)date('N');
 
-    // Jumlah hari sekolah dari settings plugin.
     $harisekolah = (int)get_config(
         'local_jurnalmengajar',
         'harisekolah'
@@ -167,21 +180,18 @@ function jurnalmengajar_generate_jam() {
         return [];
     }
 
-    if ($hari == 5) {
+    $namahari = [
+        1 => 'Senin',
+        2 => 'Selasa',
+        3 => 'Rabu',
+        4 => 'Kamis',
+        5 => 'Jumat',
+        6 => 'Sabtu',
+        7 => 'Minggu'
+    ];
 
-        // Jumat selalu memakai konfigurasi Normal Jumat.
-        $cfg = $config['normal']['jumat'] ?? [];
-
-    } else {
-
-        // Senin-Kamis (dan Sabtu bila harisekolah=6).
-        if ($mode == 'rapat') {
-            $cfg = $config['rapat']['senin_kamis'] ?? [];
-        } else {
-            $cfg = $config['normal']['senin_kamis'] ?? [];
-        }
-    }
-
-    return jurnalmengajar_generate_jam_preview($cfg);
+    return jurnalmengajar_generate_jam_hari(
+        $namahari[$hari]
+    );
 }
 ?>

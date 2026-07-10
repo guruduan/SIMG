@@ -59,7 +59,6 @@ echo '<style>
 // Ambil data acuan
 $jadwal = jurnalmengajar_get_jadwal_acuan();
 $hariurut = jurnalmengajar_get_urutan_hari();
-$jam_pelajaran = jurnalmengajar_generate_jam();
 
 /*
 =====================================================
@@ -79,7 +78,12 @@ uksort($daftarhari, function($a, $b) use ($hariurut) {
 
 $hari_ini_nama = jurnalmengajar_get_hari_ini(); 
 $default_hari = isset($daftarhari[$hari_ini_nama]) ? $hari_ini_nama : array_key_first($daftarhari);
-$filterhari = $_GET['hari'] ?? $default_hari;
+$filterhari = optional_param(
+    'hari',
+    $default_hari,
+    PARAM_TEXT
+);
+$jam_pelajaran = jurnalmengajar_generate_jam_hari($filterhari);
 
 /*
 =====================================================
@@ -91,7 +95,7 @@ $jam_aktif_sekarang = 0;
 
 if ($filterhari === $hari_ini_nama) {
     foreach ($jam_pelajaran as $j => $w) {
-        if ($now >= $w['mulai'] && $now <= $w['selesai']) {
+        if ($now >= $w['mulai'] && $now < $w['selesai']) {
             $jam_aktif_sekarang = (int)$j;
             break;
         }
@@ -124,9 +128,20 @@ echo html_writer::end_tag('form');
 */
 $matriks_jadwal = [];
 $semua_kelas = [];
+$jumlahjp = count($jam_pelajaran);
+
+if ($jumlahjp === 0) {
+    echo $OUTPUT->notification(
+        'Tidak ada konfigurasi jam pelajaran untuk hari ' . s($filterhari) . '.',
+        'notifyproblem'
+    );
+
+    echo $OUTPUT->footer();
+    exit;
+}
 
 foreach ($jadwal as $j) {
-    if ($j['hari'] != $filterhari) {
+    if ($j['hari'] !== $filterhari) {
         continue;
     }
     $kelas = $j['kelas'];
@@ -154,11 +169,13 @@ echo '<tr>';
 // Pasang class freeze-col-1 dan freeze-col-2 di header
 echo '<th rowspan="2" class="freeze-col-1" style="width: 45px; vertical-align: middle; background-color: #343a40 !important; color: #fff;">No</th>';
 echo '<th rowspan="2" class="freeze-col-2" style="width: 100px; vertical-align: middle; background-color: #343a40 !important; color: #fff;">Kelas</th>';
-echo '<th colspan="11" class="text-center bg-secondary text-white p-1">Jam Pelajaran ke:</th>';
+echo '<th colspan="' . $jumlahjp . '" class="text-center bg-secondary text-white p-1">';
+echo 'Jam Pelajaran ke:';
+echo '</th>';
 echo '</tr>';
 echo '<tr>';
 
-for ($i = 1; $i <= 11; $i++) {
+for ($i = 1; $i <= $jumlahjp; $i++) {
     if ($i === $jam_aktif_sekarang) {
         echo '<th style="width: 80px; font-size:0.85rem;" class="bg-warning text-dark font-weight-bold"><i class="fa fa-play-circle text-danger"></i> ' . $i . '</th>';
     } else {
@@ -177,7 +194,7 @@ foreach ($semua_kelas as $k) {
     echo '<td class="text-center font-weight-bold text-muted align-middle freeze-col-1">' . $no++ . '</td>';
     echo '<td class="text-center font-weight-bold align-middle freeze-col-2"><span class="badge badge-info p-2 d-block" style="font-size:0.85rem;">' . s($k) . '</span></td>';
 
-    for ($jam = 1; $jam <= 11; $jam++) {
+    for ($jam = 1; $jam <= $jumlahjp; $jam++) {
         $is_jam_aktif = ($jam === $jam_aktif_sekarang);
         
         if (isset($matriks_jadwal[$k][$jam])) {
@@ -199,7 +216,16 @@ foreach ($semua_kelas as $k) {
 }
 
 if (empty($semua_kelas)) {
-    echo '<tr><td colspan="13" class="text-center text-muted p-4"><i>Tidak ada entri data jadwal acuan untuk hari ' . s($filterhari) . '.</i></td></tr>';
+
+    echo '<tr>';
+
+    echo '<td colspan="' . ($jumlahjp + 2) . '" class="text-center text-muted p-4">';
+
+    echo '<i>Tidak ada entri data jadwal acuan untuk hari ' . s($filterhari) . '.</i>';
+
+    echo '</td>';
+
+    echo '</tr>';
 }
 
 echo '</tbody>';

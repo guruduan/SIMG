@@ -17,7 +17,6 @@ echo $OUTPUT->header();
 
 // Ambil data
 $jadwal = jurnalmengajar_get_jadwal_acuan();
-$jam_pelajaran = jurnalmengajar_generate_jam();
 $hariurut = jurnalmengajar_get_urutan_hari();
 
 // ===== Ambil daftar kelas =====
@@ -124,7 +123,8 @@ foreach ($grouped as $g) {
 
     $jamawal = min($g['jamke']);
     $jamakhir = max($g['jamke']);
-
+    $jam_pelajaran = jurnalmengajar_generate_jam_hari($g['hari']);
+    
     $mulai = $jam_pelajaran[$jamawal]['mulai'] ?? '';
     $selesai = $jam_pelajaran[$jamakhir]['selesai'] ?? '';
     $pukul = $mulai . ' - ' . $selesai;
