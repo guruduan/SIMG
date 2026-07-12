@@ -3,7 +3,9 @@ require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/lib.php');
 
 require_login();
+$context = context_system::instance();
 
+$PAGE->set_context($context);
 global $DB, $PAGE, $OUTPUT;
 
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/riwayat_individu.php'));
@@ -448,13 +450,42 @@ foreach ($walikelas as $r) {
         return $b['time'] <=> $a['time'];
     });
 
-    /* HEADER NAMA MURID */
-    echo html_writer::start_div('d-flex justify-content-between align-items-center my-4 pb-2 border-bottom');
+/* HEADER NAMA MURID */
+echo html_writer::start_div(
+    'd-flex justify-content-between align-items-center my-4 pb-2 border-bottom'
+);
+
 echo html_writer::tag(
     'h3',
-    '<i class="fa fa-user-circle text-muted"></i> ' .  ucwords(strtolower($murid->lastname)),   ['class' => 'm-0 font-weight-bold'] );
-    echo html_writer::tag('span', 'Total Log: ' . count($timeline), ['class' => 'badge badge-dark p-2']);
-    echo html_writer::end_div();
+    '<i class="fa fa-user-circle text-muted"></i> ' .
+    format_nama_siswa($murid->lastname),
+    ['class' => 'm-0 font-weight-bold']
+);
+
+echo html_writer::start_div();
+
+if (has_capability('moodle/site:config', $context)) {
+
+    echo html_writer::link(
+        new moodle_url(
+            '/local/jurnalmengajar/statusakademik.php',
+            ['userid' => $muridid]
+        ),
+        '🎓 Kelola Status Akademik',
+        ['class' => 'btn btn-success btn-sm mr-2']
+    );
+
+}
+
+echo html_writer::tag(
+    'span',
+    'Total Log: ' . count($timeline),
+    ['class' => 'badge badge-dark p-2']
+);
+
+echo html_writer::end_div();
+
+echo html_writer::end_div();
 
 /* =====================================================
 RIWAYAT KELAS SISWA
@@ -475,29 +506,160 @@ $riwayatkelas = $DB->get_records_sql(
 
 if ($riwayatkelas) {
 
-    echo html_writer::start_div(
-        'alert alert-info mb-4'
-    );
+    echo html_writer::start_div('card shadow-sm mb-4');
+
+    echo html_writer::start_div('card-header bg-primary text-white');
 
     echo html_writer::tag(
-        'h5',
-        '📚 Riwayat Kelas',
-        ['class' => 'mb-2']
+        'strong',
+        '📚 Riwayat Kelas'
     );
+
+    echo html_writer::end_div();
+
+    echo html_writer::start_div('card-body');
 
     foreach ($riwayatkelas as $r) {
 
         echo html_writer::tag(
             'div',
-            $r->tahunajaran .
-            ' → <strong>' .
+            '<strong>' .
+            format_string($r->tahunajaran) .
+            '</strong> di kelas <strong>' .
             format_string($r->namakelas) .
-            '</strong>'
+            '</strong>',
+            ['class' => 'mb-2']
         );
     }
 
     echo html_writer::end_div();
+
+    echo html_writer::end_div();
+
+} else {
+
+    echo html_writer::start_div('card shadow-sm mb-4');
+
+    echo html_writer::start_div('card-header bg-primary text-white');
+
+    echo html_writer::tag(
+        'strong',
+        '📚 Riwayat Kelas'
+    );
+
+    echo html_writer::end_div();
+
+    echo html_writer::start_div('card-body');
+
+    echo html_writer::tag(
+        'div',
+        '<i>Belum ada riwayat kelas.</i>',
+        ['class' => 'text-muted']
+    );
+
+    echo html_writer::end_div();
+
+    echo html_writer::end_div();
 }
+
+/* =====================================================
+   RIWAYAT AKADEMIK
+===================================================== */
+
+$riwayatakademik = $DB->get_records_sql(
+    "
+    SELECT *
+    FROM {local_jurnalmengajar_riwayatakademik}
+    WHERE userid = ?
+    ORDER BY tanggal ASC
+    ",
+    [$muridid]
+);
+
+echo html_writer::start_div('card shadow-sm mb-4');
+
+echo html_writer::start_div('card-header bg-success text-white');
+echo html_writer::tag(
+    'strong',
+    '🎓 Riwayat Akademik'
+);
+echo html_writer::end_div();
+
+echo html_writer::start_div('card-body');
+
+if ($riwayatakademik) {
+
+    $pertama = true;
+
+    foreach ($riwayatakademik as $r) {
+
+        if (!$pertama) {
+            echo html_writer::empty_tag('hr');
+        }
+
+        $pertama = false;
+
+        switch ($r->jenis) {
+
+            case 'masukkelas':
+                $teks = 'Masuk kelas <strong>' .
+                        format_string($r->keterangan) .
+                        '</strong>';
+                break;
+
+            case 'pindahkelas':
+                $teks = 'Pindah kelas <strong>' .
+                        format_string($r->keterangan) .
+                        '</strong>';
+                break;
+
+            case 'mutasi':
+                $teks = 'Mutasi ke <strong>' .
+                        format_string($r->keterangan) .
+                        '</strong>';
+                break;
+
+            case 'berhenti':
+                $teks = 'Berhenti';
+
+                if (!empty($r->keterangan)) {
+                    $teks .= '<br><small>' .
+                             format_string($r->keterangan) .
+                             '</small>';
+                }
+                break;
+
+            case 'lulus':
+                $teks = 'Lulus';
+                break;
+
+            default:
+                $teks = format_string($r->jenis);
+        }
+
+        echo html_writer::tag(
+            'div',
+            '✓ <strong>' .
+            tanggal_indo($r->tanggal) .
+            '</strong><br>' .
+            '&nbsp;&nbsp;&nbsp;' .
+            $teks
+        );
+    }
+
+} else {
+
+    echo html_writer::tag(
+        'div',
+        '<i>Belum ada riwayat akademik.</i>',
+        ['class' => 'text-muted']
+    );
+
+}
+
+echo html_writer::end_div();
+
+echo html_writer::end_div();
 
     /* =====================================================
     TAMBAHAN: COUNTER STATS CARDS (DASHBOARD MINI)
@@ -506,7 +668,7 @@ if ($riwayatkelas) {
     echo html_writer::start_div('row mb-4');
     
     $cards = [
-    ['Tidak Hadir KBM', $count_absen, 'bg-danger text-white', 'absen'],
+    ['Tidak Hadir kegiatan belajar', $count_absen, 'bg-danger text-white', 'absen'],
     ['Izin Keluar/Masuk/Pulang', $count_izin, 'bg-warning text-dark', 'izin'],
     ['Layanan & Pembinaan BK', $count_bk, 'bg-info text-white', 'bk'],
     ['Pendampingan Guru Wali', $count_wali, 'bg-primary text-white', 'wali'],
@@ -571,6 +733,8 @@ echo html_writer::end_div();
     }
     
     echo html_writer::end_div(); // End Row Cards
+
+
 
     /*
     =====================================================

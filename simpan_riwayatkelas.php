@@ -12,7 +12,7 @@ $PAGE->set_url(new moodle_url('/local/jurnalmengajar/simpan_riwayatkelas.php'));
 $PAGE->set_title('Simpan Riwayat Kelas');
 $PAGE->set_heading('Simpan Riwayat Kelas');
 
-global $DB, $OUTPUT;
+global $DB, $OUTPUT, $USER;
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading('📸 Snapshot Riwayat Kelas');
@@ -35,37 +35,48 @@ if (optional_param('proses', 0, PARAM_INT)) {
     require_sesskey();
 
     $jumlah = 0;
+    $now = time();
 
-    // Semua cohort = kelas siswa.
-    $cohorts = $DB->get_records('cohort');
+$tanggalawal = get_config(
+    'local_jurnalmengajar',
+    'tanggalawalminggu'
+);
 
-    foreach ($cohorts as $cohort) {
+$tanggalmasuk = !empty($tanggalawal)
+    ? strtotime($tanggalawal)
+    : $now;
 
-        $members = $DB->get_records(
-            'cohort_members',
-            ['cohortid' => $cohort->id]
+// Semua cohort = kelas siswa.
+$cohorts = $DB->get_records('cohort');
+
+$transaction = $DB->start_delegated_transaction();
+
+foreach ($cohorts as $cohort) {
+
+    $members = $DB->get_records(
+        'cohort_members',
+        ['cohortid' => $cohort->id]
+    );
+
+    foreach ($members as $member) {
+
+        $exists = $DB->record_exists(
+            'local_jurnalmengajar_riwayatkelas',
+            [
+                'userid'      => $member->userid,
+                'cohortid'    => $cohort->id,
+                'tahunajaran' => $tahunajaran
+            ]
         );
 
-        foreach ($members as $member) {
-
-            $exists = $DB->record_exists(
-                'local_jurnalmengajar_riwayatkelas',
-                [
-                    'userid'      => $member->userid,
-                    'cohortid'    => $cohort->id,
-                    'tahunajaran' => $tahunajaran
-                ]
-            );
-
-            if ($exists) {
-                continue;
-            }
+        // Simpan snapshot jika belum ada.
+        if (!$exists) {
 
             $record = new stdClass();
             $record->userid = $member->userid;
             $record->cohortid = $cohort->id;
             $record->tahunajaran = $tahunajaran;
-            $record->timecreated = time();
+            $record->timecreated = $now;
 
             $DB->insert_record(
                 'local_jurnalmengajar_riwayatkelas',
@@ -74,12 +85,46 @@ if (optional_param('proses', 0, PARAM_INT)) {
 
             $jumlah++;
         }
-    }
 
-    echo $OUTPUT->notification(
-        $jumlah . ' riwayat kelas berhasil disimpan.',
-        'notifysuccess'
+// Simpan riwayat akademik "masukkelas"
+// hanya sekali untuk setiap tahun ajaran.
+$adaakademik = $DB->record_exists(
+    'local_jurnalmengajar_riwayatakademik',
+    [
+        'userid'      => $member->userid,
+        'tahunajaran' => $tahunajaran,
+        'jenis'       => 'masukkelas'
+    ]
+);
+
+if (!$adaakademik) {
+
+    $akademik = new stdClass();
+    $akademik->userid       = $member->userid;
+    $akademik->tahunajaran  = $tahunajaran;
+    $akademik->jenis        = 'masukkelas';
+    $akademik->tanggal = $tanggalmasuk;
+    $akademik->keterangan   = $cohort->name;
+    $akademik->useridinput  = $USER->id;
+    $akademik->timecreated  = $now;
+    $akademik->timemodified = $now;
+
+    $DB->insert_record(
+        'local_jurnalmengajar_riwayatakademik',
+        $akademik
     );
+}
+
+}   // <-- foreach ($members)
+
+    }       // <-- foreach ($cohorts)
+
+$transaction->allow_commit();
+
+echo $OUTPUT->notification(
+    $jumlah . ' snapshot riwayat kelas berhasil disimpan.',
+    'notifysuccess'
+);
 
 } else {
 
