@@ -199,6 +199,8 @@ if ($mform->is_cancelled()) {
         print_error('Kelas tidak boleh kosong');
     }
 
+$now = time();
+
     $record = new stdClass();
     $record->userid = $USER->id;
 
@@ -219,13 +221,19 @@ if ($mform->is_cancelled()) {
     $record->absen = $data->absen ?? '{}';
     $record->absenid = $data->absenid ?? '{}';
     $record->keterangan = $data->keterangan ?: '-';
-    $record->timecreated = time();
+    $record->timecreated = $now;
 
     // Simpan ke database
-	$jurnalid = $DB->insert_record(
-	    'local_jurnalmengajar',
-	    $record
-	);
+$jurnalid = $DB->insert_record(
+    'local_jurnalmengajar',
+    $record
+);
+
+$namaguru = !empty($USER->lastname)
+    ? $USER->lastname
+    : $USER->firstname;
+
+$kelas = get_nama_kelas($record->kelas);
 
 $pembinaan = json_decode(
     $data->pembinaanjson ?? '[]',
@@ -249,68 +257,100 @@ if (!empty($pembinaan)) {
         $pb->catatan = $p['catatan'] ?? '';
         $pb->tindaklanjut = $p['tindaklanjut'] ?? '';
 
-        $pb->timecreated = time();
-        $pb->timemodified = time();
+$pb->timecreated  = $now;
+$pb->timemodified = $now;
 
         $DB->insert_record(
             'local_jurnalmengajar_pembinaanmapel',
             $pb
         );
+        // Nama murid
+$murid = $DB->get_record(
+    'user',
+    ['id' => $pb->muridid],
+    'lastname',
+    MUST_EXIST
+);
+
+$datawa = [
+    '{waktu}' => tanggal_indo($now),
+    '{murid}'        => format_nama_siswa($murid->lastname),
+    '{kelas}' => $kelas,
+    '{mapel}'        => $record->matapelajaran,
+    '{guru}'         => $namaguru,
+    '{jenis}'        => $pb->jenis,
+    '{catatan}'      => $pb->catatan,
+    '{tindaklanjut}' => $pb->tindaklanjut,
+
+    // data internal
+    'kelas'     => $pb->kelas,
+    'pesertaid' => json_encode([$pb->muridid]),
+    'userid'    => $USER->id
+];
+
+jm_kirim_template_auto(
+    'pembinaan_mapel',
+    $datawa
+);
+
     }
 }
 
-    // ================= KIRIM NOTIF WA =================
-    $kelasid = $record->kelas ?? null;
+// ================= KIRIM NOTIF WA =================
+$kelasid = $record->kelas ?? null;
 
-    if ($kelasid) {
-        $namaguru = !empty($USER->lastname) ? $USER->lastname : $USER->firstname;
-        $kelas = get_nama_kelas($kelasid);
+if ($kelasid) {
 
-        $jamke = $record->jamke ?? '-';
-        $mapel = $record->matapelajaran ?? '-';
-        $materi = $record->materi ?? '-';
-        $aktivitas = $record->aktivitas ?? '-';
+    $jamke      = $record->jamke ?? '-';
+    $mapel      = $record->matapelajaran ?? '-';
+    $materi     = $record->materi ?? '-';
+    $aktivitas  = $record->aktivitas ?? '-';
 
-        $absenjson = $record->absen ?? '{}';
-        $absenarr = json_decode($absenjson, true);
+    $absenjson = $record->absen ?? '{}';
+    $absenarr  = json_decode($absenjson, true);
 
-        $absen = '-';
-        if (!empty($absenarr)) {
-            $formatted = [];
-            $no = 1;
-            foreach ($absenarr as $nama => $alasan) {
-                $formatted[] = $no++ . ". {$nama}: {$alasan}";
-            }
-            $absen = implode("\n", $formatted);
+    $absen = '-';
+
+    if (!empty($absenarr)) {
+
+        $formatted = [];
+        $no = 1;
+
+        foreach ($absenarr as $nama => $alasan) {
+            $formatted[] = $no++ . ". {$nama}: {$alasan}";
         }
 
-        $keterangan = $record->keterangan ?? '-';
-        $sekolah = get_config('local_jurnalmengajar', 'nama_sekolah') ?: 'Nama Sekolah';
-        $tanggal = tanggal_indo(time(), 'judul');
-        $jam = tanggal_indo(time(), 'jam');
+        $absen = implode("\n", $formatted);
+    }
 
-	$datawa = [
-	    '{guru}'       => $namaguru,
-	    '{kelas}'      => $kelas,
-	    '{jamke}'      => $jamke,
-	    '{mapel}'      => $mapel,
-	    '{materi}'     => $materi,
-	    '{aktivitas}'  => $aktivitas,
-	    '{absen}'      => $absen,
-	    '{keterangan}' => $keterangan,
-	    '{tanggal}'    => $tanggal,
-	    '{jam}'        => $jam,
-	    '{sekolah}'    => $sekolah,
+    $keterangan = $record->keterangan ?? '-';
+    $sekolah = get_config('local_jurnalmengajar', 'nama_sekolah') ?: 'Nama Sekolah';
 
-	    // Data internal (bukan placeholder template)
-	    'kelas'        => $kelasid,
-	    'userid'       => $USER->id
-	];
+    $tanggal = tanggal_indo($now, 'judul');
+    $jam     = tanggal_indo($now, 'jam');
 
-	jm_kirim_template_auto(
-	    'jurnal',
-	    $datawa
-	);
+    $datawa = [
+        '{guru}'       => $namaguru,
+        '{kelas}'      => $kelas,
+        '{jamke}'      => $jamke,
+        '{mapel}'      => $mapel,
+        '{materi}'     => $materi,
+        '{aktivitas}'  => $aktivitas,
+        '{absen}'      => $absen,
+        '{keterangan}' => $keterangan,
+        '{tanggal}'    => $tanggal,
+        '{jam}'        => $jam,
+        '{sekolah}'    => $sekolah,
+
+        // Data internal
+        'kelas'  => $kelasid,
+        'userid' => $USER->id
+    ];
+
+    jm_kirim_template_auto(
+        'jurnal',
+        $datawa
+    );
 }
     redirect(
         new moodle_url('/local/jurnalmengajar/index.php'),

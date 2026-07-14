@@ -17,6 +17,7 @@ echo $OUTPUT->header();
 
 $jenis = [
     'jurnal'        => 'Jurnal Mengajar',
+    'pembinaan_mapel'   => 'Pembinaan Guru Mapel',
     'guruwali'      => 'Jurnal Guru Wali',
     'izinmurid'     => 'Surat Izin Murid',
     'izinguru'      => 'Surat Izin Guru',

@@ -18,7 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
         trim($_POST['template_jurnal']),
         'local_jurnalmengajar'
     );
-    
+
+    set_config(
+    'template_pembinaan_mapel',
+    trim($_POST['template_pembinaan_mapel']),
+    'local_jurnalmengajar'
+    );
+
     set_config(
         'template_guru_wali',
         trim($_POST['template_guru_wali']),
@@ -74,6 +80,11 @@ $template_jurnal = get_config(
     'template_jurnal'
 );
 
+$template_pembinaan_mapel = get_config(
+    'local_jurnalmengajar',
+    'template_pembinaan_mapel'
+);
+
 $template_guru_wali = get_config(
     'local_jurnalmengajar',
     'template_guru_wali'
@@ -127,6 +138,38 @@ Tidak Hadir :
 {absen}
 
 Tanggal : {tanggal}";
+}
+
+if (empty($template_pembinaan_mapel)) {
+
+    $template_pembinaan_mapel =
+"📋 PEMBINAAN MURID OLEH GURU MAPEL
+
+📅 Waktu :
+{waktu}
+
+👤 Murid :
+{murid}
+
+🏫 Kelas :
+{kelas}
+
+📚 Mata Pelajaran :
+{mapel}
+
+👨‍🏫 Guru Pengajar :
+{guru}
+
+📌 Jenis Pembinaan :
+{jenis}
+
+📝 Catatan :
+{catatan}
+
+🎯 Tindak Lanjut :
+{tindaklanjut}
+
+_Dikirim sebagai informasi_";
 }
 
 if (empty($template_guru_wali)) {
@@ -306,6 +349,32 @@ echo $OUTPUT->header();
 
         </div>
     </div>
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Template Notif Pembinaan Guru Mapel</strong>
+    </div>
+
+    <div class="card-body">
+
+        <p>
+            Placeholder:
+            <code>{waktu}</code>
+            <code>{murid}</code>
+            <code>{kelas}</code>
+            <code>{mapel}</code>
+            <code>{guru}</code>
+            <code>{jenis}</code>
+            <code>{catatan}</code>
+            <code>{tindaklanjut}</code>
+        </p>
+
+        <textarea
+            name="template_pembinaan_mapel"
+            class="form-control"
+            rows="12"><?php echo s($template_pembinaan_mapel); ?></textarea>
+
+    </div>
+</div>
 
 	<div class="card mb-4">
 	    <div class="card-header">

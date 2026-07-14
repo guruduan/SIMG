@@ -961,6 +961,8 @@ foreach ($jam_pelajaran as $j => $w) {
     }
 }
 
+
+
 /*
 =====================================================
 JIKA SEDANG ISTIRAHAT
@@ -978,6 +980,47 @@ if (!$jamaktif) {
             break;
         }
     }
+}
+
+/*
+=====================================================
+HITUNG WAKTU AUTO RELOAD
+RELOAD SAAT PERGANTIAN JAM
+=====================================================
+*/
+
+// Gunakan waktu yang sedang dipakai TV
+$nowtimestamp = strtotime(
+    $tanggalhariini . ' ' . $now
+);
+
+$reloadseconds = 0; // default: tidak reload
+
+if ($jamaktif && !empty($jam_pelajaran[$jamaktif])) {
+
+    $target = strtotime(
+        $tanggalhariini . ' ' .
+        $jam_pelajaran[$jamaktif]['selesai']
+    );
+
+    $reloadseconds = max(
+        1,
+        $target - $nowtimestamp + 1
+    );
+
+} else if ($jamberikut && !empty($jam_pelajaran[$jamberikut])) {
+
+    // Sedang istirahat / sebelum jam pertama
+
+    $target = strtotime(
+        $tanggalhariini . ' ' .
+        $jam_pelajaran[$jamberikut]['mulai']
+    );
+
+    $reloadseconds = max(
+        1,
+        $target - $nowtimestamp + 1
+    );
 }
 
 /*
@@ -1323,7 +1366,7 @@ th{
 }
 td{
     padding:18px;
-    font-size:28px;
+    font-size:36px;
     border-bottom:1px solid #334155;
 }
 
@@ -2072,14 +2115,16 @@ document.querySelectorAll('.panel-scroll').forEach(panel => {
 
 /*
 =====================================================
-4. AUTO REFRESH (ANTI-STUCK)
+4. AUTO REFRESH
+SAAT PERGANTIAN JAM
 =====================================================
 */
-<?php if ($mode_tv === 'KBM'): ?>
+
+<?php if ($mode_tv === 'KBM' && $reloadseconds > 0): ?>
 
 setTimeout(() => {
     location.reload();
-}, 900000); // 15 menit
+}, <?= $reloadseconds * 1000 ?>);
 
 <?php endif; ?>
 

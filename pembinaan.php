@@ -112,7 +112,10 @@ $datawa = [
     '{gurubk}'       => $nama,
 
     // dipakai resolver tujuan
-    'kelas'          => $record->kelas
+    'kelas'          => $record->kelas,
+
+    // daftar userid siswa yang dibina
+    'pesertaid'      => $record->pesertaid
 ];
 
 jm_kirim_template_auto(

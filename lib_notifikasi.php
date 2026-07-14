@@ -226,6 +226,7 @@ function jm_get_template($kode) {
 
     $map = [
         'jurnal'           => 'template_jurnal',
+        'pembinaan_mapel'  => 'template_pembinaan_mapel',
         'guruwali'         => 'template_guru_wali',
         'izinmurid'        => 'template_izin_murid',
         'izinguru'         => 'template_izin_guru',
@@ -363,16 +364,18 @@ function jm_get_nomor_tujuan($kode, array $data = []) {
                 }
                 break;
 
-	case 'guruwali':
-	    if (!empty($data['kelas'])) {
+case 'guruwali':
 
-		$list = get_nomor_guru_wali($data['kelas']);
+    if (!empty($data['pesertaid'])) {
 
-		if (!empty($list)) {
-		    $nomor = array_merge($nomor, $list);
-		}
-	    }
-	    break;
+        $list = get_nomor_guru_wali($data['pesertaid']);
+
+        if (!empty($list)) {
+            $nomor = array_merge($nomor, $list);
+        }
+    }
+
+    break;
 
 	case 'gurubk':
 	    $list = get_nomor_guru_bk();
@@ -481,54 +484,37 @@ function get_nomor_guru_bk($kelas = null) {
 }
 
 /**
- * Ambil nomor WA Guru Wali berdasarkan kelas
+ * Ambil nomor WA Guru Wali berdasarkan peserta pembinaan
  */
-function get_nomor_guru_wali($kelas) {
-    global $CFG, $DB;
+function get_nomor_guru_wali($pesertaid) {
+    global $DB;
 
-    if (is_numeric($kelas)) {
+    // pesertaid disimpan dalam bentuk JSON
+    $peserta = json_decode($pesertaid, true);
 
-    $namakelas = $DB->get_field(
-        'cohort',
-        'name',
-        ['id' => $kelas]
-    );
-
-    if (!empty($namakelas)) {
-        $kelas = $namakelas;
-    }
-}
-
-    $file = $CFG->dataroot . '/binaan.csv';
-
-    if (!file_exists($file)) {
+    if (!is_array($peserta) || empty($peserta)) {
         return [];
     }
 
     $nomor = [];
 
-    if (($handle = fopen($file, 'r')) !== false) {
+    foreach ($peserta as $muridid) {
 
-        fgetcsv($handle); // Header
+        $guruid = $DB->get_field(
+            'local_jurnalmengajar_guruwali',
+            'guruid',
+            ['muridid' => (int)$muridid]
+        );
 
-        while (($row = fgetcsv($handle)) !== false) {
-
-            if (count($row) < 5) {
-                continue;
-            }
-
-            if (trim($row[4]) !== trim($kelas)) {
-                continue;
-            }
-
-            $wa = get_user_nowa((int)$row[0]);
-
-            if (!empty($wa)) {
-                $nomor[] = $wa;
-            }
+        if (empty($guruid)) {
+            continue;
         }
 
-        fclose($handle);
+        $wa = get_user_nowa($guruid);
+
+        if (!empty($wa)) {
+            $nomor[] = $wa;
+        }
     }
 
     return array_unique($nomor);
