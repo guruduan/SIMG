@@ -55,13 +55,17 @@ if ($hapusid = optional_param('hapusid', 0, PARAM_INT)) {
 $siswaoptions = [];
 
 if ($kelasid) {
-    $members = $DB->get_records('cohort_members', ['cohortid' => $kelasid]);
+    $members = $DB->get_records_sql("
+        SELECT u.id, u.lastname
+        FROM {cohort_members} cm
+        JOIN {user} u
+            ON u.id = cm.userid
+        WHERE cm.cohortid = :cohortid
+        ORDER BY u.lastname ASC
+    ", ['cohortid' => $kelasid]);
 
-    foreach ($members as $m) {
-        $u = $DB->get_record('user', ['id' => $m->userid], 'id, firstname, lastname');
-        if ($u) {
-            $siswaoptions[$u->id] = !empty($u->lastname) ? $u->lastname : $u->firstname;
-        }
+    foreach ($members as $u) {
+        $siswaoptions[$u->id] = $u->lastname;
     }
 }
 
