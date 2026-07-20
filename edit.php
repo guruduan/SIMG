@@ -24,30 +24,31 @@ let daftarPembinaan = [];
 let editIndex = -1;
 
 function loadSiswa(kelas, absenData = {}) {
+
     if (!kelas) {
         console.warn("Kelas tidak valid:", kelas);
         return;
     }
 
     $.get("/local/jurnalmengajar/get_students.php", {kelas: kelas}, function(data) {
+
         $("#absen-area").html(data);
 
-        // 🔥 PRELOAD DATA LAMA
-    $('.absen-checkbox').each(function() {
+        $('.absen-checkbox').each(function() {
 
-       const userid = $(this).data('userid');
+            const userid = $(this).data('userid');
 
-       if (absenData[userid]) {
+            if (absenData[userid]) {
 
-	   $(this).prop('checked', true);
+                $(this).prop('checked', true);
 
-           const parent = $(this).closest('.absen-item');
-           const dropdown = parent.find('.absen-alasan');
+                const parent = $(this).closest('.absen-item');
+                const dropdown = parent.find('.absen-alasan');
 
-           dropdown.prop('disabled', false);
-           dropdown.val(absenData[userid]);
-	    }
-	});
+                dropdown.prop('disabled', false);
+                dropdown.val(absenData[userid]);
+            }
+        });
 
         bindAbsenEvent();
         updateAbsenField();
@@ -93,43 +94,46 @@ function updateAbsenField() {
         }
     });
 
-    $('#id_absen')
-        .val(JSON.stringify(hasil));
+$('textarea[name="absen"]')
+    .val(JSON.stringify(hasil));
 
-    $('#id_absenid')
-        .val(JSON.stringify(hasilid));
+$('input[name="absenid"]')
+    .val(JSON.stringify(hasilid));
 }
 
 
 // 🔥 load pertama (setelah form benar-benar siap)
  $(window).on('load', function() {
 
-    let absenData = {};
+let absenData = {};
 
-    try {
-      absenData = JSON.parse($('#id_absenid').val() || '{}');
-    } catch(e) {
-      absenData = {};
-    }
+try {
+    absenData = JSON.parse(
+        $('input[name="absenid"]').val() || '{}'
+    );
+} catch(e) {
+    absenData = {};
+}
 
     const kelas = $('select[name=kelas]').val();
 
-    console.log("kelas loaded:", kelas);
-    console.log("absenData:", absenData);
-
     loadSiswa(kelas, absenData);
     loadDropdownMurid(kelas);
-	try {
-	    daftarPembinaan = JSON.parse(
-		$('#id_pembinaanjson').val() || '[]'
-	    );
 
-	    $('input[name="pembinaanjson"]')
-		.val(JSON.stringify(daftarPembinaan));
+try {
 
-	} catch(e) {
-	    daftarPembinaan = [];
-	}
+    daftarPembinaan = JSON.parse(
+        $('input[name="pembinaanjson"]').val() || '[]'
+    );
+
+    $('input[name="pembinaanjson"]')
+        .val(JSON.stringify(daftarPembinaan));
+
+} catch (e) {
+
+    daftarPembinaan = [];
+
+}
 
 	renderPembinaan();
 
