@@ -2,6 +2,11 @@
 // File: local/jurnalmengajar/rekapnilai.php
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
+require_once($CFG->libdir . '/phpspreadsheet/vendor/autoload.php');
+
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+
 require_login();
 
 $context = context_system::instance();
@@ -15,6 +20,7 @@ $PAGE->set_heading('Rekap Nilai Harian');
 $config = get_config('local_jurnalmengajar');
 $tahunajaran = $config->tahun_ajaran ?? '-';
 $namasekolah = $config->nama_sekolah ?? '-';
+$tanggalawal = get_config('local_jurnalmengajar', 'tanggalawalminggu');
 
 global $DB, $USER, $OUTPUT;
 
@@ -25,13 +31,17 @@ $export   = optional_param('export', '', PARAM_ALPHA);
 
 // ====== Opsi Mapel: hanya mapel yang pernah diisi oleh user ini ======
 $mapelopts = [];
-$myMapels = $DB->get_fieldset_sql(
-    "SELECT DISTINCT mapel
-       FROM {local_jm_nilaiharian}
-      WHERE userid = :uid AND mapel <> ''
-   ORDER BY mapel ASC",
-   ['uid' => $USER->id]
-);
+$myMapels = $DB->get_fieldset_sql("
+    SELECT DISTINCT mapel
+      FROM {local_jm_nilaiharian}
+     WHERE userid = :uid
+       AND tanggal >= :tanggalawal
+       AND mapel <> ''
+  ORDER BY mapel ASC
+", [
+    'uid' => $USER->id,
+    'tanggalawal' => $tanggalawal
+]);
 foreach ($myMapels as $m) {
     $m = trim($m);
     if ($m !== '') { $mapelopts[$m] = $m; }
@@ -50,9 +60,14 @@ $seen = [];
 $mycohortids = $DB->get_fieldset_sql("
     SELECT DISTINCT cohortid
       FROM {local_jm_nilaiharian}
-     WHERE userid = :uid AND cohortid > 0
+     WHERE userid = :uid
+       AND cohortid > 0
+       AND tanggal >= :tanggalawal
   ORDER BY cohortid ASC
-", ['uid' => $USER->id]);
+", [
+    'uid' => $USER->id,
+    'tanggalawal' => $tanggalawal
+]);
 
 if (!empty($mycohortids)) {
     // ambil nama cohort berdasarkan id yang ditemukan
@@ -68,7 +83,6 @@ if (!empty($mycohortids)) {
 if ($cohortid && !array_key_exists($cohortid, $cohortopts)) {
     $cohortid = 0;
 }
-
 
 // ----------------------------------------------------
 // Siapkan data (members, entries, matrix) lebih dulu,
@@ -94,8 +108,15 @@ if (!empty($cohortid)) {
     }
 
     // Ambil entri nilai (milik user ini), filter mapel jika dipilih
-    $where  = "cohortid = :cohortid AND userid = :uid";
-    $params = ['cohortid' => $cohortid, 'uid' => $USER->id];
+$where = "cohortid = :cohortid
+          AND userid = :uid
+          AND tanggal >= :tanggalawal";
+
+$params = [
+    'cohortid'    => $cohortid,
+    'uid'         => $USER->id,
+    'tanggalawal' => $tanggalawal
+];
     if (!empty($mapel)) {
         $where .= " AND mapel = :mapel";
         $params['mapel'] = $mapel;
@@ -112,7 +133,9 @@ foreach ($entries as $rec) {
     $ts = !empty($rec->tanggal) ? strtotime($rec->tanggal) : false;
 
     $attempts[$idx] = [
+        'id'      => $rec->id,
         'idx'     => $idx + 1,
+        'judul'   => $rec->judul,
         'mapel'   => $rec->mapel,
         'kelas'   => $rec->kelas,
         'tanggal' => ($ts !== false)
@@ -148,54 +171,101 @@ $N = count($attempts);
     }
 }
 
-// ====== EXPORT CSV (harus dieksekusi sebelum output HTML) ======
-// ====== EXPORT CSV ======
-if ($export === 'csv' && !empty($cohortid)) {
-    $filename = 'rekap_nilai_per_murid_' . userdate(time(), '%Y%m%d_%H%M%S') . '.csv';
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="'.$filename.'"');
-    $out = fopen('php://output', 'w');
+// ====== EXPORT XLSX (harus dieksekusi sebelum output HTML) ======
+$mapellabel = $mapel ?: '- Semua Mapel -';
+$kelaslabel = $cohortopts[$cohortid] ?? '';
+// ====== EXPORT XLSX ======
+if ($export === 'xlsx' && !empty($cohortid)) {
 
-    // --- Tambahan judul rekap ---
-    fputcsv($out, ['REKAP NILAI HARIAN']);
-    fputcsv($out, []); // baris kosong
+    $filename = 'rekap_nilai_per_murid_' . userdate(time(), '%Y%m%d_%H%M%S') . '.xlsx';
 
-    // Ambil label mapel & kelas untuk dicetak
-    $mapellabel  = $mapel ?: '- Semua Mapel -';
-    $kelaslabel  = isset($cohortopts[$cohortid]) ? $cohortopts[$cohortid] : '';
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
 
-    fputcsv($out, ['Mata Pelajaran :', $mapellabel]);
-    fputcsv($out, [$namasekolah]);
-    fputcsv($out, ['Kelas :', $kelaslabel]);
-    fputcsv($out, ['Tahun :', $tahunajaran]);
-    fputcsv($out, []); // baris kosong sebelum tabel
+    $sheet->setCellValue('A1', 'REKAP NILAI HARIAN');
+    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
 
-    // --- Header tabel ---
-    $header = ['No', 'Nama Murid', 'Rata-rata'];
-    for ($i=1; $i <= max(1,$N); $i++) { 
-        $header[] = 'Nilai ' . $i; 
+    $sheet->setCellValue('A3', 'Mata Pelajaran');
+    $sheet->setCellValue('B3', $mapellabel);
+
+    $sheet->setCellValue('A4', 'Sekolah');
+    $sheet->setCellValue('B4', $namasekolah);
+
+    $sheet->setCellValue('A5', 'Kelas');
+    $sheet->setCellValue('B5', $kelaslabel);
+
+    $sheet->setCellValue('A6', 'Tahun');
+    $sheet->setCellValue('B6', $tahunajaran);
+
+    $row = 8;
+
+    $sheet->setCellValue('A'.$row, 'No');
+    $sheet->setCellValue('B'.$row, 'Nama Murid');
+    $sheet->setCellValue('C'.$row, 'Rata-rata');
+
+    $col = 'D';
+
+    if ($N > 0) {
+        foreach ($attempts as $a) {
+            $sheet->setCellValue($col.$row, $a['judul']);
+            $col++;
+        }
+    } else {
+        $sheet->setCellValue('D'.$row, 'Nilai');
     }
-    fputcsv($out, $header);
 
-    // --- Isi data ---
-    $no  = 1;
+    $sheet->getStyle('A8:' . $sheet->getHighestColumn() . '8')
+        ->getFont()
+        ->setBold(true);
+
+    $row++;
+
+    $no = 1;
     $den = max(1, $N);
+
     foreach ($students as $uid => $name) {
+
         $sum = 0;
-        for ($i=0; $i < $den; $i++) { $sum += (int)$matrix[$uid][$i]; }
+
+        for ($i = 0; $i < $den; $i++) {
+            $sum += (int)$matrix[$uid][$i];
+        }
+
         $avg = $den > 0 ? round($sum / $den, 2) : 0;
 
-        $row = [$no++, $name, $avg];
-        for ($i=0; $i < $den; $i++) {
-            $row[] = $matrix[$uid][$i];
+        $sheet->setCellValue('A'.$row, $no++);
+        $sheet->setCellValue('B'.$row, $name);
+        $sheet->setCellValue('C'.$row, $avg);
+
+        $col = 'D';
+
+        for ($i = 0; $i < $den; $i++) {
+            $sheet->setCellValue($col.$row, $matrix[$uid][$i]);
+            $col++;
         }
-        fputcsv($out, $row);
+
+        $row++;
     }
 
-    fclose($out);
+    $lastrow = $sheet->getHighestRow();
+
+    $sheet->getStyle(
+        'A8:' . $sheet->getHighestColumn() . $lastrow
+    )->getBorders()->getAllBorders()->setBorderStyle(
+        \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN
+    );
+
+    foreach (range('A', $sheet->getHighestColumn()) as $column) {
+        $sheet->getColumnDimension($column)->setAutoSize(true);
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="'.$filename.'"');
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save('php://output');
     exit;
 }
-
 
 // ====== Mulai output HTML ======
 echo $OUTPUT->header();
@@ -236,8 +306,17 @@ echo html_writer::div(
 
 // Tombol
 echo html_writer::div(
-    html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Tampilkan', 'class' => 'btn btn-primary']) . ' ' .
-    html_writer::empty_tag('input', ['type' => 'submit', 'name' => 'export', 'value' => 'csv', 'class' => 'btn btn-secondary']),
+    html_writer::empty_tag('input', [
+        'type'  => 'submit',
+        'value' => 'Tampilkan',
+        'class' => 'btn btn-primary'
+    ]) . ' ' .
+    html_writer::tag('button', '📥 Export XLSX', [
+        'type'  => 'submit',
+        'name'  => 'export',
+        'value' => 'xlsx',
+        'class' => 'btn btn-secondary'
+    ]),
     'fitem'
 );
 
@@ -254,7 +333,25 @@ if (empty($cohortid)) {
 // ====== Tabel hasil ======
 $table = new html_table();
 $head = ['No', 'Nama Murid', 'Rata-rata'];
-for ($i=1; $i <= max(1,$N); $i++) { $head[] = 'Nilai ' . $i; }
+
+if ($N > 0) {
+    foreach ($attempts as $a) {
+$url = new moodle_url(
+    '/local/jurnalmengajar/nilaiharian.php',
+    ['id' => $a['id']]
+);
+
+$head[] =
+    html_writer::div(s($a['judul'])) .
+    html_writer::div(
+        html_writer::link($url, '✏️ Edit'),
+        '',
+        ['style' => 'font-size:11px;']
+    );
+    }
+} else {
+    $head[] = 'Nilai';
+}
 $table->head  = $head;
 $table->align = array_merge(['center','left','center'], array_fill(0, max(1,$N), 'center'));
 
@@ -285,7 +382,12 @@ if ($N > 0) {
     $ket = [];
     for ($i=0; $i<$N; $i++) {
         $guru = fullname(\core_user::get_user($attempts[$i]['guru']));
-        $ket[] = 'Nilai '.($i+1).': '.$attempts[$i]['mapel'].' • '.$attempts[$i]['kelas'].' • '.$attempts[$i]['tanggal'].' • '.$guru;
+        $ket[] =
+    $attempts[$i]['judul'].' : '.
+    $attempts[$i]['mapel'].' • '.
+    $attempts[$i]['kelas'].' • '.
+    $attempts[$i]['tanggal'].' • '.
+    $guru;
     }
     echo $OUTPUT->box(implode('<br>', array_map('s', $ket)), 'generalbox');
 }

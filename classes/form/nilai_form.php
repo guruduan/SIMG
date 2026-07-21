@@ -38,12 +38,38 @@ class nilai_form extends \moodleform {
         // ====== Header form ======
         $mform->addElement('header', 'hdr', \get_string('inputnilaiharian', 'local_jurnalmengajar'));
 
+$record = $this->_customdata['record'] ?? null;
+
+$mform->addElement('hidden', 'id');
+$mform->setType('id', PARAM_INT);
+
+if ($record) {
+    $mform->setDefault('id', $record->id);
+}
+
         // ====== Mata Pelajaran — dengan placeholder ======
         $mapelops = ['' => '- Pilih Mata Pelajaran -'] + $mapels;
         $mform->addElement('select', 'mapel', \get_string('matapelajaran', 'local_jurnalmengajar'), $mapelops);
         $mform->setType('mapel', PARAM_TEXT);
         $mform->setDefault('mapel', '');
         $mform->addRule('mapel', \get_string('required'), 'required', null, 'client');
+
+// ====== Judul Penilaian ======
+$mform->addElement(
+    'text',
+    'judul',
+    'Nama Penilaian',
+    ['size' => 60]
+);
+$mform->setType('judul', PARAM_TEXT);
+$mform->setDefault('judul', '');
+$mform->addRule(
+    'judul',
+    \get_string('required'),
+    'required',
+    null,
+    'client'
+);
 
         // ====== Kelas (cohort) — placeholder + auto-submit ======
         $cohortops = ['' => '-- Pilih Kelas --'] + $cohorts;
@@ -70,27 +96,67 @@ class nilai_form extends \moodleform {
         $this->add_action_buttons(true, 'Simpan Nilai');
     }
 
-    public function definition_after_data() {
-        global $DB;
+public function definition_after_data() {
+    global $DB;
 
-        $mform = $this->_form;
-        $data  = $this->get_data();
-        if (!$data) { $data = (object)$this->_customdata; }
+    $mform = $this->_form;
 
-        // Ambil cohort yang dipilih: dari request atau data form.
-        $cohortid = \optional_param('cohortid', 0, PARAM_INT);
-        if (empty($cohortid) && !empty($data->cohortid)) { $cohortid = $data->cohortid; }
+    $data = $this->get_data();
 
-        if ($cohortid) {
-            // Ambil anggota cohort
-            $members = $DB->get_records_sql("
-                SELECT u.id, u.firstname, u.lastname
-                  FROM {cohort_members} cm
-                  JOIN {user} u ON u.id = cm.userid
-                 WHERE cm.cohortid = :cid
-              ORDER BY u.lastname, u.firstname
-            ", ['cid' => $cohortid]);
+$record = $this->_customdata['record'] ?? null;
 
+
+    // Ambil cohort yang dipilih.
+    $cohortid = \optional_param('cohortid', 0, PARAM_INT);
+
+if (empty($cohortid)) {
+
+    if (!empty($data) && !empty($data->cohortid)) {
+
+        $cohortid = $data->cohortid;
+
+    } else if ($record && !empty($record->cohortid)) {
+
+        $cohortid = $record->cohortid;
+
+    }
+
+}
+    if ($cohortid) {
+
+        // Ambil anggota cohort
+        $members = $DB->get_records_sql("
+            SELECT
+                u.id,
+                u.firstname,
+                u.lastname
+            FROM {cohort_members} cm
+            JOIN {user} u
+                ON u.id = cm.userid
+            WHERE cm.cohortid = :cid
+            ORDER BY
+                u.lastname,
+                u.firstname
+        ", ['cid' => $cohortid]);
+        $nilaimap = [];
+
+if ($record && !empty($record->nilaijson)) {
+
+    $items = json_decode($record->nilaijson, true);
+
+    if (is_array($items)) {
+
+        foreach ($items as $item) {
+
+if (isset($item['userid'], $item['nilai'])) {
+    $nilaimap[(int)$item['userid']] = $item['nilai'];
+}
+
+        }
+
+    }
+
+}
             // Render tabel input nilai
             $html  = '<div class="table-responsive">';
             $html .= '<table class="generaltable">';
@@ -102,7 +168,19 @@ class nilai_form extends \moodleform {
                 $html .= '<tr>';
                 $html .= '<td>' . $no++ . '</td>';
                 $html .= '<td>' . \s($lastname) . '</td>';
-                $html .= '<td><input type="number" name="nilai['.$u->id.']" step="1" min="0" max="100" style="width:140px;" /></td>';
+                $value = '';
+
+if (isset($nilaimap[$u->id])) {
+    $value = (int)$nilaimap[$u->id];
+}
+
+$html .= '<td><input type="number"
+    name="nilai['.$u->id.']"
+    value="'.$value.'"
+    step="1"
+    min="0"
+    max="100"
+    style="width:140px;" /></td>';
                 $html .= '</tr>';
             }
 
