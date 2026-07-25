@@ -95,8 +95,44 @@ echo html_writer::start_div('row g-3 align-items-center');
 
 // Baris 3: Mata Pelajaran & Checkbox & Tombol
 echo html_writer::start_div('col-md-5');
-echo html_writer::tag('label', 'Mata Pelajaran:', ['for' => 'matpel', 'class' => 'form-label fw-bold']);
-echo html_writer::empty_tag('input', ['type' => 'text', 'name' => 'matpel', 'id' => 'matpel', 'value' => s($matpel), 'class' => 'form-control', 'placeholder' => 'Semua mata pelajaran']);
+
+echo html_writer::tag(
+    'label',
+    'Mata Pelajaran:',
+    [
+        'for' => 'matpel',
+        'class' => 'form-label fw-bold'
+    ]
+);
+
+// Ambil daftar mapel dari setting plugin
+$mapeloptions = [
+    '' => '-- Semua Mata Pelajaran --'
+];
+
+$setting = get_config('local_jurnalmengajar', 'mapel_list');
+
+if (!empty($setting)) {
+    foreach (explode(',', $setting) as $mapelitem) {
+        $mapelitem = trim($mapelitem);
+
+        if ($mapelitem !== '') {
+            $mapeloptions[$mapelitem] = $mapelitem;
+        }
+    }
+}
+
+echo html_writer::select(
+    $mapeloptions,
+    'matpel',
+    $matpel,
+    false,
+    [
+        'class' => 'form-control form-select',
+        'id' => 'matpel'
+    ]
+);
+
 echo html_writer::end_div();
 
 echo html_writer::start_div('col-md-4 pt-4'); // pt-4 mendorong agar sejajar input text
@@ -133,22 +169,34 @@ if ($kelasid && $dari && $sampai) {
 
 // ===== PROSES DATA & TABEL =====
 if ($kelasid && $dari && $sampai) {
-    $members = $DB->get_records('cohort_members', ['cohortid' => $kelasid]);
-    $userids = array_map(fn($m) => $m->userid, $members);
+$users = $DB->get_records_sql("
+    SELECT
+        u.id,
+        u.firstname,
+        u.lastname
+    FROM {cohort_members} cm
+    JOIN {user} u
+        ON u.id = cm.userid
+    WHERE cm.cohortid = :cohortid
+    ORDER BY u.lastname ASC, u.firstname ASC
+", [
+    'cohortid' => $kelasid
+]);
 
-    if (empty($userids)) {
-        echo html_writer::div('Tidak ada murid dalam kelas ini.', 'alert alert-warning text-center fw-bold mt-3');
-        echo $OUTPUT->footer();
-        exit;
-    }
+// Filter peserta sesuai mata pelajaran
+$users = jurnalmengajar_filter_peserta_mapel(
+    $users,
+    $matpel
+);
 
-    list($in_sql, $paramsin) = $DB->get_in_or_equal($userids);
-    $users = $DB->get_records_sql("
-        SELECT id, firstname, lastname
-        FROM {user}
-        WHERE id $in_sql
-        ORDER BY lastname ASC, firstname ASC
-    ", $paramsin);
+if (empty($users)) {
+    echo html_writer::div(
+        'Tidak ada murid dalam kelas ini.',
+        'alert alert-warning text-center fw-bold mt-3'
+    );
+    echo $OUTPUT->footer();
+    exit;
+}
 
     $params = ['kelas' => $kelasid, 'dari' => $dari, 'sampai' => $sampai];
     $wheres = ['kelas = :kelas', 'timecreated BETWEEN :dari AND :sampai'];
@@ -194,7 +242,9 @@ if ($kelasid && $dari && $sampai) {
                 if (!isset($perhari[$uid][$tgl])) {
                     $perhari[$uid][$tgl] = ['hadir' => 0, 'sakit' => 0, 'ijin' => 0, 'alpa' => 0, 'dispensasi' => 0];
                 }
-
+if (!jurnalmengajar_is_peserta_mapel($uid, $jurnal->matapelajaran)) {
+    continue;
+}
                 $status = isset($lookup[$namasiswa]) ? $lookup[$namasiswa] : 'hadir';
                 if (!isset($perhari[$uid][$tgl][$status])) {
                     $status = 'hadir';

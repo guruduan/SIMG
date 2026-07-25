@@ -161,7 +161,9 @@ echo html_writer::div(
                 if (!isset($perhari[$uid][$tgl])) {
                     $perhari[$uid][$tgl] = ['hadir' => 0, 'sakit' => 0, 'ijin' => 0, 'alpa' => 0, 'dispensasi' => 0];
                 }
-
+if (!jurnalmengajar_is_peserta_mapel($uid, $jurnal->matapelajaran)) {
+    continue;
+}
                 $status = isset($lookup[$namasiswa]) ? $lookup[$namasiswa] : 'hadir';
                 if (!isset($perhari[$uid][$tgl][$status])) {
                     $status = 'hadir';
@@ -225,6 +227,9 @@ echo html_writer::div(
             $absen = json_decode($jurnal->absen, true) ?? [];
 
             foreach ($users as $uid => $u) {
+            if (!jurnalmengajar_is_peserta_mapel($uid, $jurnal->matapelajaran)) {
+    continue;
+}
                 $namasiswa = trim($u->lastname);
                 $found = false;
 

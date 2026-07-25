@@ -225,7 +225,9 @@ if (empty($u->kelasid) ||
     (int)$j->kelas !== (int)$u->kelasid) {
     continue;
 }
-
+if (!jurnalmengajar_is_peserta_mapel($u->id, $j->matapelajaran)) {
+    continue;
+}
                 $tgl = date('Y-m-d', $j->timecreated);
                 $all_dates[$u->id][$tgl] = true;
 
@@ -271,7 +273,9 @@ if (empty($u->kelasid) ||
     (int)$j->kelas !== (int)$u->kelasid) {
     continue;
 }
-
+if (!jurnalmengajar_is_peserta_mapel($u->id, $j->matapelajaran)) {
+    continue;
+}
                 $found = false;
                 foreach ($absen as $nama => $alasan) {
                     if (strcasecmp(trim($nama), trim($u->lastname)) === 0) {

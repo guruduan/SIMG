@@ -31,13 +31,26 @@ $(document).ready(function() {
         }
     });
 
-    function loadSiswa(kelas) {
-        if (!kelas) return;
-        $.get("/local/jurnalmengajar/get_students.php", {kelas: kelas}, function(data) {
+function loadSiswa(kelas) {
+
+    if (!kelas) {
+        return;
+    }
+
+    const mapel = $('select[name="matapelajaran"]').val();
+
+    $.get(
+        "/local/jurnalmengajar/get_students.php",
+        {
+            kelas: kelas,
+            mapel: mapel
+        },
+        function(data) {
             $("#absen-area").html(data);
             bindAbsenEvent();
-        });
-    }
+        }
+    );
+}
 
     function bindAbsenEvent() {
 
@@ -102,6 +115,13 @@ $(document).ready(function() {
 	    loadDropdownMurid(kelas);
 
 	});
+	$('select[name="matapelajaran"]').on('change', function() {
+
+    const kelas = $('select[name="kelas"]').val();
+
+    loadSiswa(kelas);
+
+});
 
 function loadDropdownMurid(kelas) {
 
@@ -359,7 +379,7 @@ if ($kelasid) {
     );
 }
 
-$PAGE->requires->js_call_amd('local_jurnalmengajar/absen', 'init');
+//$PAGE->requires->js_call_amd('local_jurnalmengajar/absen', 'init');
 
 // ================= TAMPILAN MCOODLE =================
 echo $OUTPUT->header();

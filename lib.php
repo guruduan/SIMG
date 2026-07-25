@@ -1325,3 +1325,98 @@ return $DB->get_field_sql(
 ) ?: false;
 }
 
+/**
+ * Cek apakah murid termasuk Kristen.
+ */
+function jurnalmengajar_is_kristen(int $userid): bool {
+    global $DB;
+
+    static $cache = null;
+
+    if ($cache === null) {
+        $cache = [];
+
+        $records = $DB->get_records('local_jurnalmengajar_kristen');
+
+        foreach ($records as $record) {
+            $cache[$record->userid] = true;
+        }
+    }
+
+    return isset($cache[$userid]);
+}
+
+/**
+ * Cek apakah murid merupakan peserta mapel.
+ */
+function jurnalmengajar_is_peserta_mapel(int $userid, string $mapel): bool {
+
+    $iskristen = jurnalmengajar_is_kristen($userid);
+
+    // Normalisasi nama mapel.
+    $mapel = core_text::strtolower(trim($mapel));
+    $mapel = preg_replace('/\s+/', ' ', $mapel);
+
+    static $mapelislam = [
+        'pendidikan agama islam dan budi pekerti',
+        'pendidikan al quran',
+    ];
+
+    static $mapelkristen = [
+        'pendidikan agama kristen dan budi pekerti',
+        'pendalaman alkitab',
+    ];
+
+    if (in_array($mapel, $mapelkristen, true)) {
+        return $iskristen;
+    }
+
+    if (in_array($mapel, $mapelislam, true)) {
+        return !$iskristen;
+    }
+
+    // Selain mapel agama, semua murid adalah peserta.
+    return true;
+}
+
+/**
+ * Filter daftar peserta sesuai mapel.
+ *
+ * @param array $users Array berisi object user atau userid.
+ * @param string $mapel Nama mata pelajaran.
+ * @return array
+ */
+function jurnalmengajar_filter_peserta_mapel(array $users, string $mapel): array {
+
+    foreach ($users as $key => $user) {
+
+        if (is_object($user)) {
+
+            if (isset($user->id)) {
+                $userid = (int)$user->id;
+
+            } else if (isset($user->userid)) {
+                $userid = (int)$user->userid;
+
+            } else {
+                unset($users[$key]);
+                continue;
+            }
+
+        } else if (is_numeric($user)) {
+
+            $userid = (int)$user;
+
+        } else {
+
+            unset($users[$key]);
+            continue;
+        }
+
+        if (!jurnalmengajar_is_peserta_mapel($userid, $mapel)) {
+            unset($users[$key]);
+        }
+    }
+
+    return $users;
+}

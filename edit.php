@@ -30,29 +30,38 @@ function loadSiswa(kelas, absenData = {}) {
         return;
     }
 
-    $.get("/local/jurnalmengajar/get_students.php", {kelas: kelas}, function(data) {
+    const mapel = $('select[name="matapelajaran"]').val();
 
-        $("#absen-area").html(data);
+    $.get(
+        "/local/jurnalmengajar/get_students.php",
+        {
+            kelas: kelas,
+            matapelajaran: mapel
+        },
+        function(data) {
 
-        $('.absen-checkbox').each(function() {
+            $("#absen-area").html(data);
 
-            const userid = $(this).data('userid');
+            $('.absen-checkbox').each(function() {
 
-            if (absenData[userid]) {
+                const userid = $(this).data('userid');
 
-                $(this).prop('checked', true);
+                if (absenData[userid]) {
 
-                const parent = $(this).closest('.absen-item');
-                const dropdown = parent.find('.absen-alasan');
+                    $(this).prop('checked', true);
 
-                dropdown.prop('disabled', false);
-                dropdown.val(absenData[userid]);
-            }
-        });
+                    const parent = $(this).closest('.absen-item');
+                    const dropdown = parent.find('.absen-alasan');
 
-        bindAbsenEvent();
-        updateAbsenField();
-    });
+                    dropdown.prop('disabled', false);
+                    dropdown.val(absenData[userid]);
+                }
+            });
+
+            bindAbsenEvent();
+            updateAbsenField();
+        }
+    );
 }
 
 function bindAbsenEvent() {
@@ -244,15 +253,29 @@ $('select[name=kelas]').on('change', function() {
 
 });
 
+$('select[name=matapelajaran]').on('change', function() {
+
+    const kelas = $('select[name=kelas]').val();
+
+    loadSiswa(kelas, {});
+    loadDropdownMurid(kelas);
+
+});
+
 function loadDropdownMurid(kelas, selectedid = '') {
 
     if (!kelas) {
         return;
     }
 
+    const mapel = $('select[name="matapelajaran"]').val();
+
     $.get(
         "/local/jurnalmengajar/get_students_dropdown.php",
-        {kelas: kelas},
+        {
+            kelas: kelas,
+            matapelajaran: mapel
+        },
         function(data) {
 
             $('select[name="murid_pembinaan"]').html(data);

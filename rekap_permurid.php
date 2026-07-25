@@ -136,6 +136,9 @@ if ($mode === 'hari') {
 if (!is_array($absen)) {
     $absen = [];
 }
+if (!jurnalmengajar_is_peserta_mapel($siswaid, $j->matapelajaran)) {
+    continue;
+}
         $statusJurnal = null;
 
         foreach ($absen as $nama => $als) {
@@ -232,7 +235,7 @@ unset($info); // ✅ TARUH DI SINI (di luar loop)
     echo html_writer::tag('tr',
         html_writer::tag('th', 'No') .
         html_writer::tag('th', 'Hari, tanggal') .
-        html_writer::tag('th', 'Absensi (dominan)') .
+        html_writer::tag('th', 'Absensi') .
         html_writer::tag('th', 'Rincian perhari')
     );
 
@@ -284,6 +287,9 @@ foreach ($jurnals as $jurnal) {
     $tanggal = tanggal_indo($jurnal->timecreated, 'judul');
 
     $absen = json_decode($jurnal->absen, true);
+if (!jurnalmengajar_is_peserta_mapel($siswaid, $jurnal->matapelajaran)) {
+    continue;
+}
 
     if (!is_array($absen)) {
         $absen = [];

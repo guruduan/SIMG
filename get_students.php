@@ -1,5 +1,6 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/lib.php');
 require_login();
 require_capability('local/jurnalmengajar:submit', context_system::instance());
 
@@ -9,6 +10,7 @@ $PAGE->set_context($context); // Wajib agar $PAGE->context tersedia
 header('Content-Type: text/html; charset=utf-8');
 
 $cohortid = required_param('kelas', PARAM_INT);
+$mapel = optional_param('mapel', '', PARAM_TEXT);
 $cohort = $DB->get_record('cohort', ['id' => $cohortid], '*', IGNORE_MISSING);
 if (!$cohort) {
     echo "<div class='alert alert-warning'>Cohort tidak ditemukan.</div>";
@@ -22,7 +24,7 @@ $members = $DB->get_records_sql("
     WHERE cm.cohortid = ?
     ORDER BY u.lastname ASC
 ", [$cohortid]);
-
+$members = jurnalmengajar_filter_peserta_mapel($members, $mapel);
 if (!$members) {
     echo "<div class='alert alert-info'>Tidak ada siswa dalam cohort ini.</div>";
     exit;

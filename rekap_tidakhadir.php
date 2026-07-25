@@ -138,10 +138,12 @@ foreach ($kelaslist as $kelas) {
 // Ambil semua jurnal kelas sejak awal tahun
 $jurnals = $DB->get_records_sql(
     "
-SELECT id,
-       timecreated,
-       jamke,
-       absen
+SELECT
+    id,
+    timecreated,
+    jamke,
+    matapelajaran,
+    absen
     FROM {local_jurnalmengajar}
     WHERE kelas = ?
       AND timecreated BETWEEN ? AND ?
@@ -199,7 +201,9 @@ foreach ($jurnals as $jurnal) {
     foreach ($users as $u) {
 
         $userid = $u->id;
-
+if (!jurnalmengajar_is_peserta_mapel($userid, $jurnal->matapelajaran)) {
+    continue;
+}
         $namasiswa = mb_strtolower(
             trim($u->lastname),
             'UTF-8'
@@ -398,4 +402,3 @@ $tombolkembali = html_writer::link(
 echo html_writer::div($tombolkembali, 'mb-3');
 
 echo $OUTPUT->footer();
-

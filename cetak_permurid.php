@@ -1,4 +1,3 @@
-cetak_permurid.php
 <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
@@ -94,6 +93,9 @@ if ($mode === 'hari') {
 $per_tanggal = []; // 'Y-m-d' => ['status_count'=>[], 'rincian'=>[]]
 
 foreach ($jurnals as $j) {
+  if (!jurnalmengajar_is_peserta_mapel($siswaid, $j->matapelajaran)) {
+        continue;
+    }
     $tglKey = date('Y-m-d', $j->timecreated);
     $absen = json_decode($j->absen, true);
     if (!is_array($absen)) $absen = [];
@@ -229,6 +231,10 @@ unset($info);
     $totaljam = 0;
 
     foreach ($jurnals as $j) {
+        if (!jurnalmengajar_is_peserta_mapel($siswaid, $j->matapelajaran)) {
+        continue;
+    }
+
                 $absen = json_decode($j->absen, true);
 
         if (!is_array($absen)) {

@@ -99,6 +99,9 @@ if ($mode === 'hari') {
         }
 
         foreach ($users as $uid => $u) {
+        if (!jurnalmengajar_is_peserta_mapel($uid, $j->matapelajaran)) {
+    continue;
+}
             $namasiswa = mb_strtolower(trim($u->lastname), 'UTF-8');
             if (isset($lookup[$namasiswa]) && isset($priority[$lookup[$namasiswa]])) {
                 $old = $perhari[$uid][$tgl] ?? 'hadir';
@@ -130,6 +133,9 @@ if ($mode === 'hari') {
         $absen  = json_decode($j->absen, true) ?? [];
 
         foreach ($users as $uid => $u) {
+        if (!jurnalmengajar_is_peserta_mapel($uid, $j->matapelajaran)) {
+    continue;
+}
             $namasiswa = trim($u->lastname);
             $found = false;
             foreach ($absen as $nama => $alasan) {
