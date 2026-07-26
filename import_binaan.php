@@ -2,7 +2,7 @@
 require('../../config.php');
 
 require_login();
-
+require_once(__DIR__ . '/lib.php');
 $context = context_system::instance();
 require_capability('moodle/site:config', $context);
 
