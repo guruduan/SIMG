@@ -307,7 +307,7 @@ if (!jurnalmengajar_is_peserta_mapel($u->id, $j->matapelajaran)) {
              <th class="align-middle text-warning"><i class="fa fa-stethoscope"></i> Sakit</th>
              <th class="align-middle text-info"><i class="fa fa-envelope"></i> Ijin</th>
              <th class="align-middle text-danger"><i class="fa fa-times-circle"></i> Alpa</th>
-             <th class="align-middle text-secondary"><i class="fa fa-briefcase"></i> Disp</th>
+             <th class="align-middle"><i class="fa fa-briefcase"></i> Disp</th>
              <th class="align-middle">Aksi</th>'
         ), ['class'=>'thead-light bg-light']
     );
@@ -330,12 +330,12 @@ if (!jurnalmengajar_is_peserta_mapel($u->id, $j->matapelajaran)) {
             '<td class="text-left font-weight-bold">' .
 format_nama_siswa($u->lastname) .
 '</td>'.
-            '<td><span class="badge badge-secondary bg-secondary">'.s($u->kelas).'</span></td>'.
+           '<td>'.s($u->kelas).'</td>'.
            '<td class="text-success font-weight-bold">'.$d['hadir'].'</td>'.
            '<td class="text-warning font-weight-bold">'.$d['sakit'].'</td>'.
            '<td class="text-info font-weight-bold">'.$d['ijin'].'</td>'.
            '<td class="text-danger font-weight-bold">'.$d['alpa'].'</td>'.
-           '<td class="text-secondary font-weight-bold">'.$d['dispensasi'].'</td>'.
+           '<td>'.$d['dispensasi'].'</td>'.
             '<td>'.html_writer::link($detailurl, '<i class="fa fa-search-plus"></i> Detail', ['class'=>'btn btn-sm btn-outline-primary']).'</td>'
         );
     }

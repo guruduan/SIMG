@@ -352,12 +352,10 @@ if (!jurnalmengajar_is_peserta_mapel($uid, $jurnal->matapelajaran)) {
             $is_int = abs($p1 - round($p1)) < 0.00001;
             $pstr = $is_int ? (string)round($p1) : number_format($p1, 1, ',', '');
             
-            // Pewarnaan teks persentase biar stand-out
-            $text_color = ($p1 >= 85) ? 'text-success fw-bold' : (($p1 >= 75) ? 'text-warning fw-bold' : 'text-danger fw-bold');
-            $persen = '<span class="'.$text_color.'">' . $pstr . '%</span> <small class="text-muted">dari ' . $total . ' ' . $unit_label . '</small>';
-        } else {
-            $persen = '<span class="text-muted">-</span>';
-        }
+            $persen = $pstr . '% dari ' . $total . ' ' . $unit_label;
+} else {
+    $persen = '-';
+}
 
         $namasiswa = ucwords(strtolower($users[$uid]->lastname));
 
@@ -376,7 +374,7 @@ if (!jurnalmengajar_is_peserta_mapel($uid, $jurnal->matapelajaran)) {
         echo html_writer::start_tag('tr', ['class' => 'text-center']);
         echo html_writer::tag('td', $no++);
         echo html_writer::tag('td', $namasiswa, ['class' => 'text-start fw-bold']);
-        echo html_writer::tag('td', '<span class="badge bg-success-light text-success fw-bold">' . $d['hadir'] . '</span>');
+        echo html_writer::tag('td', $d['hadir']);
         echo html_writer::tag('td', $d['sakit'] ?: '<span class="text-muted">0</span>');
         echo html_writer::tag('td', $d['ijin'] ?: '<span class="text-muted">0</span>');
         echo html_writer::tag('td', $d['alpa'] ? '<span class="text-danger fw-bold">' . $d['alpa'] . '</span>' : '<span class="text-muted">0</span>');
