@@ -225,7 +225,7 @@ if ($data->editid > 0) {
 
 if (!isset($notifkelas[$kelas])) {
     $notifkelas[$kelas] = [
-        'kelas' => get_nama_kelas($kelas),
+        'kelas' => $kelas,
         'murid' => []
     ];
 }

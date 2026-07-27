@@ -227,6 +227,7 @@ function jm_get_template($kode) {
     $map = [
         'jurnal'           => 'template_jurnal',
         'pembinaan_mapel'  => 'template_pembinaan_mapel',
+        'nilai_harian'     => 'template_nilai_harian',
         'guruwali'         => 'template_guru_wali',
         'izinmurid'        => 'template_izin_murid',
         'izinguru'         => 'template_izin_guru',
@@ -404,6 +405,351 @@ case 'guruwali':
     }
 
     return array_unique(array_filter($nomor));
+}
+
+/* ===========================
+ * BUILD DATA TEMPLATE
+ * =========================== */
+
+
+function jm_build_data_template(
+    string $kode,
+    stdClass $record
+) {
+    global $DB;
+
+    switch ($kode) {
+
+        case 'jurnal':
+
+            $user = $DB->get_record(
+                'user',
+                ['id' => $record->userid],
+                'id,firstname,lastname',
+                MUST_EXIST
+            );
+
+            $namaguru = !empty($user->lastname)
+                ? $user->lastname
+                : $user->firstname;
+
+            $kelas = get_nama_kelas($record->kelas);
+
+            $absen = '-';
+
+            $absenarr = json_decode(
+                $record->absen ?? '{}',
+                true
+            );
+
+            if (!empty($absenarr)) {
+
+                $formatted = [];
+                $no = 1;
+
+                foreach ($absenarr as $nama => $alasan) {
+
+                    $formatted[] =
+                        $no++ . ". {$nama}: {$alasan}";
+                }
+
+                $absen = implode(
+                    "\n",
+                    $formatted
+                );
+            }
+
+            $sekolah = get_config(
+                'local_jurnalmengajar',
+                'nama_sekolah'
+            ) ?: 'Nama Sekolah';
+
+            return [
+
+                '{guru}'       => $namaguru,
+                '{kelas}'      => $kelas,
+                '{jamke}'      => $record->jamke,
+                '{mapel}'      => $record->matapelajaran,
+                '{materi}'     => $record->materi,
+                '{aktivitas}'  => $record->aktivitas,
+                '{absen}'      => $absen,
+                '{keterangan}' => $record->keterangan ?? '-',
+                '{tanggal}'    => tanggal_indo(
+                    $record->timecreated,
+                    'judul'
+                ),
+                '{jam}'        => tanggal_indo(
+                    $record->timecreated,
+                    'jam'
+                ),
+                '{sekolah}'    => $sekolah,
+
+                // dipakai resolver tujuan
+                'kelas'  => $record->kelas,
+                'userid' => $record->userid
+            ];
+
+case 'pembinaan_mapel':
+
+    // Ambil jurnal induk
+    $jurnal = $DB->get_record(
+        'local_jurnalmengajar',
+        ['id' => $record->jurnalid],
+        '*',
+        MUST_EXIST
+    );
+
+    // Guru pengajar
+    $guru = $DB->get_record(
+        'user',
+        ['id' => $jurnal->userid],
+        'firstname,lastname',
+        MUST_EXIST
+    );
+
+    $namaguru = !empty($guru->lastname)
+        ? $guru->lastname
+        : $guru->firstname;
+
+    // Murid
+    $murid = $DB->get_record(
+        'user',
+        ['id' => $record->muridid],
+        'lastname',
+        MUST_EXIST
+    );
+
+    return [
+
+        '{waktu}'        => tanggal_indo($jurnal->timecreated),
+        '{murid}'        => format_nama_siswa($murid->lastname),
+        '{kelas}'        => get_nama_kelas($record->kelas),
+        '{mapel}'        => $jurnal->matapelajaran,
+        '{guru}'         => $namaguru,
+        '{jenis}'        => $record->jenis,
+        '{catatan}'      => $record->catatan,
+        '{tindaklanjut}' => $record->tindaklanjut,
+
+        // dipakai resolver tujuan
+        'kelas'          => $record->kelas,
+        'pesertaid'      => json_encode([$record->muridid]),
+        'userid'         => $jurnal->userid
+    ];
+    
+case 'nilai_harian':
+
+    $guru = $DB->get_record(
+        'user',
+        ['id' => $record->userid],
+        'firstname,lastname',
+        MUST_EXIST
+    );
+
+    $namaguru = !empty($guru->lastname)
+        ? $guru->lastname
+        : $guru->firstname;
+
+    $rows = json_decode($record->nilaijson);
+
+    $daftarnilai = '';
+
+    foreach ($rows as $r) {
+
+        $daftarnilai .=
+            $r->no . '. ' .
+            $r->name . ' : ' .
+            $r->nilai . "\n";
+    }
+
+    return [
+
+        '{guru}'        => $namaguru,
+        '{mapel}'       => $record->mapel,
+        '{kelas}'       => $record->kelas,              // nama kelas
+        '{judul}'       => $record->judul,
+        '{tanggal}'     => tanggal_indo(strtotime($record->tanggal), 'judul'),
+        '{daftarnilai}' => trim($daftarnilai),
+
+        // dipakai resolver tujuan
+        'kelas'         => $record->cohortid,           // ID cohort
+        'userid'        => $record->userid
+    ];
+case 'izinmurid':
+
+    $siswa = $DB->get_record(
+        'user',
+        ['id' => $record->userid],
+        'lastname',
+        MUST_EXIST
+    );
+
+    $guru = $DB->get_record(
+        'user',
+        ['id' => $record->guru_pengajar],
+        'firstname,lastname',
+        MUST_EXIST
+    );
+
+    $pengawas = $DB->get_record(
+        'user',
+        ['id' => $record->penginput],
+        'firstname,lastname',
+        MUST_EXIST
+    );
+
+    $namaguru = !empty($guru->lastname)
+        ? $guru->lastname
+        : $guru->firstname;
+
+    $namapengawas = !empty($pengawas->lastname)
+        ? $pengawas->lastname
+        : $pengawas->firstname;
+
+    return [
+
+        '{waktu}'     => tanggal_indo($record->timecreated),
+        '{nama}'      => format_nama_siswa($siswa->lastname),
+        '{kelas}'     => get_nama_kelas($record->kelasid),
+        '{guru}'      => $namaguru,
+        '{alasan}'    => $record->alasan,
+        '{keperluan}' => $record->keperluan,
+        '{pengawas}'  => $namapengawas,
+
+        // dipakai resolver tujuan
+        'kelas'       => $record->kelasid
+    ];
+
+case 'layanan_bk':
+
+    $guru = $DB->get_record(
+        'user',
+        ['id' => $record->userid],
+        'firstname,lastname',
+        MUST_EXIST
+    );
+
+    $namaguru = !empty($guru->lastname)
+        ? $guru->lastname
+        : $guru->firstname;
+
+    $peserta = json_decode($record->peserta ?? '[]', true);
+
+    if (is_array($peserta) && !empty($peserta)) {
+
+        $peserta = array_map(
+            'format_nama_siswa',
+            $peserta
+        );
+
+        $peserta_str = implode(', ', $peserta);
+
+    } else {
+
+        $peserta_str = '-';
+    }
+
+    return [
+
+        '{waktu}'         => tanggal_indo($record->timecreated),
+        '{murid}'         => $peserta_str,
+        '{kelas}'         => get_nama_kelas($record->kelas),
+        '{jenislayanan}'  => $record->jenislayanan,
+        '{topik}'         => $record->topik,
+        '{tindaklanjut}'  => $record->tindaklanjut,
+        '{catatan}'       => $record->catatan,
+        '{gurubk}'        => $namaguru,
+
+        // dipakai resolver tujuan
+        'kelas'           => $record->kelas,
+
+        // dipakai resolver peserta (jika diperlukan)
+        'pesertaid'       => $record->pesertaid
+    ];
+    
+case 'pembinaan':
+
+    $guru = $DB->get_record(
+        'user',
+        ['id' => $record->userid],
+        'firstname,lastname',
+        MUST_EXIST
+    );
+
+    $namaguru = !empty($guru->lastname)
+        ? $guru->lastname
+        : $guru->firstname;
+
+    $peserta = json_decode($record->peserta ?? '[]', true);
+
+    if (is_array($peserta) && !empty($peserta)) {
+
+        $peserta = array_map(
+            'format_nama_siswa',
+            $peserta
+        );
+
+        $peserta_str = implode(', ', $peserta);
+
+    } else {
+
+        $peserta_str = '-';
+    }
+
+    return [
+
+        '{waktu}'        => tanggal_indo($record->timecreated),
+        '{murid}'        => $peserta_str,
+        '{kelas}'        => get_nama_kelas($record->kelas),
+        '{permasalahan}' => $record->permasalahan,
+        '{upaya}'        => $record->tindakan,
+        '{gurubk}'       => $namaguru,
+
+        // dipakai resolver tujuan
+        'kelas'          => $record->kelas,
+
+        // dipakai resolver peserta
+        'pesertaid'      => $record->pesertaid
+    ];
+    
+case 'guruwali':
+
+    $murid = $DB->get_record(
+        'user',
+        ['id' => $record->muridid],
+        'lastname',
+        MUST_EXIST
+    );
+
+    $guru = $DB->get_record(
+        'user',
+        ['id' => $record->guruid],
+        'firstname,lastname',
+        MUST_EXIST
+    );
+
+    $namaguru = !empty($guru->lastname)
+        ? $guru->lastname
+        : $guru->firstname;
+
+    $kelas = $record->kelas;
+
+    return [
+
+        '{waktu}'        => tanggal_indo($record->timecreated),
+        '{murid}'        => format_nama_siswa($murid->lastname),
+        '{kelas}'        => $kelas,
+        '{topik}'        => $record->topik,
+        '{tindaklanjut}' => $record->tindaklanjut,
+        '{keterangan}'   => $record->keterangan,
+        '{guruwali}'     => $namaguru,
+
+        // dipakai resolver tujuan
+        'kelas'          => $record->kelas
+    ];
+    
+    }
+
+    return [];
 }
 
 function jm_kirim_template_auto(
