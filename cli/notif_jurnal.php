@@ -25,6 +25,9 @@ $jamsekarang = date('H:i');
 $isrekap = ($jamsekarang >= $jamrekap);
 //$isrekap = true; //test mode rekap
 
+$dryrun = in_array('--dry-run', $argv);
+// $dryrun = true; // untuk test
+
 // ===== Cek hari sekolah =====
 $hariSekolah = get_config('local_jurnalmengajar', 'harisekolah');
 
@@ -300,11 +303,32 @@ foreach ($urut as $kelas => $jamlist) {
 	    '{kelasjam}' => trim($listkelas)
 	];
 
-	    $res = jm_kirim_template(
-	    'reminder_jurnal',
-	    $nomor,
-	    $datawa
-	);
+if ($dryrun) {
+
+    $pesan = "Notifikasi SiM ❗\n\n";
+    $pesan .= "Bpk/Ibu Guru {$info['lastname']},\n";
+    $pesan .= "mohon mengisi jurnal mengajar hari ini ({$todayLabel}) untuk:\n\n";
+    $pesan .= trim($listkelas);
+    $pesan .= "\n\nTerima kasih.";
+
+    mtrace("");
+    mtrace("========================================");
+    mtrace("TEST REMINDER");
+    mtrace("Nomor : $nomor");
+    mtrace("----------------------------------------");
+    mtrace($pesan);
+    mtrace("========================================");
+
+    continue;
+
+} else {
+
+    $res = jm_kirim_template(
+        'reminder_jurnal',
+        $nomor,
+        $datawa
+    );
+}
 
 	$pending[$userid]['ringkas'] = $ringkas;
 	

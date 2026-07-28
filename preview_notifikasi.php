@@ -488,12 +488,15 @@ if (empty($timeline)) {
         );
 
         echo html_writer::empty_tag('hr');
-
-        /* guru */
+        
+        
+        /* guru atau murid */
+        
+        $label_pemohon = ($item['jenis'] === 'izinmurid') ? 'Murid :' : 'Guru :';
 
         echo html_writer::tag(
             'div',
-            '<strong>Guru :</strong> '
+            '<strong>' . $label_pemohon . '</strong> '
             .s($item['guru'])
         );
 

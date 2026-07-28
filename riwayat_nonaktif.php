@@ -126,7 +126,7 @@ $status = ucfirst($row->jenis);
         s($row->nis),
         format_nama_siswa($row->nama),
         $status,
-        tanggal_indo($row->tanggal),
+        tanggal_indo($row->tanggal, 'judul'), // Tambahkan parameter 'judul' di sini
         format_text($row->keterangan, FORMAT_PLAIN)
     ];
 }
