@@ -56,10 +56,10 @@ if (jurnalmengajar_cek_libur($today)) {
 }
 
 // ===== Cek tanggal asesmen =====
-$tanggalasesmen = trim(get_config('local_jurnalmengajar', 'tanggalasesmen'));
+$tanggalasesmen = trim((string)get_config('local_jurnalmengajar', 'tanggalasesmen'));
 if (!empty($tanggalasesmen)) {
     if (preg_match('/(\d{4}-\d{2}-\d{2})\s*s\/d\s*(\d{4}-\d{2}-\d{2})/i', $tanggalasesmen, $match)) {
-        $mulai  = strtotime($match[1]);
+        $mulai   = strtotime($match[1]);
         $selesai = strtotime($match[2]);
         $hariini = strtotime($today);
 
@@ -85,8 +85,6 @@ if (empty($jam_terlewat)) {
     jm_berhenti_dengan_pesan("Belum ada jam pelajaran yang selesai / terlewat hari ini.");
 }
 
-echo html_writer::div('Jam yang sudah lewat: <strong>' . implode(', ', $jam_terlewat) . '</strong>', 'alert alert-info mb-4');
-
 // ===== Ambil jurnal hari ini =====
 $starttoday = strtotime("$today 00:00:00");
 $endtoday   = strtotime("$today 23:59:59");
@@ -110,11 +108,13 @@ foreach ($jurnaltoday as $row) {
     }
 }
 
-// ===== Ambil jadwal dari database =====
+// ===== Ambil jadwal dari database (Optimasi: JOIN dengan custom field 'nowa') =====
 $jadwal_db = $DB->get_records_sql("
-    SELECT j.id, j.userid, j.kelas, j.jamke, u.lastname
+    SELECT j.id, j.userid, j.kelas, j.jamke, u.lastname, d.data AS nowa
     FROM {local_jurnalmengajar_jadwal} j
     JOIN {user} u ON u.id = j.userid
+    LEFT JOIN {user_info_field} f ON f.shortname = 'nowa'
+    LEFT JOIN {user_info_data} d ON d.fieldid = f.id AND d.userid = u.id
     WHERE j.hari = :hari
 ", ['hari' => $hariIndo]);
 
@@ -124,7 +124,8 @@ foreach ($jadwal_db as $j) {
         'userid'   => $j->userid,
         'lastname' => $j->lastname,
         'kelas'    => $j->kelas,
-        'jamke'    => $j->jamke
+        'jamke'    => $j->jamke,
+        'nowa'     => $j->nowa
     ];
 }
 
@@ -184,6 +185,7 @@ foreach ($jadwal as $j) {
     if (!isset($pending[$j['userid']])) {
         $pending[$j['userid']] = [
             'lastname' => $j['lastname'],
+            'nowa'     => $j['nowa'],
             'kelasjam' => []
         ];
     }
@@ -195,14 +197,30 @@ foreach ($jadwal as $j) {
     $pending[$j['userid']]['kelasjam'][$j['kelas']][] = (int)$j['jamke'];
 }
 
+// ===== Hentikan jika tidak ada data pending / tidak hadir =====
+if (empty($pending) && empty($tidakhadir)) {
+    jm_berhenti_dengan_pesan("Selamat! Semua jurnal untuk jam yang terlewat sudah diisi.", 'success');
+}
+
+// ===== TAMPILKAN HEADER & TOMBOL EKSEKUSI =====
+echo html_writer::div('Jam yang sudah lewat: <strong>' . implode(', ', $jam_terlewat) . '</strong>', 'alert alert-info mb-4');
+
+$url_proses = new moodle_url('/local/jurnalmengajar/proses_notifikasi.php');
+$tombol_eksekusi = $OUTPUT->single_button(
+    $url_proses, 
+    '🚀 Kirim Semua Notifikasi WA via Gateway', 
+    'post', 
+    [
+        'class' => 'btn-warning btn-lg font-weight-bold mb-4',
+        'onclick' => "return confirm('Apakah Anda yakin ingin mengirim semua notifikasi WhatsApp ini secara otomatis melalui Gateway?');"
+    ]
+);
+
+echo html_writer::div($tombol_eksekusi, 'mb-4');
 
 /* ==========================================
  * TAMPILKAN UI KARTU REMINDER (PER GURU)
  * ========================================== */
-
-if (empty($pending) && empty($tidakhadir)) {
-    jm_berhenti_dengan_pesan("Selamat! Semua jurnal untuk jam yang terlewat sudah diisi.", 'success');
-}
 
 echo html_writer::tag('h3', 'Daftar Reminder Guru', ['class' => 'mt-4 mb-3']);
 
@@ -211,50 +229,41 @@ $icon  = '⏰'; // Ikon jam
 
 foreach ($pending as $userid => $info) {
 
-    // 1. Ambil nomor WA
-    $nowa = $DB->get_field_sql("
-        SELECT d.data
-        FROM {user_info_data} d
-        JOIN {user_info_field} f ON f.id = d.fieldid
-        WHERE d.userid = :userid AND f.shortname = 'nowa'
-    ", ['userid' => $userid]);
+    // Sanitasi nomor WA yang sudah didapatkan dari query awal
+    $nomor = !empty($info['nowa']) ? preg_replace('/[^0-9]/', '', $info['nowa']) : '';
 
-    $nomor = !empty($nowa) ? preg_replace('/[^0-9]/', '', $nowa) : '';
-
-    // 2. Format kelas dan jam yang belum diisi
+    // Format kelas dan jam yang belum diisi
     $urut = [];
     foreach ($info['kelasjam'] as $kelas => $jamlist) {
         $jamlist = array_unique($jamlist);
         sort($jamlist);
         $urut[$kelas] = $jamlist;
     }
+    
     uasort($urut, function($a, $b) {
         return $a[0] <=> $b[0];
     });
 
-$listkelas = "";
+    $listkelas = "";
     $ringkasParts = [];
     foreach ($urut as $kelas => $jamlist) {
         $listkelas .= "$kelas jam ke " . implode(',', $jamlist) . "\n";
-        
-        // FORMAT BARU SESUAI PERMINTAAN
         $ringkasParts[] = 'Kelas ' . $kelas . ': Jamke ' . implode(',', $jamlist);
     }
     
     // Simpan ringkasan untuk rekap admin nanti
     $pending[$userid]['ringkas'] = implode('; ', $ringkasParts);
 
-    // 3. Susun Pesan
+    // Susun Pesan
     $datawa = [
         '{guru}'     => $info['lastname'],
         '{tanggal}'  => $todayLabel,
         '{kelasjam}' => trim($listkelas)
     ];
 
-    // Kita gunakan jm_preview_template untuk memanggil template text
     $pesan = jm_preview_template('reminder_jurnal', $datawa);
 
-    // 4. Render Card UI
+    // Render Card UI
     echo html_writer::start_div('card mb-3 shadow-sm', ['style' => 'border-left:6px solid '.$warna]);
     echo html_writer::start_div('card-body');
 
@@ -289,7 +298,7 @@ $listkelas = "";
         'onclick' => "navigator.clipboard.writeText(".json_encode($pesan).").then(()=>alert('Pesan berhasil disalin'));"
     ]);
 
-    echo ' '; // spasi antar tombol
+    echo ' '; // Spasi antar tombol
 
     // Tombol Kirim WhatsApp
     if (!empty($nomor)) {
@@ -306,11 +315,10 @@ $listkelas = "";
         ]);
     }
 
-    echo html_writer::end_div(); // End mt-3 (Tombol)
+    echo html_writer::end_div(); // End mt-3
     echo html_writer::end_div(); // End card-body
     echo html_writer::end_div(); // End card
 }
-
 
 /* ==========================================
  * TAMPILKAN UI KARTU REKAP (UNTUK ADMIN)
