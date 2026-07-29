@@ -133,7 +133,7 @@ if (!empty($_GET['jam'])) {
 
 $jam_pelajaran =
     jurnalmengajar_generate_jam_hari($hari_ini);
-    
+
 /*
 =====================================================
 VALIDASI HARI SEKOLAH
@@ -551,7 +551,6 @@ foreach ($daftarlibur as $libur) {
 }
 
 
-
 /*
 =====================================================
 DATA ASESMEN
@@ -654,6 +653,7 @@ foreach ($sesiasesmen as $nomor => $sesi) {
         break;
     }
 }
+
 /*
 =====================================================
 JIKA BELUM MASUK SESI PERTAMA
@@ -685,6 +685,7 @@ if (!$sesiaktif) {
         }
     }
 }
+
 /*
 =====================================================
 PENGAWAS AKTIF
@@ -803,6 +804,7 @@ if (
             $timestamp_target - $timestamp_now
         );
 }
+
 /*
 =====================================================
 SESI TERAKHIR
@@ -961,8 +963,6 @@ foreach ($jam_pelajaran as $j => $w) {
     }
 }
 
-
-
 /*
 =====================================================
 JIKA SEDANG ISTIRAHAT
@@ -984,8 +984,7 @@ if (!$jamaktif) {
 
 /*
 =====================================================
-HITUNG WAKTU AUTO RELOAD
-RELOAD SAAT PERGANTIAN JAM
+HITUNG WAKTU AUTO RELOAD & SISA DETIK KBM
 =====================================================
 */
 
@@ -995,6 +994,7 @@ $nowtimestamp = strtotime(
 );
 
 $reloadseconds = 0; // default: tidak reload
+$kbm_status_label = 'PERGANTIAN JAM DALAM';
 
 if ($jamaktif && !empty($jam_pelajaran[$jamaktif])) {
 
@@ -1008,10 +1008,17 @@ if ($jamaktif && !empty($jam_pelajaran[$jamaktif])) {
         $target - $nowtimestamp + 1
     );
 
+    // Cek apakah ada jam pelajaran berikutnya
+    if (!empty($jam_pelajaran[$jamberikut])) {
+        $kbm_status_label = 'PERGANTIAN JAM DALAM';
+    } else {
+        // Jika sudah jam terakhir
+        $kbm_status_label = 'KBM SELESAI DALAM';
+    }
+
 } else if ($jamberikut && !empty($jam_pelajaran[$jamberikut])) {
 
     // Sedang istirahat / sebelum jam pertama
-
     $target = strtotime(
         $tanggalhariini . ' ' .
         $jam_pelajaran[$jamberikut]['mulai']
@@ -1021,7 +1028,16 @@ if ($jamaktif && !empty($jam_pelajaran[$jamaktif])) {
         1,
         $target - $nowtimestamp + 1
     );
+    $kbm_status_label = 'JAM MASUK KBM DALAM';
+
+} else {
+
+    // Jika seluruh jam pelajaran sudah selesai (setelah KBM berakhir)
+    $kbm_status_label = 'KBM HARI INI TELAH SELESAI';
 }
+
+// Sisa detik untuk hitung mundur KBM
+$sisadetik_kbm = $reloadseconds;
 
 /*
 =====================================================
@@ -1045,35 +1061,35 @@ foreach ($jadwal as $j) {
 
     $kelas = trim($j['kelas']);
 
-	/*
-	============================================
-	CEK CUTOFF KELAS
-	============================================
-	*/
+    /*
+    ============================================
+    CEK CUTOFF KELAS
+    ============================================
+    */
 
-	preg_match('/^(XII|XI|X)/', $kelas, $match);
+    preg_match('/^(XII|XI|X)/', $kelas, $match);
 
-	$tingkatkelas = $match[1] ?? '';
+    $tingkatkelas = $match[1] ?? '';
 
-	if (!empty($cutoffkelas[$tingkatkelas])) {
+    if (!empty($cutoffkelas[$tingkatkelas])) {
 
-	    $tanggalcutoff =
-		strtotime($cutoffkelas[$tingkatkelas]);
+        $tanggalcutoff =
+        strtotime($cutoffkelas[$tingkatkelas]);
 
-	    /*
-	    =========================================
-	    JIKA SUDAH LEWAT CUTOFF
-	    =========================================
-	    */
+        /*
+        =========================================
+        JIKA SUDAH LEWAT CUTOFF
+        =========================================
+        */
 
-	    if (
-		strtotime($tanggalhariini)
-		>=
-		$tanggalcutoff
-	    ) {
-		continue;
-	    }
-	}
+        if (
+        strtotime($tanggalhariini)
+        >=
+        $tanggalcutoff
+        ) {
+        continue;
+        }
+    }
     /*
     =============================================
     INISIALISASI DATA KELAS
@@ -1289,7 +1305,7 @@ TOP PANELS
 }
 
 .panel-item{
-    font-size:20px;
+    font-size:28px;
     margin-bottom:6px;
     line-height:1.25;
 }
@@ -1298,6 +1314,34 @@ TOP PANELS
     opacity:0.7;
     font-size:20px;
 }
+
+/* DESAIN COUNTDOWN PENGUMUMAN (UKURAN DIPERBESAR) */
+.countdown-announcement-box {
+    background: #0f172a;
+    border: 2px solid #ef4444;
+    border-left: 8px solid #ef4444;
+    padding: 10px 18px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.countdown-announcement-title {
+    font-size: 32px; /* Sebelumnya 16px */
+    color: #f1f5f9;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.countdown-announcement-time {
+    font-size: 54px; /* Sebelumnya 22px */
+    font-weight: bold;
+    color: #ef4444;
+    letter-spacing: 2px;
+}
+
 /*
 =====================================================
 BANNER
@@ -1718,21 +1762,21 @@ RUNNING TEXT
 
             <div class="ruang-list">
 
-		<?php foreach ($pengawasaktif as $ruang => $data): ?>
+        <?php foreach ($pengawasaktif as $ruang => $data): ?>
 
-		    <div class="ruang-item">
+            <div class="ruang-item">
 
-			<div class="ruang-label">
-			    <?= s($ruang); ?>
-			</div>
+            <div class="ruang-label">
+                <?= s($ruang); ?>
+            </div>
 
-			<div class="ruang-guru">
-			    <?= s($data['guru'] ?? '-'); ?>
-			</div>
+            <div class="ruang-guru">
+                <?= s($data['guru'] ?? '-'); ?>
+            </div>
 
-		    </div>
+            </div>
 
-		<?php endforeach; ?>
+        <?php endforeach; ?>
 
             </div>
 
@@ -1782,21 +1826,21 @@ RUNNING TEXT
 
             <div class="ruang-list">
 
-		<?php foreach ($pengawasberikut as $ruang => $data): ?>
+        <?php foreach ($pengawasberikut as $ruang => $data): ?>
 
-		    <div class="ruang-item">
+            <div class="ruang-item">
 
-			<div class="ruang-label">
-			    <?= s($ruang); ?>
-			</div>
+            <div class="ruang-label">
+                <?= s($ruang); ?>
+            </div>
 
-			<div class="ruang-guru">
-			    <?= s($data['guru'] ?? '-'); ?>
-			</div>
+            <div class="ruang-guru">
+                <?= s($data['guru'] ?? '-'); ?>
+            </div>
 
-		    </div>
+            </div>
 
-		<?php endforeach; ?>
+        <?php endforeach; ?>
 
             </div>
 
@@ -1925,6 +1969,20 @@ updateCountdownAsesmen();
 
         <div class="panel-scroll">
 
+            <?php if ($sisadetik_kbm > 0): ?>
+
+                <!-- COUNTDOWN DIPINDAHKAN KE SINI -->
+                <div class="countdown-announcement-box">
+                    <span class="countdown-announcement-title">
+                        ⏳ <?= s($kbm_status_label); ?>
+                    </span>
+                    <span class="countdown-announcement-time" id="kbmCountdownPanel">
+                        00:00
+                    </span>
+                </div>
+
+            <?php endif; ?>
+
             <?php if (!empty($pengumuman)): ?>
 
                 <?php foreach ($pengumuman as $p): ?>
@@ -1937,9 +1995,11 @@ updateCountdownAsesmen();
 
             <?php else: ?>
 
-                <div class="panel-empty">
-                    Belum ada pengumuman
-                </div>
+                <?php if ($sisadetik_kbm <= 0): ?>
+                    <div class="panel-empty">
+                        Belum ada pengumuman
+                    </div>
+                <?php endif; ?>
 
             <?php endif; ?>
 
@@ -2115,16 +2175,37 @@ document.querySelectorAll('.panel-scroll').forEach(panel => {
 
 /*
 =====================================================
-4. AUTO REFRESH
-SAAT PERGANTIAN JAM
+4. AUTO REFRESH & COUNTDOWN PANEL PENGUMUMAN
 =====================================================
 */
 
-<?php if ($mode_tv === 'KBM' && $reloadseconds > 0): ?>
+<?php if ($mode_tv === 'KBM' && $sisadetik_kbm > 0): ?>
 
-setTimeout(() => {
-    location.reload();
-}, <?= $reloadseconds * 1000 ?>);
+let sisaKBM = <?= (int)$sisadetik_kbm; ?>;
+
+function updateCountdownKBM() {
+    if (sisaKBM < 0) sisaKBM = 0;
+
+    let m = String(Math.floor(sisaKBM / 60)).padStart(2, '0');
+    let s = String(sisaKBM % 60).padStart(2, '0');
+
+    const countdownEl = document.getElementById('kbmCountdownPanel');
+    if (countdownEl) {
+        countdownEl.innerHTML = `${m}:${s}`;
+    }
+
+    if (sisaKBM > 0) {
+        sisaKBM--;
+        if (sisaKBM === 0) {
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        }
+    }
+}
+
+updateCountdownKBM();
+setInterval(updateCountdownKBM, 1000);
 
 <?php endif; ?>
 
