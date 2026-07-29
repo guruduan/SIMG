@@ -20,7 +20,6 @@ global $USER;
 // Ambil jadwal dan jam pelajaran
 $jadwal = jurnalmengajar_get_jadwal_acuan();
 
-
 // Ambil daftar guru unik
 $daftarguru = [];
 foreach ($jadwal as $j) {
@@ -103,11 +102,16 @@ usort($grouped, function($a, $b) {
 
 /*
 =====================================================
-TABEL JADWAL MENGAJAR (LEBIH BERSIH & JELAS)
+TABEL JADWAL MENGAJAR (DENGAN PENANDA JAM AKTIF)
 =====================================================
 */
+
+// Ambil waktu & hari saat ini untuk penanda jam aktif
+$hari_ini = jurnalmengajar_get_hari_ini();
+$now      = date('H:i');
+
 echo '<div class="table-responsive">';
-echo '<table class="table table-bordered table-hover bg-white shadow-sm">';
+echo '<table class="table table-bordered table-hover bg-white shadow-sm align-middle">';
 echo '<thead class="thead-dark">';
 echo '<tr>';
 echo '<th style="width: 5%;" class="text-center">No</th>';
@@ -115,7 +119,7 @@ echo '<th style="width: 12%;">Hari</th>';
 echo '<th>Guru</th>';
 echo '<th style="width: 15%;" class="text-center">Kelas</th>';
 echo '<th style="width: 18%;" class="text-center">Jam Pelajaran</th>';
-echo '<th style="width: 20%;" class="text-center">Pukul</th>';
+echo '<th style="width: 22%;" class="text-center">Pukul</th>';
 echo '</tr>';
 echo '</thead>';
 echo '<tbody>';
@@ -124,7 +128,7 @@ $no = 1;
 $hari_sebelumnya = '';
 $totaljam = 0;
 
-// Palet warna teks badge kelas (soft/pastel text on dark background atau badge standar)
+// Palet warna teks badge kelas
 $warna_kelas = [];
 $warna_list = [
     'badge-primary',
@@ -144,7 +148,7 @@ foreach ($grouped as $g) {
     }
 
     sort($g['jamke']);
-    $jamgabung = implode(', ', array_unique($g['jamke'])); // Ditambahkan spasi setelah koma agar rapi
+    $jamgabung = implode(', ', array_unique($g['jamke']));
 
     $jamawal = min($g['jamke']);
     $jamakhir = max($g['jamke']);
@@ -163,30 +167,40 @@ foreach ($grouped as $g) {
         $index_warna++;
     }
 
-    echo '<tr>';
+    // LOGIKA PENANDA JAM AKTIF
+    // Berlangsung jika HARI SAMA dan WAKTU SEKARANG berada dalam rentang MULAI & SELESAI[cite: 1]
+    $is_aktif = ($g['hari'] === $hari_ini && $now >= $mulai && $now <= $selesai);
+
+    $row_attr = $is_aktif ? "class='table-success font-weight-bold'" : "";
+    $badge_aktif = $is_aktif ? " <span class='badge badge-success p-1 ml-1'><i class='fa fa-play-circle'></i> Aktif</span>" : "";
+
+    echo "<tr {$row_attr}>";
 
     // Logika pengelompokan baris Hari
     if ($hari_sebelumnya != $g['hari']) {
-        echo "<td class='text-center align-middle font-weight-bold table-active'>$no</td>";
-        echo "<td class='align-middle font-weight-bold table-active'>{$g['hari']}</td>";
+        $bg_hari = $is_aktif ? "table-success" : "table-active";
+        echo "<td class='text-center align-middle font-weight-bold {$bg_hari}'>$no</td>";
+        echo "<td class='align-middle font-weight-bold {$bg_hari}'>{$g['hari']}</td>";
         $hari_sebelumnya = $g['hari'];
         $no++;
     } else {
-        echo "<td class='table-active'></td>";
-        echo "<td class='table-active'></td>";
+        $bg_hari = $is_aktif ? "table-success" : "table-active";
+        echo "<td class='{$bg_hari}'></td>";
+        echo "<td class='{$bg_hari}'></td>";
     }
 
-    // Kolom Guru (Biasa/Normal tidak tebal)
+    // Kolom Guru
     echo "<td class='align-middle' style='color: #212529;'>{$g['lastname']}</td>";
     
-    // Kolom Kelas menggunakan Badge agar kontras teks tetap aman terjaga
+    // Kolom Kelas menggunakan Badge
     echo "<td class='text-center align-middle'><span class='badge {$warna_kelas[$kelas]} p-2' style='font-size:0.9rem; min-width:60px;'>$kelas</span></td>";
     
     // Jam Pelajaran
-    echo "<td class='text-center align-middle font-weight-bold text-info'>Jam ke-$jamgabung</td>";
+    $jam_class = $is_aktif ? "text-success" : "text-info";
+    echo "<td class='text-center align-middle font-weight-bold {$jam_class}'>Jam ke-$jamgabung</td>";
     
-    // Pukul/Waktu (Jelas dan Kontras)
-    echo "<td class='text-center align-middle' style='color: #212529;'><i class='fa fa-clock-o text-muted mr-1'></i> $pukul</td>";
+    // Pukul/Waktu + Indicator Aktif[cite: 1]
+    echo "<td class='text-center align-middle' style='color: #212529;'><i class='fa fa-clock-o text-muted mr-1'></i> {$pukul}{$badge_aktif}</td>";
 
     echo '</tr>';
 }

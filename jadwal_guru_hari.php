@@ -170,12 +170,12 @@ foreach ($jadwal as $j) {
 }
 
 /* ==========================================================
- * TAMPILAN
+ * TAMPILKAN JADWAL & TANDA JAM AKTIF
  * ========================================================== */
 
 $totalmengajar = 0;
-
 $namaguru = $listguru[$filterguru] ?? '-';
+$now = date('H:i'); // Jam & Menit saat ini untuk penanda jam aktif
 
 echo html_writer::start_div('card shadow-sm');
 
@@ -193,12 +193,12 @@ echo html_writer::div(
 
 echo html_writer::start_div('table-responsive');
 
-echo "<table class='table table-bordered table-striped table-hover'>";
+echo "<table class='table table-bordered table-striped table-hover align-middle'>";
 
 echo "
 <thead class='thead-dark'>
 <tr>
-    <th width='8%' class='text-center'>Jam</th>
+    <th width='12%' class='text-center'>Jam</th>
     <th width='22%'>Pukul</th>
     <th>Status</th>
 </tr>
@@ -211,10 +211,18 @@ foreach ($timeline as $jam => $data) {
     $mulai   = $jamhari[$jam]['mulai'] ?? '-';
     $selesai = $jamhari[$jam]['selesai'] ?? '-';
 
+    // Cek apakah waktu saat ini berada dalam durasi jam pelajaran ini
+    $is_aktif = ($now >= $mulai && $now <= $selesai);
+
+    // Styling baris & label jam
+    $row_class = $is_aktif ? "class='table-success font-weight-bold'" : "";
+    $badge_jam = $is_aktif 
+        ? "<span class='badge badge-success p-2'><i class='fa fa-play-circle mr-1'></i> Jam {$jam} (Aktif)</span>" 
+        : "<strong>{$jam}</strong>";
+
     if ($data['status'] == 'Mengajar') {
 
         $status = "<span class='badge badge-success p-2'>Mengajar : {$data['kelas']}</span>";
-
         $totalmengajar++;
 
     } else {
@@ -222,9 +230,9 @@ foreach ($timeline as $jam => $data) {
         $status = "<span class='badge badge-light border'>Tidak Mengajar</span>";
     }
 
-    echo "<tr>";
+    echo "<tr {$row_class}>";
 
-    echo "<td class='text-center'><strong>{$jam}</strong></td>";
+    echo "<td class='text-center'>{$badge_jam}</td>";
 
     echo "<td>{$mulai} - {$selesai}</td>";
 
@@ -243,16 +251,20 @@ foreach ($timeline as $jam => $data) {
 
         $akhirist = strtotime("+{$durasi} minutes", $mulaiist);
 
+        $str_mulaiist = date('H:i', $mulaiist);
+        $str_akhirist = date('H:i', $akhirist);
+
+        // Cek juga apakah waktu sekarang berada di jam istirahat
+        $is_ist_aktif = ($now >= $str_mulaiist && $now <= $str_akhirist);
+        $ist_class    = $is_ist_aktif ? "table-warning font-weight-bold border-warning" : "table-warning";
+        $ist_badge    = $is_ist_aktif ? " <span class='badge badge-warning text-dark ml-2'>(Sedang Istirahat)</span>" : "";
+
         echo "
-        <tr class='table-warning'>
+        <tr class='{$ist_class}'>
             <td></td>
-            <td><strong>"
-            . date('H:i', $mulaiist)
-            . " - "
-            . date('H:i', $akhirist)
-            . "</strong></td>
+            <td><strong>{$str_mulaiist} - {$str_akhirist}</strong></td>
             <td>
-                ☕ <strong>Istirahat ({$durasi} menit)</strong>
+                ☕ <strong>Istirahat ({$durasi} menit)</strong>{$ist_badge}
             </td>
         </tr>";
     }
