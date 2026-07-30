@@ -149,7 +149,7 @@ foreach ($jurnaltoday as $row) {
 
         $key = $row->userid . '-' . $kelas . '-' . $j;
         $filled[$key] = true;
-        web_trace("FILLED: " . $key);
+        // Opsional: web_trace("FILLED: " . $key); // Bisa dinonaktifkan jika log terlalu panjang
     }
 }
 
@@ -178,21 +178,65 @@ if (empty($jadwal)) {
     selesai_proses("Tidak ada jadwal di database untuk hari $hariIndo");
 }
 
-web_trace("=== JADWAL ===");
+/* =======================================================
+ * OPTIMASI LOGIKA BLOK MENGAJAR (JAM BERURUTAN)
+ * ======================================================= */
+$jadwal_guru_raw = [];
 foreach ($jadwal as $j) {
-    $k = $j['userid'].'-'.$j['kelas'].'-'.$j['jamke'];
-    web_trace("JADWAL: " . $k);
+    $jadwal_guru_raw[$j['userid']][] = (int)$j['jamke'];
+}
+
+$jam_boleh_diingatkan = [];
+foreach ($jadwal_guru_raw as $uid => $jamlist) {
+    $jamlist = array_unique($jamlist);
+    sort($jamlist);
+
+    $blocks = [];
+    $current_block = [];
+    $prev_jam = -1;
+
+    foreach ($jamlist as $jam) {
+        if ($prev_jam === -1 || $jam == $prev_jam + 1) {
+            $current_block[] = $jam;
+        } else {
+            $blocks[] = $current_block;
+            $current_block = [$jam];
+        }
+        $prev_jam = $jam;
+    }
+    if (!empty($current_block)) {
+        $blocks[] = $current_block;
+    }
+
+    $jam_boleh_diingatkan[$uid] = [];
+    foreach ($blocks as $block) {
+        $jam_terakhir_di_blok = max($block);
+        
+        // Hanya masukkan ke daftar proses jika jam terakhir di blok ini sudah lewat
+        if (in_array($jam_terakhir_di_blok, $jam_terlewat)) {
+            $jam_boleh_diingatkan[$uid] = array_merge($jam_boleh_diingatkan[$uid], $block);
+        }
+    }
 }
 
 // ===== Group jurnal yang belum diisi =====
 $pending = [];
 $tidakhadir = [];
 $cutoff_cache = [];
+$cache_status_takhadir = []; 
+$kelas_akhir_regex = get_config('local_jurnalmengajar', 'kelas_cutoff_regex') ?: '\b(VI|IX|XII)\b';
 
 foreach ($jadwal as $j) {
-    $kelas_level = null;
+    $uid = $j['userid'];
 
-    if (preg_match('/\b(VI|IX|XII)\b/i', $j['kelas'], $match)) {
+    // FILTER UTAMA BLOK MENGAJAR
+    if (!isset($jam_boleh_diingatkan[$uid]) || !in_array((int)$j['jamke'], $jam_boleh_diingatkan[$uid])) {
+        continue;
+    }
+
+    // Filter cutoff multi kelas
+    $kelas_level = null;
+    if (preg_match('/' . $kelas_akhir_regex . '/i', $j['kelas'], $match)) {
         $kelas_level = strtoupper($match[1]);
     }
 
@@ -211,58 +255,63 @@ foreach ($jadwal as $j) {
         continue;
     }
 
-    if (!in_array((int)$j['jamke'], $jam_terlewat)) {
-        continue;
+    // Cek Guru Tidak Hadir (Optimasi Cache N+1)
+    if (!isset($cache_status_takhadir[$uid])) {
+        $cache_status_takhadir[$uid] = jurnalmengajar_get_status_takhadir($uid, $today);
     }
+    $status = $cache_status_takhadir[$uid];
 
-    $status = jurnalmengajar_get_status_takhadir($j['userid'], $today);
     if ($status !== false) {
-        if (!isset($tidakhadir[$j['userid']])) {
-            $tidakhadir[$j['userid']] = [
+        if (!isset($tidakhadir[$uid])) {
+            $tidakhadir[$uid] = [
                 'lastname' => $j['lastname'],
                 'status'   => $status
             ];
         }
-        web_trace("TAKHADIR: {$j['lastname']} | {$j['kelas']} | " . ucfirst($status));
+        // Opsional: web_trace("TAKHADIR: {$j['lastname']} | {$j['kelas']} | " . ucfirst($status));
         continue;
     }
 
-    $key = $j['userid'] . '-' . $j['kelas'] . '-' . (int)$j['jamke'];
+    $key = $uid . '-' . $j['kelas'] . '-' . (int)$j['jamke'];
     if (isset($filled[$key])) {
         continue;
     }
 
-    if (!isset($pending[$j['userid']])) {
-        $pending[$j['userid']] = [
+    if (!isset($pending[$uid])) {
+        $pending[$uid] = [
             'lastname' => $j['lastname'],
             'nowa'     => $j['nowa'],
             'kelasjam' => []
         ];
     }
-    if (!isset($pending[$j['userid']]['kelasjam'][$j['kelas']])) {
-        $pending[$j['userid']]['kelasjam'][$j['kelas']] = [];
+    if (!isset($pending[$uid]['kelasjam'][$j['kelas']])) {
+        $pending[$uid]['kelasjam'][$j['kelas']] = [];
     }
-    $pending[$j['userid']]['kelasjam'][$j['kelas']][] = (int)$j['jamke'];
+    $pending[$uid]['kelasjam'][$j['kelas']][] = (int)$j['jamke'];
 }
 
 if (empty($pending) && empty($tidakhadir)) {
-    selesai_proses("Semua jurnal sudah diisi.");
+    selesai_proses("Semua jurnal yang jamnya sudah selesai telah diisi.");
 }
 
 // ===== Kirim WA per guru =====
 $mengirim = 0;
 
 if (!$isrekap) {
-    web_trace("Mode: Reminder Guru");
+    web_trace("Mode: Reminder Guru Individual");
 
     foreach ($pending as $userid => $info) {
 
         if (empty($info['nowa'])) {
-            web_trace("Tidak ada nomor WA untuk {$info['lastname']}");
+            web_trace("TIDAK DIKIRIM: Tidak ada nomor WA untuk {$info['lastname']}");
             continue;
         }
 
+        // Standardisasi nomor 0 menjadi 62
         $nomor = preg_replace('/[^0-9]/', '', $info['nowa']);
+        if (substr($nomor, 0, 1) === '0') {
+            $nomor = '62' . substr($nomor, 1);
+        }
 
         $urut = [];
         foreach ($info['kelasjam'] as $kelas => $jamlist) {
@@ -280,7 +329,7 @@ if (!$isrekap) {
 
         foreach ($urut as $kelas => $jamlist) {
             $listkelas .= "$kelas jam ke " . implode(',', $jamlist) . "\n";
-            $ringkasParts[] = $kelas . ':' . implode(',', $jamlist);
+            $ringkasParts[] = 'Kelas ' . $kelas . ': Jamke ' . implode(',', $jamlist);
         }
 
         $ringkas = implode('; ', $ringkasParts);
@@ -312,7 +361,7 @@ if (!$isrekap) {
         file_put_contents($logtxt, $line, FILE_APPEND);
     }
 } else {
-    web_trace("Mode: Rekap Admin");
+    web_trace("Mode: Rekap Admin (Jam batas rekap sudah lewat)");
 
     foreach ($pending as $userid => $info) {
         $urut = [];
@@ -328,12 +377,13 @@ if (!$isrekap) {
 
         $ringkasParts = [];
         foreach ($urut as $kelas => $jamlist) {
-            $ringkasParts[] = $kelas . ':' . implode(',', $jamlist);
+            $ringkasParts[] = 'Kelas ' . $kelas . ': Jamke ' . implode(',', $jamlist);
         }
         $pending[$userid]['ringkas'] = implode('; ', $ringkasParts);
     }
 }
 
+// Eksekusi pengiriman REKAP ke Admin jika waktunya sudah malam (berdasarkan konfigurasi $isrekap)
 if ($isrekap) {
     $daftar = '';
     $daftartakhadir = '';
@@ -351,20 +401,20 @@ if ($isrekap) {
     }
 
     $datawa = [
-        '{tanggal}' => $todayLabel,
-        '{daftar}'  => trim($daftar),
-        '{jumlah}'  => count($pending),
-        '{tidakhadir}'  => trim($daftartakhadir)
+        '{tanggal}'    => $todayLabel,
+        '{daftar}'     => trim($daftar),
+        '{jumlah}'     => count($pending),
+        '{tidakhadir}' => trim($daftartakhadir)
     ];
 
     $res = jm_kirim_template_auto('rekap_reminder', $datawa);
 
     if ($res) {
-        web_trace("Rekap reminder dikirim.");
+        web_trace("Rekap reminder Harian berhasil dikirim ke Admin.");
     } else {
-        web_trace("Rekap reminder dilewati (tidak ada tujuan notifikasi atau pengiriman gagal).");
+        web_trace("Gagal mengirim rekap reminder Harian (cek konfigurasi API atau nomor tujuan).");
     }
 }
 
 // Akhiri proses dan tampilkan semua log
-selesai_proses("Selesai. Total notifikasi dikirim: $mengirim");
+selesai_proses("Selesai. Total notifikasi individual yang dikirim: $mengirim");

@@ -1010,7 +1010,7 @@ if ($jamaktif && !empty($jam_pelajaran[$jamaktif])) {
 
     // Cek apakah ada jam pelajaran berikutnya
     if (!empty($jam_pelajaran[$jamberikut])) {
-        $kbm_status_label = 'PERGANTIAN JAM DALAM';
+        $kbm_status_label = 'GANTI JAM DALAM';
     } else {
         // Jika sudah jam terakhir
         $kbm_status_label = 'KBM SELESAI DALAM';

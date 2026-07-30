@@ -108,7 +108,7 @@ foreach ($jurnaltoday as $row) {
     }
 }
 
-// ===== Ambil jadwal dari database (Optimasi: JOIN dengan custom field 'nowa') =====
+// ===== Ambil jadwal dari database =====
 $jadwal_db = $DB->get_records_sql("
     SELECT j.id, j.userid, j.kelas, j.jamke, u.lastname, d.data AS nowa
     FROM {local_jurnalmengajar_jadwal} j
@@ -133,15 +133,72 @@ if (empty($jadwal)) {
     jm_berhenti_dengan_pesan("Tidak ada jadwal KBM di database untuk hari $hariIndo.", 'warning');
 }
 
+/* =======================================================
+ * OPTIMASI LOGIKA BLOK MENGAJAR (JAM BERURUTAN)
+ * =======================================================
+ * Mengelompokkan jam mengajar guru menjadi blok berurutan.
+ * Guru hanya akan masuk list jika jam *terakhir* di bloknya
+ * sudah masuk kategori $jam_terlewat.
+ * ======================================================= */
+$jadwal_guru_raw = [];
+foreach ($jadwal as $j) {
+    $jadwal_guru_raw[$j['userid']][] = (int)$j['jamke'];
+}
+
+$jam_boleh_diingatkan = [];
+foreach ($jadwal_guru_raw as $uid => $jamlist) {
+    $jamlist = array_unique($jamlist);
+    sort($jamlist); // Urutkan jam dari terkecil ke terbesar
+
+    $blocks = [];
+    $current_block = [];
+    $prev_jam = -1;
+
+    // Deteksi deret angka berurutan sebagai 1 blok
+    foreach ($jamlist as $jam) {
+        if ($prev_jam === -1 || $jam == $prev_jam + 1) {
+            $current_block[] = $jam;
+        } else {
+            $blocks[] = $current_block;
+            $current_block = [$jam];
+        }
+        $prev_jam = $jam;
+    }
+    if (!empty($current_block)) {
+        $blocks[] = $current_block;
+    }
+
+    $jam_boleh_diingatkan[$uid] = [];
+    foreach ($blocks as $block) {
+        $jam_terakhir_di_blok = max($block); // Jam paling akhir dalam blok tersebut
+        
+        // Jika jam terakhir di blok ini sudah lewat, maka keseluruhan blok boleh dikirim notif
+        if (in_array($jam_terakhir_di_blok, $jam_terlewat)) {
+            $jam_boleh_diingatkan[$uid] = array_merge($jam_boleh_diingatkan[$uid], $block);
+        }
+    }
+}
+
+
 // ===== Group jurnal yang belum diisi =====
 $pending = [];
 $tidakhadir = [];
+
 $cutoff_cache = [];
+$cache_status_takhadir = []; 
+$kelas_akhir_regex = get_config('local_jurnalmengajar', 'kelas_cutoff_regex') ?: '\b(VI|IX|XII)\b';
 
 foreach ($jadwal as $j) {
+    $uid = $j['userid'];
+
+    // FILTER UTAMA: Lewati jika jam ini belum termasuk dalam blok ngajar yang sudah SELESAI
+    if (!isset($jam_boleh_diingatkan[$uid]) || !in_array((int)$j['jamke'], $jam_boleh_diingatkan[$uid])) {
+        continue;
+    }
+
     // Filter cutoff multi kelas
     $kelas_level = null;
-    if (preg_match('/\b(VI|IX|XII)\b/i', $j['kelas'], $match)) {
+    if (preg_match('/' . $kelas_akhir_regex . '/i', $j['kelas'], $match)) {
         $kelas_level = strtoupper($match[1]);
     }
 
@@ -160,16 +217,15 @@ foreach ($jadwal as $j) {
         continue;
     }
 
-    // Lewati jika jam belum selesai
-    if (!in_array((int)$j['jamke'], $jam_terlewat)) {
-        continue;
+    // Cek Guru Tidak Hadir (Optimasi N+1 Cache)
+    if (!isset($cache_status_takhadir[$uid])) {
+        $cache_status_takhadir[$uid] = jurnalmengajar_get_status_takhadir($uid, $today);
     }
+    $status = $cache_status_takhadir[$uid];
 
-    // Cek Guru Tidak Hadir
-    $status = jurnalmengajar_get_status_takhadir($j['userid'], $today);
     if ($status !== false) {
-        if (!isset($tidakhadir[$j['userid']])) {
-            $tidakhadir[$j['userid']] = [
+        if (!isset($tidakhadir[$uid])) {
+            $tidakhadir[$uid] = [
                 'lastname' => $j['lastname'],
                 'status'   => $status
             ];
@@ -177,33 +233,35 @@ foreach ($jadwal as $j) {
         continue;
     }
 
-    $key = $j['userid'] . '-' . $j['kelas'] . '-' . (int)$j['jamke'];
+    // Cek di array apakah jurnal sudah diisi
+    $key = $uid . '-' . $j['kelas'] . '-' . (int)$j['jamke'];
     if (isset($filled[$key])) {
         continue;
     }
 
-    if (!isset($pending[$j['userid']])) {
-        $pending[$j['userid']] = [
+    // Jika belum diisi dan lolos semua filter, masukkan ke daftar pending
+    if (!isset($pending[$uid])) {
+        $pending[$uid] = [
             'lastname' => $j['lastname'],
             'nowa'     => $j['nowa'],
             'kelasjam' => []
         ];
     }
 
-    if (!isset($pending[$j['userid']]['kelasjam'][$j['kelas']])) {
-        $pending[$j['userid']]['kelasjam'][$j['kelas']] = [];
+    if (!isset($pending[$uid]['kelasjam'][$j['kelas']])) {
+        $pending[$uid]['kelasjam'][$j['kelas']] = [];
     }
 
-    $pending[$j['userid']]['kelasjam'][$j['kelas']][] = (int)$j['jamke'];
+    $pending[$uid]['kelasjam'][$j['kelas']][] = (int)$j['jamke'];
 }
 
 // ===== Hentikan jika tidak ada data pending / tidak hadir =====
 if (empty($pending) && empty($tidakhadir)) {
-    jm_berhenti_dengan_pesan("Selamat! Semua jurnal untuk jam yang terlewat sudah diisi.", 'success');
+    jm_berhenti_dengan_pesan("Semua guru dengan blok mengajar yang sudah selesai telah mengisi jurnal.", 'success');
 }
 
 // ===== TAMPILKAN HEADER & TOMBOL EKSEKUSI =====
-echo html_writer::div('Jam yang sudah lewat: <strong>' . implode(', ', $jam_terlewat) . '</strong>', 'alert alert-info mb-4');
+echo html_writer::div('Jam yang sudah lewat secara sistem: <strong>' . implode(', ', $jam_terlewat) . '</strong><br><small><em>*Guru yang masih melangsungkan sisa jam berurutan tidak akan ditampilkan agar tidak terganggu.</em></small>', 'alert alert-info mb-4');
 
 $url_proses = new moodle_url('/local/jurnalmengajar/proses_notifikasi.php');
 $tombol_eksekusi = $OUTPUT->single_button(
@@ -212,7 +270,7 @@ $tombol_eksekusi = $OUTPUT->single_button(
     'post', 
     [
         'class' => 'btn-warning btn-lg font-weight-bold mb-4',
-        'onclick' => "return confirm('Apakah Anda yakin ingin mengirim semua notifikasi WhatsApp ini secara otomatis melalui Gateway?');"
+        'onclick' => "return confirm('Apakah Anda yakin ingin mengirim notifikasi otomatis melalui Gateway?');"
     ]
 );
 
@@ -229,10 +287,12 @@ $icon  = '⏰'; // Ikon jam
 
 foreach ($pending as $userid => $info) {
 
-    // Sanitasi nomor WA yang sudah didapatkan dari query awal
+    // Standardisasi nomor 0 menjadi 62
     $nomor = !empty($info['nowa']) ? preg_replace('/[^0-9]/', '', $info['nowa']) : '';
+    if (substr($nomor, 0, 1) === '0') {
+        $nomor = '62' . substr($nomor, 1);
+    }
 
-    // Format kelas dan jam yang belum diisi
     $urut = [];
     foreach ($info['kelasjam'] as $kelas => $jamlist) {
         $jamlist = array_unique($jamlist);
@@ -251,10 +311,8 @@ foreach ($pending as $userid => $info) {
         $ringkasParts[] = 'Kelas ' . $kelas . ': Jamke ' . implode(',', $jamlist);
     }
     
-    // Simpan ringkasan untuk rekap admin nanti
     $pending[$userid]['ringkas'] = implode('; ', $ringkasParts);
 
-    // Susun Pesan
     $datawa = [
         '{guru}'     => $info['lastname'],
         '{tanggal}'  => $todayLabel,
@@ -263,44 +321,31 @@ foreach ($pending as $userid => $info) {
 
     $pesan = jm_preview_template('reminder_jurnal', $datawa);
 
-    // Render Card UI
     echo html_writer::start_div('card mb-3 shadow-sm', ['style' => 'border-left:6px solid '.$warna]);
     echo html_writer::start_div('card-body');
-
-    // Judul & Guru
     echo html_writer::tag('h5', $icon . ' Reminder: ' . s($info['lastname']));
     echo html_writer::empty_tag('hr');
-
-    // Info Kelas
     echo html_writer::tag('div', '<strong>Kelas belum diisi:</strong><br>' . nl2br(s(trim($listkelas))));
     echo html_writer::empty_tag('hr');
-
-    // Box Preview Pesan
     echo html_writer::start_div('alert alert-light');
     echo html_writer::tag('strong', 'Preview Pesan');
     echo html_writer::tag('pre', s($pesan), ['style'=>'white-space:pre-wrap']);
     echo html_writer::end_div();
 
-    // Nomor Tujuan
     echo html_writer::tag('strong', 'Nomor Tujuan');
     if (empty($nomor)) {
         echo html_writer::div('<em>Tidak ada nomor WA di profil.</em>', 'text-danger mb-3');
     } else {
-        echo html_writer::tag('div', '<strong>' . s($info['lastname']) . '</strong> (' . s($nomor) . ')', ['class' => 'mb-3']);
+        echo html_writer::tag('div', '<strong>' . s($info['lastname']) . '</strong> (+' . s($nomor) . ')', ['class' => 'mb-3']);
     }
 
-    // Tombol Aksi (Copy & WA)
     echo html_writer::start_div('mt-3');
-    
-    // Tombol Copy
     echo html_writer::tag('button', '📋 Copy Pesan', [
         'class'   => 'btn btn-primary btn-sm mr-2',
         'onclick' => "navigator.clipboard.writeText(".json_encode($pesan).").then(()=>alert('Pesan berhasil disalin'));"
     ]);
+    echo ' ';
 
-    echo ' '; // Spasi antar tombol
-
-    // Tombol Kirim WhatsApp
     if (!empty($nomor)) {
         $linkwa = 'https://wa.me/' . $nomor . '?text=' . rawurlencode($pesan);
         echo html_writer::link($linkwa, 'Buka WhatsApp', [
@@ -315,9 +360,9 @@ foreach ($pending as $userid => $info) {
         ]);
     }
 
-    echo html_writer::end_div(); // End mt-3
-    echo html_writer::end_div(); // End card-body
-    echo html_writer::end_div(); // End card
+    echo html_writer::end_div();
+    echo html_writer::end_div();
+    echo html_writer::end_div();
 }
 
 /* ==========================================
@@ -348,28 +393,24 @@ $datawa_rekap = [
 ];
 
 $pesan_rekap = jm_preview_template('rekap_reminder', $datawa_rekap);
-$warna_rekap = '#0d6efd'; // Warna border biru
+$warna_rekap = '#0d6efd'; 
 $icon_rekap  = '📋';
 
 echo html_writer::start_div('card mb-4 shadow-sm', ['style' => 'border-left:6px solid '.$warna_rekap]);
 echo html_writer::start_div('card-body');
-
 echo html_writer::tag('h5', $icon_rekap . ' Pesan Rekapitulasi Harian');
 echo html_writer::empty_tag('hr');
-
 echo html_writer::start_div('alert alert-light');
 echo html_writer::tag('strong', 'Preview Pesan Rekap');
 echo html_writer::tag('pre', s($pesan_rekap), ['style'=>'white-space:pre-wrap']);
 echo html_writer::end_div();
-
 echo html_writer::start_div('mt-3');
 echo html_writer::tag('button', '📋 Copy Pesan Rekap', [
     'class'   => 'btn btn-primary btn-sm',
     'onclick' => "navigator.clipboard.writeText(".json_encode($pesan_rekap).").then(()=>alert('Pesan Rekap berhasil disalin'));"
 ]);
 echo html_writer::end_div();
-
-echo html_writer::end_div(); // End card-body
-echo html_writer::end_div(); // End card
+echo html_writer::end_div();
+echo html_writer::end_div();
 
 echo $OUTPUT->footer();

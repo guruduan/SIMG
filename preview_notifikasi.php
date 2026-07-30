@@ -5,16 +5,11 @@ require_once(__DIR__ . '/lib.php');
 require_once(__DIR__ . '/lib_notifikasi.php');
 
 require_login();
-
 $context = context_system::instance();
 require_capability('moodle/site:config', $context);
 
 $PAGE->set_context($context);
-$PAGE->set_url(
-    new moodle_url(
-        '/local/jurnalmengajar/preview_notifikasi.php'
-    )
-);
+$PAGE->set_url(new moodle_url('/local/jurnalmengajar/preview_notifikasi.php'));
 
 $PAGE->set_title('Preview Notifikasi WhatsApp');
 $PAGE->set_heading('Preview Notifikasi WhatsApp');
