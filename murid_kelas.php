@@ -27,22 +27,25 @@ $PAGE->set_url(
 );
 
 $PAGE->set_pagelayout('standard');
-$PAGE->set_title('Daftar Murid');
-$PAGE->set_heading('Daftar Murid Kelas '.$cohort->name);
+$PAGE->set_title('Daftar Murid Kelas ' . $cohort->name);
+$PAGE->set_heading('Daftar Murid Kelas ' . $cohort->name);
 
 echo $OUTPUT->header();
 
 // ======================================================
-// Ambil Daftar Murid
+// Ambil Daftar Murid & Guru Wali
 // ======================================================
 
+// TAMBAHAN: Mengambil field guru.lastname sebagai namaguruwali 
+// dan melakukan LEFT JOIN ke tabel guruwali
 $sql = "
 SELECT
     u.id,
     u.firstname,
     u.lastname,
     nis.data AS nis,
-    jk.data  AS jeniskelamin
+    jk.data  AS jeniskelamin,
+    guru.lastname AS namaguruwali
 
 FROM {cohort_members} cm
 
@@ -64,6 +67,12 @@ LEFT JOIN {user_info_data} jk
         FROM {user_info_field}
         WHERE shortname = 'gender'
     )
+
+LEFT JOIN {local_jurnalmengajar_guruwali} gw
+     ON gw.muridid = u.id
+
+LEFT JOIN {user} guru
+     ON guru.id = gw.guruid
 
 WHERE cm.cohortid = ?
 
@@ -153,16 +162,22 @@ if (empty($murid)) {
     $table->attributes['class'] =
         'table table-bordered table-striped table-hover align-middle';
 
+    // TAMBAHAN: Tambah header 'Guru Wali'
     $table->head = [
         'No',
         'NIS',
         'Nama Murid',
-        'L/P'
+        'L/P',
+        'Guru Wali'
     ];
 
     $no = 1;
 
     foreach ($murid as $m) {
+
+        // TAMBAHAN: Validasi jika tidak ada guru wali yang di set
+        //$namaguruwali = !empty($m->namaguruwali) ? format_nama_siswa($m->namaguruwali) : '-';
+          $namaguruwali = !empty($m->namaguruwali) ? s($m->namaguruwali) : '-';
 
         $table->data[] = [
 
@@ -172,7 +187,9 @@ if (empty($murid)) {
 
             ucwords(strtolower($m->lastname)),
 
-            s($m->jeniskelamin)
+            s($m->jeniskelamin),
+
+            $namaguruwali // TAMBAHAN: Memasukkan variabel ke baris tabel
 
         ];
     }
@@ -212,4 +229,3 @@ echo html_writer::end_div();
 // ======================================================
 
 echo $OUTPUT->footer();
-

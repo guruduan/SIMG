@@ -19,6 +19,29 @@ echo $OUTPUT->header();
 global $DB, $USER;
 
 // ============================
+// Ambil Data Mapping Wali Kelas
+// ============================
+$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+$walimapping = json_decode($json_mapping, true);
+if (!is_array($walimapping)) {
+    $walimapping = [];
+}
+
+// Pre-fetch nama-nama Wali Kelas agar tidak perlu query berulang di dalam loop
+$walinames = [];
+if (!empty($walimapping)) {
+    $wali_userids = array_unique(array_values($walimapping));
+    if (!empty($wali_userids)) {
+        list($in_sql, $in_params) = $DB->get_in_or_equal($wali_userids);
+        $wali_users = $DB->get_records_select('user', "id $in_sql", $in_params, '', 'id, firstname, lastname');
+        foreach ($wali_users as $wu) {
+            $walinames[$wu->id] = !empty($wu->lastname) ? $wu->lastname : $wu->firstname;
+        }
+    }
+}
+
+
+// ============================
 // List guru wali
 // ============================
 $listguru = [];
@@ -42,6 +65,7 @@ foreach ($rowsguru as $g) {
 // Default = guru login
 $filterguru = optional_param('guru', $USER->id, PARAM_INT);
 
+// Query utama tanpa join ke tabel guru karena kolom Guru Wali dihilangkan
 $sql = "
 SELECT
 
@@ -49,16 +73,12 @@ SELECT
 
     murid.lastname AS namamurid,
 
-    guru.lastname AS namaguru,
-
     uid.data AS nis,
-
+    
+    c.id AS cohortid,
     c.name AS kelas
 
 FROM {local_jurnalmengajar_guruwali} gw
-
-JOIN {user} guru
-ON guru.id=gw.guruid
 
 JOIN {user} murid
 ON murid.id=gw.muridid
@@ -131,12 +151,13 @@ if (!empty($filtered)) {
 
     $table = new html_table();
 
+    // Kolom 'Guru Wali' sudah dihapus dari header
     $table->head = [
         'No',
         'NIS',
         'Nama Murid',
         'Kelas',
-        'Guru Wali'
+        'Wali Kelas'
     ];
 
     $table->attributes['class'] =
@@ -149,13 +170,23 @@ if (!empty($filtered)) {
         $kelas = !empty($r->kelas)
             ? s($r->kelas)
             : 'Belum ada kelas';
+            
+        // Mencocokkan Wali Kelas dari id cohort
+        $nama_walikelas = '-';
+        if (!empty($r->cohortid) && isset($walimapping[$r->cohortid])) {
+            $wali_id = $walimapping[$r->cohortid];
+            if (isset($walinames[$wali_id])) {
+                $nama_walikelas = $walinames[$wali_id];
+            }
+        }
 
+        // Variabel s($r->namaguru) sudah dihapus dari row
         $row = new html_table_row([
             $no,
             s($r->nis),
             format_nama_siswa($r->namamurid),
             $kelas,
-            s($r->namaguru)
+            $nama_walikelas
         ]);
 
         $table->data[] = $row;
