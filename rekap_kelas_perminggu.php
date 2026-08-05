@@ -56,8 +56,26 @@ $hariini = strtotime(date('Y-m-d'));
 $diff = floor(($hariini - strtotime($tanggalawalminggu)) / (7 * 24 * 60 * 60));
 $minggu_berjalan = ($diff >= 0) ? $diff + 1 : 1;
 
-// === Ambil input dengan default kelas pertama & minggu berjalan ===
-$kelas = optional_param('kelas', key($kelasoptions), PARAM_INT); 
+// === Cek apakah user login adalah Wali Kelas ===
+global $USER;
+$default_kelas = key($kelasoptions); // Default awal jika bukan wali kelas (kelas pertama)
+
+// Ambil data mapping wali kelas dari config
+$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+$mapping = json_decode($json_mapping, true);
+
+if (is_array($mapping)) {
+    foreach ($mapping as $cohortid => $userid) {
+        // Jika ID user login cocok dengan data mapping, dan kelasnya terdaftar di sistem
+        if ($userid == $USER->id && isset($kelasoptions[$cohortid])) {
+            $default_kelas = $cohortid; // Timpa default kelas dengan kelas binaannya
+            break;
+        }
+    }
+}
+
+// === Ambil input dengan default kelas (wali kelas / kelas pertama) & minggu berjalan ===
+$kelas = optional_param('kelas', $default_kelas, PARAM_INT); 
 $minggu = optional_param('minggu', $minggu_berjalan, PARAM_INT);
 
 // === Hitung tanggal filter ===
@@ -144,30 +162,54 @@ foreach ($hari as $eng => $indo) {
             
             // Ambil lastname pengajar
             $lastname = $users[$r->userid]->lastname ?? '-';
-            //$lastname = ucwords(strtolower($lastname));
 
             // Format Jam (Badge)
             $jam_html = html_writer::tag('span', $r->jamke, ['class' => 'badge badge-info p-1 font-weight-normal']);
             
-// Waktu Input (Muted Text dihapus)
+            // === LOGIKA BARU: Ambil data absensi (Menggantikan Materi) ===
+            $abs = json_decode($r->absen ?? '', true);
+            if (is_array($abs) && !empty($abs)) {
+                $abtxt = implode(', ', array_map(fn($n, $a) => "$n ($a)", array_keys($abs), $abs));
+                // Tampilkan teks absen dengan format warna merah jika ada siswa absen
+                $absen_cell = html_writer::tag('div', s($abtxt), ['class' => 'text-danger font-weight-bold small', 'style' => 'line-height:1.4']);
+            } else {
+                // Tampilkan indikator hijau jika hadir semua
+                $absen_cell = html_writer::tag('span', '<i class="fa fa-check-circle text-success"></i> Hadir Semua', ['class' => 'text-success small']);
+            }
+            // =============================================================
+
+            // Waktu Input
             $waktu_input = html_writer::tag('span', tanggal_indo($r->timecreated, 'jam'), ['class' => 'small']);
 
             $rows[] = [
                 $jam_html,
                 html_writer::tag('strong', format_string($r->matapelajaran)),
                 $lastname,
-                html_writer::tag('div', format_text($r->materi), ['class' => 'text-justify small', 'style' => 'line-height:1.4']),
+                $absen_cell, // <--- Variabel Absen dipanggil di sini
                 $waktu_input
             ];
         }
     }
 
+// Ambil nama kelas yang dipilih
+    $namakelas_terpilih = $kelasoptions[$kelas] ?? '';
+
     // Buat Kotak (Card) per Hari
     echo html_writer::start_div('card mb-4 shadow-sm border-0');
         
-        // Header Card (Hari & Tanggal)
-        $judul_hari = html_writer::tag('span', strtoupper($indo), ['class' => 'font-weight-bold text-dark mr-2']);
-$sub_tanggal = $tanggalhari ? html_writer::tag('span', $tanggalhari, ['class' => 'small']) : html_writer::tag('span', '(Belum ada kegiatan)', ['class' => 'small font-italic']);
+        // Format Teks Kelas & Hari
+        $teks_kelas = $namakelas_terpilih ? 'Kelas ' . $namakelas_terpilih . ' - ' : '';
+        $teks_hari  = 'Hari ' . ucfirst(strtolower($indo)); 
+        
+        // Gabungkan Kelas dan Hari
+        $judul_hari = html_writer::tag('span', $teks_kelas . $teks_hari, ['class' => 'font-weight-bold text-dark']);
+        
+        // Format Tanggal (Contoh: ", 04 Agustus 2026")
+        if ($tanggalhari) {
+            $sub_tanggal = html_writer::tag('span', ', ' . $tanggalhari, ['class' => 'font-weight-bold text-dark']);
+        } else {
+            $sub_tanggal = html_writer::tag('span', ' (Belum ada kegiatan)', ['class' => 'small font-italic text-muted']);
+        }
         
         echo html_writer::start_div('card-header bg-white border-bottom-0 pt-3 pb-2');
             echo html_writer::tag('h5', $judul_hari . $sub_tanggal, ['class' => 'mb-0']);
@@ -183,17 +225,16 @@ $sub_tanggal = $tanggalhari ? html_writer::tag('span', $tanggalhari, ['class' =>
             );
         } else {
             $table = new html_table();
-            // Terapkan kelas Bootstrap ke tabel Moodle
             $table->attributes['class'] = 'table table-hover table-striped mb-0 text-nowrap';
             $table->head = [
                 html_writer::tag('span', 'Jam', ['class' => 'text-uppercase small']), 
                 html_writer::tag('span', 'Mata Pelajaran', ['class' => 'text-uppercase small']), 
                 html_writer::tag('span', 'Guru', ['class' => 'text-uppercase small']), 
-                html_writer::tag('span', 'Materi', ['class' => 'text-uppercase small']), 
+                html_writer::tag('span', 'Keterangan Absen', ['class' => 'text-uppercase small']), // <--- Header diubah jadi Absen
                 html_writer::tag('span', 'Waktu Input', ['class' => 'text-uppercase small'])
             ];
             
-            // Atur lebar kolom untuk Materi agar leluasa, sisanya menyesuaikan (nowrap)
+            // Atur lebar kolom (w-50 tetap dipertahankan untuk kolom absensi agar leluasa jika nama absen panjang)
             $table->colclasses = ['text-center align-middle', 'align-middle', 'align-middle', 'align-middle text-wrap w-50', 'text-center align-middle'];
             $table->data = $rows;
             
@@ -204,9 +245,7 @@ $sub_tanggal = $tanggalhari ? html_writer::tag('span', $tanggalhari, ['class' =>
     echo html_writer::end_div(); // End card
 }
 
-// Tambahan style untuk text justify
 echo '<style>
-    .text-justify { text-align: justify; }
     .table-responsive { overflow-x: auto; }
 </style>';
 
