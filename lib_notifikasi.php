@@ -326,13 +326,18 @@ function jm_get_tujuan_notifikasi($kode) {
  * Mengubah tujuan menjadi daftar nomor WA
  */
 function jm_get_nomor_tujuan($kode, array $data = []) {
-
+    global $DB; // Ditambahkan untuk membantu query data Wali Kelas
+    
     $nomor = [];
-
     $tujuan = jm_get_tujuan_notifikasi($kode);
 
-    foreach ($tujuan as $role) {
+    // Ambil nomor WA guru penginput (jika ada) untuk memblokir notifikasi ke diri sendiri
+    $nomor_penginput = '';
+    if (!empty($data['userid'])) {
+        $nomor_penginput = get_user_nowa($data['userid']);
+    }
 
+    foreach ($tujuan as $role) {
         switch ($role) {
 
             case 'kepsek':
@@ -349,15 +354,31 @@ function jm_get_nomor_tujuan($kode, array $data = []) {
                 }
                 break;
 
-	   case 'wakasek_kurikulum':
-	        $wa = get_nomor_wakasek_kurikulum();
-     	        if ($wa) {
-		    $nomor[] = $wa;
-	        }
-	        break;
-    
+            case 'wakasek_kurikulum':
+                $wa = get_nomor_wakasek_kurikulum();
+                if ($wa) {
+                    $nomor[] = $wa;
+                }
+                break;
+            
             case 'walikelas':
                 if (!empty($data['kelas'])) {
+                    // Cek ID Cohort jika data kelas berupa nama
+                    $kelas_cek = $data['kelas'];
+                    if (!is_numeric($kelas_cek)) {
+                        $kelas_cek = $DB->get_field('cohort', 'id', ['name' => $kelas_cek]);
+                    }
+                    
+                    // Ambil mapping wali kelas
+                    $json_map = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+                    $map_wk = json_decode($json_map, true);
+                    $walikelas_userid = $map_wk[$kelas_cek] ?? null;
+
+                    // Jika guru yang menginput Jurnal adalah Wali Kelas tersebut, lewati (jangan kirim)
+                    if (!empty($data['userid']) && $walikelas_userid == $data['userid']) {
+                        break; 
+                    }
+
                     $wa = get_nomor_wali_kelas($data['kelas']);
                     if ($wa) {
                         $nomor[] = $wa;
@@ -365,42 +386,35 @@ function jm_get_nomor_tujuan($kode, array $data = []) {
                 }
                 break;
 
-case 'guruwali':
+            case 'guruwali':
+                if (!empty($data['pesertaid'])) {
+                    $list = get_nomor_guru_wali($data['pesertaid']);
 
-    if (!empty($data['pesertaid'])) {
+                    if (!empty($list)) {
+                        // Hapus nomor guru penginput dari daftar tujuan Guru Wali (jangan kirim ke diri sendiri)
+                        if (!empty($nomor_penginput)) {
+                            $list = array_diff($list, [$nomor_penginput]);
+                        }
+                        $nomor = array_merge($nomor, $list);
+                    }
+                }
+                break;
 
-        $list = get_nomor_guru_wali($data['pesertaid']);
+            case 'gurubk':
+                $list = get_nomor_guru_bk();
+                if (!empty($list)) {
+                    $nomor = array_merge($nomor, $list);
+                }
+                break;
 
-        if (!empty($list)) {
-            $nomor = array_merge($nomor, $list);
-        }
-    }
+            case 'guru_penginput':
+                if (!empty($nomor_penginput)) {
+                    $nomor[] = $nomor_penginput;
+                }
+                break;
 
-    break;
-
-	case 'gurubk':
-	    $list = get_nomor_guru_bk();
-
-	    if (!empty($list)) {
-		$nomor = array_merge($nomor, $list);
-	    }
-	    break;
-
-	case 'guru_penginput':
-
-	    if (!empty($data['userid'])) {
-
-		$wa = get_nomor_guru_penginput($data['userid']);
-
-		if (!empty($wa)) {
-		    $nomor[] = $wa;
-		}
-	    }
-
-	    break;
-
-	default:
-	    break;
+            default:
+                break;
         }
     }
 
