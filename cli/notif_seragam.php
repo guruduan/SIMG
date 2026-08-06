@@ -5,8 +5,6 @@ define('CLI_SCRIPT', true);
 require(__DIR__ . '/../../../config.php'); // tetap load Moodle (untuk mtrace)
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
 
-
-
 /* ============================ CLI args ================================== */
 $mode   = 'auto';
 $targetOverride = null;
@@ -43,14 +41,19 @@ if ($targetOverride) {
 
 /* ============================ Helpers =================================== */
 
-function label_waktu(DateTime $now, DateTime $target): string {
+function label_waktu(
+    DateTimeInterface $now,
+    DateTimeInterface $target
+): string {
+
     $diffDays = (int)$now->diff($target)->format('%a');
+
     if ($diffDays === 1) return 'besok';
     if ($diffDays === 2) return 'lusa';
     return 'pada';
 }
 
-function week_of_month(DateTime $dt): int {
+function week_of_month(DateTimeInterface $dt): int {
     return intdiv(((int)$dt->format('j')) - 1, 7) + 1;
 }
 
@@ -61,20 +64,32 @@ $wom = week_of_month($target);
 $tanggal = tanggal_indo($target->getTimestamp(), 'judul');
 $label   = label_waktu($now, $target);
 
-
-
+// Daftar nama hari dipindahkan ke sini agar bisa digunakan untuk cek guru piket
+$hariIndoList = [
+    1 => 'Senin',
+    2 => 'Selasa',
+    3 => 'Rabu',
+    4 => 'Kamis',
+    5 => 'Jumat',
+    6 => 'Sabtu',
+    7 => 'Minggu'
+];
+$hariIndo = $hariIndoList[$dowN];
+$targetDate = $target->format('Y-m-d');
 
 if ($debug) {
-    mtrace("DEBUG now     : ".$now->format('Y-m-d H:i:s'));
-    mtrace("DEBUG target  : ".$target->format('Y-m-d').' ('.$target->format('l').')');
-    mtrace("DEBUG week    : $wom  dayNum=$dayNum  dowN=$dowN");
-    mtrace("DEBUG label   : $label");
-    mtrace("DEBUG group   : $GROUP_ID");
-    mtrace("DEBUG jidmode : $jidmode");
+    mtrace("DEBUG now      : ".$now->format('Y-m-d H:i:s'));
+    mtrace("DEBUG target   : ".$target->format('Y-m-d').' ('.$target->format('l').')');
+    mtrace("DEBUG week     : $wom  dayNum=$dayNum  dowN=$dowN");
+    mtrace("DEBUG label    : $label");
+    mtrace("DEBUG hari     : $hariIndo");
+    mtrace("DEBUG group    : $GROUP_ID");
+    mtrace("DEBUG jidmode  : $jidmode");
 }
 
 /* ========================== Bangun pesan ================================ */
 $pesan = [];
+
 // 1) Rabu minggu pertama: PDH abu-abu
 if ($dowN === 3 && $wom === 1) {
     $pesan[] = "Pengingat seragam $label $tanggal: Rabu Minggu Pertama — *Baju PDL Bungas*.";
@@ -87,19 +102,40 @@ if ($dayNum === 17) {
 if ($dayNum === 1) {
     $pesan[] = "Pengingat $label $tanggal: untuk *mengisi e-Dialog* (periode tanggal 1–5).";
 }
-
 // 3b) eDialog SKP tgl 5
 if ($dayNum === 5) {
     $pesan[] = "Pengingat $label $tanggal: jangan lupa *mengisi eDialog* (periode tanggal 1–5). Abaikan bila sudah";
 }
 // 4) Kamis: Sasirangan (M1 hitam, M2 biru motif ketupat, M3 hijau tua, M4 ungu)
 if ($dowN === 4) {
-    $warna = [1=>'warna hitam', 2=>'warna biru motif ketupat', 3=>'warna hijau tua', 4=>'warna ungu', 5=>'warna tidak ditentukan'];
+    $warna = [1=>'warna biru terbaru', 2=>'warna hitam', 3=>'warna ungu', 4=>'warna hijau lumut', 5=>'warna bebas'];
     if (isset($warna[$wom])) {
         $pesan[] = "Pengingat seragam $label $tanggal: Kamis Minggu ke-$wom — *Sasirangan {$warna[$wom]}*.";
     }
 }
 
+// 5) Pengingat Guru Piket
+// Mengambil nama setting secara otomatis (contoh: 'guru_piket_senin', 'guru_piket_selasa')
+$setting_piket = 'guru_piket_' . strtolower($hariIndo);
+
+if (isset($config->$setting_piket) && trim($config->$setting_piket) !== '') {
+    // Memecah teks berdasarkan baris baru (enter)
+    $list_nama = explode("\n", trim($config->$setting_piket));
+    // Membersihkan spasi kosong di tiap baris dan membuang baris yang kosong
+    $list_nama = array_filter(array_map('trim', $list_nama));
+
+    if (!empty($list_nama)) {
+        $pesan_piket = "Pengingat *Guru Piket* $label $tanggal:\n";
+        $nomor = 1;
+        foreach ($list_nama as $nama) {
+            $pesan_piket .= "  $nomor. $nama\n";
+            $nomor++;
+        }
+        $pesan[] = trim($pesan_piket); // Masukkan ke dalam daftar pesan yang akan dikirim
+    }
+}
+
+/* ====================== Pengecekan Akhir Pesan ====================== */
 if (empty($pesan)) {
     mtrace("[INFO] Tidak ada notifikasi untuk $label ($tanggal).");
     if (!$debug) mtrace("      (Gunakan --debug, atau --mode=before / --target=YYYY-MM-DD)");
@@ -107,20 +143,6 @@ if (empty($pesan)) {
 }
 
 /* ====================== Filter Hari Sekolah ====================== */
-
-$hariIndoList = [
-    1 => 'Senin',
-    2 => 'Selasa',
-    3 => 'Rabu',
-    4 => 'Kamis',
-    5 => 'Jumat',
-    6 => 'Sabtu',
-    7 => 'Minggu'
-];
-
-$hariIndo = $hariIndoList[(int)$target->format('N')];
-$targetDate = $target->format('Y-m-d');
-
 /*
  * Pengingat administrasi (e-Dialog)
  * tidak mengikuti aturan hari sekolah maupun hari libur.
