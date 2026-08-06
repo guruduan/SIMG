@@ -36,10 +36,36 @@ echo $OUTPUT->heading('Rekap Kehadiran Murid Per Kelas', 3, 'mb-4');
 // Ambil daftar kelas
 $kelaslist = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
 
-// Ambil parameter
-$kelasid     = optional_param('kelas', 0, PARAM_INT);
-$dari_raw    = optional_param('dari', '', PARAM_RAW);
-$sampai_raw  = optional_param('sampai', '', PARAM_RAW);
+// === 1. Tentukan Default Kelas (Berdasarkan Mapping Wali Kelas) ===
+global $USER;
+$default_kelas = 0; // Default awal (belum pilih kelas) jika bukan wali kelas
+
+$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+$mapping = json_decode($json_mapping, true);
+
+if (is_array($mapping)) {
+    foreach ($mapping as $cohortid => $userid) {
+        // Jika ID user login adalah wali kelas, dan kelasnya terdaftar di sistem
+        if ($userid == $USER->id && isset($kelaslist[$cohortid])) {
+            $default_kelas = $cohortid; 
+            break;
+        }
+    }
+}
+
+// === 2. Tentukan Default Rentang Tanggal ===
+// 'Dari' mengambil pengaturan tanggalawalminggu di plugin
+$default_dari = get_config('local_jurnalmengajar', 'tanggalawalminggu');
+if (empty($default_dari)) {
+    $default_dari = date('Y-m-d'); // Fallback jika belum diatur di admin
+}
+// 'Sampai' mengambil tanggal hari ini
+$default_sampai = date('Y-m-d');
+
+// === 3. Ambil parameter form (dengan menerapkan default di atas) ===
+$kelasid     = optional_param('kelas', $default_kelas, PARAM_INT);
+$dari_raw    = optional_param('dari', $default_dari, PARAM_RAW);
+$sampai_raw  = optional_param('sampai', $default_sampai, PARAM_RAW);
 $mode        = optional_param('mode', 'hari', PARAM_ALPHA); 
 $onlymine    = optional_param('onlymine', 0, PARAM_BOOL);
 $matpel      = optional_param('matpel', '', PARAM_TEXT);

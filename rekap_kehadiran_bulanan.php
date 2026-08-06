@@ -33,7 +33,26 @@ echo $OUTPUT->heading('Rekap Kehadiran Murid Per Bulan', 2, 'mb-4');
 
 $kelaslist = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
 
-$kelasid  = optional_param('kelas', 0, PARAM_INT);
+// === 1. Tentukan Default Kelas (Berdasarkan Mapping Wali Kelas) ===
+global $USER;
+$default_kelas = 0; // Default awal jika bukan wali kelas
+
+$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+$mapping = json_decode($json_mapping, true);
+
+if (is_array($mapping)) {
+    foreach ($mapping as $cohortid => $userid) {
+        // Jika ID user login adalah wali kelas, dan kelasnya terdaftar di sistem
+        if ($userid == $USER->id && isset($kelaslist[$cohortid])) {
+            $default_kelas = $cohortid; 
+            break;
+        }
+    }
+}
+
+// === 2. Ambil parameter form (dengan menerapkan default kelas) ===
+$kelasid  = optional_param('kelas', $default_kelas, PARAM_INT);
+// Default bulan langsung diarahkan ke bulan saat ini (contoh: 2026-08)
 $bulanraw = optional_param('bulan', date('Y-m'), PARAM_TEXT);
 $mode     = optional_param('mode', 'hari', PARAM_ALPHA);
 

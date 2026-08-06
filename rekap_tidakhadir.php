@@ -66,6 +66,35 @@ if (!$kelaslist) {
     exit;
 }
 
+// === PRIORITASKAN KELAS UNTUK WALI KELAS ===
+global $USER;
+$my_cohortid = 0;
+$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+$mapping = json_decode($json_mapping, true);
+
+if (is_array($mapping)) {
+    foreach ($mapping as $cohortid => $userid) {
+        // Cek apakah user yang login adalah wali kelas dari kelas tertentu
+        if ($userid == $USER->id && isset($kelaslist[$cohortid])) {
+            $my_cohortid = $cohortid;
+            break;
+        }
+    }
+}
+
+// Jika user terdeteksi sebagai wali kelas
+if ($my_cohortid) {
+    // 1. Ambil/simpan sementara data kelas miliknya
+    $kelas_wali = $kelaslist[$my_cohortid];
+    
+    // 2. Hapus kelas miliknya dari urutan awal (abjad)
+    unset($kelaslist[$my_cohortid]);
+    
+    // 3. Masukkan kembali kelas tersebut ke posisi paling atas, diikuti sisa kelas lainnya
+    $kelaslist = [$my_cohortid => $kelas_wali] + $kelaslist;
+}
+
+
 /* =====================================================
    STATUS YANG DIHITUNG
 ===================================================== */
