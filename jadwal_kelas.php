@@ -15,6 +15,8 @@ $PAGE->set_heading('Jadwal Per Kelas');
 
 echo $OUTPUT->header();
 
+global $USER; // Tambahkan global USER untuk mengambil ID login saat ini
+
 // Ambil data
 $jadwal = jurnalmengajar_get_jadwal_acuan();
 $hariurut = jurnalmengajar_get_urutan_hari();
@@ -26,10 +28,23 @@ foreach ($jadwal as $j) {
 }
 asort($daftarkelas);
 
+// ===== CEK MAPPING WALI KELAS UNTUK FILTER DEFAULT =====
+$default_kelas = array_key_first($daftarkelas); // Default standar
+$cohortid_wali = jurnalmengajar_get_kelas_wali($USER->id);
+
+if ($cohortid_wali) {
+    $namakelas_wali = get_nama_kelas($cohortid_wali);
+    
+    // Jika nama kelas wali ada di dalam daftar jadwal, jadikan default
+    if (!empty($namakelas_wali) && isset($daftarkelas[$namakelas_wali])) {
+        $default_kelas = $namakelas_wali;
+    }
+}
+
 // Default filter kelas
 $filterkelas = optional_param(
     'kelas',
-    array_key_first($daftarkelas),
+    $default_kelas,
     PARAM_TEXT
 );
 
@@ -49,7 +64,7 @@ echo html_writer::start_div('row align-items-end');
 echo html_writer::start_div('col-md-5 mb-2 mb-md-0');
 echo html_writer::tag('label', 'Filter Kelas', ['class' => 'font-weight-bold mb-1']);
 echo html_writer::select($daftarkelas, 'kelas', $filterkelas, null, [
-    'class' => 'form-control form-control-sm',
+    'class' => 'form-control form-control-sm custom-select',
     'onchange' => 'this.form.submit();'
 ]);
 echo html_writer::end_div();
