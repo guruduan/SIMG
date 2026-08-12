@@ -149,7 +149,6 @@ foreach ($jurnaltoday as $row) {
 
         $key = $row->userid . '-' . $kelas . '-' . $j;
         $filled[$key] = true;
-        // Opsional: web_trace("FILLED: " . $key); // Bisa dinonaktifkan jika log terlalu panjang
     }
 }
 
@@ -177,6 +176,44 @@ foreach ($jadwal_db as $j) {
 if (empty($jadwal)) {
     selesai_proses("Tidak ada jadwal di database untuk hari $hariIndo");
 }
+
+// =======================================================
+// CEK DATA KEGIATAN (JAM TIDAK BELAJAR) HARI INI
+// =======================================================
+$today_timestamp = strtotime($today); 
+$kegiatan_hari_ini = $DB->get_records_sql("
+    SELECT id, kelas, jamke
+    FROM {local_jurnalmengajar_kegiatan}
+    WHERE tanggal = :today
+", ['today' => $today_timestamp]);
+
+$jam_kegiatan_global = []; 
+$jam_kegiatan_kelas = [];  
+
+foreach ($kegiatan_hari_ini as $keg) {
+    $jam_batal = array_filter(array_map('trim', explode(',', $keg->jamke)));
+    
+    if (empty($keg->kelas)) {
+        $jam_kegiatan_global = array_merge($jam_kegiatan_global, $jam_batal);
+    } else {
+        // Ambil nama kelas jika $keg->kelas berupa ID cohort
+        $namakelas = isset($cohortmap[$keg->kelas]) ? $cohortmap[$keg->kelas] : $keg->kelas;
+        
+        // Simpan berdasarkan NAMA KELAS (misal: "X-A")
+        if (!isset($jam_kegiatan_kelas[$namakelas])) {
+            $jam_kegiatan_kelas[$namakelas] = [];
+        }
+        $jam_kegiatan_kelas[$namakelas] = array_merge($jam_kegiatan_kelas[$namakelas], $jam_batal);
+        
+        // Simpan juga berdasarkan ID KELAS (misal: "75") untuk jaga-jaga
+        if (!isset($jam_kegiatan_kelas[$keg->kelas])) {
+            $jam_kegiatan_kelas[$keg->kelas] = [];
+        }
+        $jam_kegiatan_kelas[$keg->kelas] = array_merge($jam_kegiatan_kelas[$keg->kelas], $jam_batal);
+    }
+}
+$jam_kegiatan_global = array_unique($jam_kegiatan_global);
+
 
 /* =======================================================
  * OPTIMASI LOGIKA BLOK MENGAJAR (JAM BERURUTAN)
@@ -228,6 +265,17 @@ $kelas_akhir_regex = get_config('local_jurnalmengajar', 'kelas_cutoff_regex') ?:
 
 foreach ($jadwal as $j) {
     $uid = $j['userid'];
+    $jam_ini = (string)$j['jamke'];
+
+    // 🔥 FILTER JAM TIDAK BELAJAR (KEGIATAN GLOBAL)
+    if (in_array($jam_ini, $jam_kegiatan_global)) {
+        continue; // Lewati jam ini karena ada kegiatan sekolah
+    }
+
+    // 🔥 FILTER JAM TIDAK BELAJAR (KEGIATAN PER KELAS)
+    if (isset($jam_kegiatan_kelas[$j['kelas']]) && in_array($jam_ini, $jam_kegiatan_kelas[$j['kelas']])) {
+        continue; // Lewati jam ini karena kelas tersebut sedang ada kegiatan
+    }
 
     // FILTER UTAMA BLOK MENGAJAR
     if (!isset($jam_boleh_diingatkan[$uid]) || !in_array((int)$j['jamke'], $jam_boleh_diingatkan[$uid])) {
@@ -268,7 +316,6 @@ foreach ($jadwal as $j) {
                 'status'   => $status
             ];
         }
-        // Opsional: web_trace("TAKHADIR: {$j['lastname']} | {$j['kelas']} | " . ucfirst($status));
         continue;
     }
 
@@ -291,7 +338,7 @@ foreach ($jadwal as $j) {
 }
 
 if (empty($pending) && empty($tidakhadir)) {
-    selesai_proses("Semua jurnal yang jamnya sudah selesai telah diisi.");
+    selesai_proses("Semua jurnal yang jamnya sudah selesai telah diisi (atau ditiadakan karena kegiatan).");
 }
 
 // ===== Kirim WA per guru =====

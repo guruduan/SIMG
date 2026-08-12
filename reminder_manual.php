@@ -133,12 +133,46 @@ if (empty($jadwal)) {
     jm_berhenti_dengan_pesan("Tidak ada jadwal KBM di database untuk hari $hariIndo.", 'warning');
 }
 
+// =======================================================
+// CEK DATA KEGIATAN (JAM TIDAK BELAJAR) HARI INI
+// =======================================================
+$today_timestamp = strtotime($today); 
+$kegiatan_hari_ini = $DB->get_records_sql("
+    SELECT id, kelas, jamke
+    FROM {local_jurnalmengajar_kegiatan}
+    WHERE tanggal = :today
+", ['today' => $today_timestamp]);
+
+$jam_kegiatan_global = []; 
+$jam_kegiatan_kelas = [];  
+
+foreach ($kegiatan_hari_ini as $keg) {
+    $jam_batal = array_filter(array_map('trim', explode(',', $keg->jamke)));
+    
+    if (empty($keg->kelas)) {
+        $jam_kegiatan_global = array_merge($jam_kegiatan_global, $jam_batal);
+    } else {
+        // Ambil nama kelas jika $keg->kelas berupa ID cohort
+        $namakelas = isset($cohortmap[$keg->kelas]) ? $cohortmap[$keg->kelas] : $keg->kelas;
+        
+        // Simpan berdasarkan NAMA KELAS (misal: "X-A")
+        if (!isset($jam_kegiatan_kelas[$namakelas])) {
+            $jam_kegiatan_kelas[$namakelas] = [];
+        }
+        $jam_kegiatan_kelas[$namakelas] = array_merge($jam_kegiatan_kelas[$namakelas], $jam_batal);
+        
+        // Simpan juga berdasarkan ID KELAS (misal: "75") untuk jaga-jaga
+        if (!isset($jam_kegiatan_kelas[$keg->kelas])) {
+            $jam_kegiatan_kelas[$keg->kelas] = [];
+        }
+        $jam_kegiatan_kelas[$keg->kelas] = array_merge($jam_kegiatan_kelas[$keg->kelas], $jam_batal);
+    }
+}
+$jam_kegiatan_global = array_unique($jam_kegiatan_global);
+
+
 /* =======================================================
  * OPTIMASI LOGIKA BLOK MENGAJAR (JAM BERURUTAN)
- * =======================================================
- * Mengelompokkan jam mengajar guru menjadi blok berurutan.
- * Guru hanya akan masuk list jika jam *terakhir* di bloknya
- * sudah masuk kategori $jam_terlewat.
  * ======================================================= */
 $jadwal_guru_raw = [];
 foreach ($jadwal as $j) {
@@ -170,7 +204,7 @@ foreach ($jadwal_guru_raw as $uid => $jamlist) {
 
     $jam_boleh_diingatkan[$uid] = [];
     foreach ($blocks as $block) {
-        $jam_terakhir_di_blok = max($block); // Jam paling akhir dalam blok tersebut
+        $jam_terakhir_di_blok = max($block); 
         
         // Jika jam terakhir di blok ini sudah lewat, maka keseluruhan blok boleh dikirim notif
         if (in_array($jam_terakhir_di_blok, $jam_terlewat)) {
@@ -190,6 +224,17 @@ $kelas_akhir_regex = get_config('local_jurnalmengajar', 'kelas_cutoff_regex') ?:
 
 foreach ($jadwal as $j) {
     $uid = $j['userid'];
+    $jam_ini = (string)$j['jamke'];
+
+    // 🔥 FILTER JAM TIDAK BELAJAR (KEGIATAN GLOBAL)
+    if (in_array($jam_ini, $jam_kegiatan_global)) {
+        continue;
+    }
+
+    // 🔥 FILTER JAM TIDAK BELAJAR (KEGIATAN PER KELAS)
+    if (isset($jam_kegiatan_kelas[$j['kelas']]) && in_array($jam_ini, $jam_kegiatan_kelas[$j['kelas']])) {
+        continue;
+    }
 
     // FILTER UTAMA: Lewati jika jam ini belum termasuk dalam blok ngajar yang sudah SELESAI
     if (!isset($jam_boleh_diingatkan[$uid]) || !in_array((int)$j['jamke'], $jam_boleh_diingatkan[$uid])) {
@@ -257,7 +302,7 @@ foreach ($jadwal as $j) {
 
 // ===== Hentikan jika tidak ada data pending / tidak hadir =====
 if (empty($pending) && empty($tidakhadir)) {
-    jm_berhenti_dengan_pesan("Semua guru dengan blok mengajar yang sudah selesai telah mengisi jurnal.", 'success');
+    jm_berhenti_dengan_pesan("Semua guru dengan blok mengajar yang sudah selesai telah mengisi jurnal (Atau ditiadakan karena Kegiatan).", 'success');
 }
 
 // ===== TAMPILKAN HEADER & TOMBOL EKSEKUSI =====
