@@ -198,51 +198,39 @@ if (empty($rekap)) {
         $nama = ucwords($lastname);
         $beban_minggu = $beban[$userid] ?? 0;
 
-$pengurang_libur =
-    jurnalmengajar_get_pengurang_target_libur(
-        $userid,
-        $tanggal_awal_minggu_ini,
-        $tanggal_akhir_minggu_ini
-    );
+$pengurang_libur = jurnalmengajar_get_pengurang_target_libur(
+            $userid,
+            $tanggal_awal_minggu_ini,
+            $tanggal_akhir_minggu_ini
+        );
 
-$target_final =
-    max(0, $beban_minggu - $pengurang_libur);
+        // --- KOREKSI PENGURANGAN GANDA ---
+        // $beban_minggu (22) sudah merupakan hasil bersih (Net) dari lib.php
+        $target_final = $beban_minggu; 
+        
+        // Kita hitung beban kotor (Gross = 25) untuk ditampilkan di UI
+        $beban_kotor = $beban_minggu + $pengurang_libur; 
 
-if ($target_final > 0) {
-
-    $persen = round(
-        ($jumlahjam / $target_final) * 100
-    );
-
-    $persen = min($persen, 100);
-
-} else {
-
-    $persen = null;
-}
+        if ($target_final > 0) {
+            $persen = round(($jumlahjam / $target_final) * 100);
+            $persen = min($persen, 100);
+        } else {
+            $persen = null;
+        }
 
         // Atur warna Badge Persentase & Soft warning di Baris Tabel
-	$tr_class = '';
-
-	if ($persen === null) {
-
-	    $badge_class = 'badge-secondary';
-
-	} elseif ($persen >= 80) {
-
-	    $badge_class = 'badge-success';
-
-	} elseif ($persen >= 50) {
-
-	    $badge_class = 'badge-info';
-
-	} else {
-
-	    $badge_class = 'badge-danger';
-	    $tr_class = 'table-danger-light';
-	} // Membutuhkan CSS kustom di bawah agar soft warnanya
+        $tr_class = '';
+        if ($persen === null) {
+            $badge_class = 'badge-secondary';
+        } elseif ($persen >= 80) {
+            $badge_class = 'badge-success';
+        } elseif ($persen >= 50) {
+            $badge_class = 'badge-info';
+        } else {
+            $badge_class = 'badge-danger';
+            $tr_class = 'table-danger-light';
+        } 
         
-
         echo html_writer::start_tag('tr', ['class' => $tr_class]);
             echo html_writer::tag('td', $no++, ['class' => 'text-center align-middle font-weight-bold text-muted']);
             
@@ -251,27 +239,20 @@ if ($target_final > 0) {
             echo html_writer::tag('td', html_writer::link($urlguru, $nama, ['class' => 'font-weight-bold text-dark text-decoration-none']));
             
             echo html_writer::tag('td', $jumlahjam . ' JP', ['class' => 'text-center align-middle']);
-            $teks_target = $beban_minggu . ' JP';
+            
+            // --- MENAMPILKAN BEBAN KOTOR DI ATAS ---
+            $teks_target = $beban_kotor . ' JP'; 
 
-if ($pengurang_libur > 0) {
+            if ($pengurang_libur > 0) {
+                $teks_target .= '<br><small class="text-danger">-' . $pengurang_libur . ' JP tanpa KBM</small>';
+                $teks_target .= '<br><small class="text-success font-weight-bold">Beban Aktual: ' . $target_final . ' JP</small>';
+            }
 
-    $teks_target .=
-    '<br><small class="text-danger">-'
-    . $pengurang_libur .
-    ' JP tanpa KBM</small>';
-
-    $teks_target .=
-    '<br><small class="text-success font-weight-bold">'
-    . 'Target Akhir: '
-    . $target_final .
-    ' JP</small>';
-}
-
-echo html_writer::tag(
-    'td',
-    $teks_target,
-    ['class' => 'text-center align-middle text-muted']
-);
+            echo html_writer::tag(
+                'td',
+                $teks_target,
+                ['class' => 'text-center align-middle text-muted']
+            );
             
 	// Badge Persentase
 	$badge_text = ($persen === null)
