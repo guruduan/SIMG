@@ -539,13 +539,23 @@ function jurnalmengajar_get_beban_jam_guru_by_date($timestamp) {
         $offset = $maphari[$j['hari']] ?? 0;
         $timestampjadwal = strtotime("+$offset day", $timestamp);
 
-        $cutoff = null;
+$cutoff = null;
         if ($kelas_level) {
             $cutoff = jurnalmengajar_get_cutoff_by_kelas($kelas_level, $timestampjadwal);
             if (!empty($cutoff) && $timestampjadwal >= $cutoff) continue;
         }
 
-        if (jurnalmengajar_is_kbm_ditiadakan($kelas, date('Y-m-d', $timestampjadwal))) {
+        // --- TAMBAHAN PERBAIKAN BUG: Cek Tanggal Libur & Asesmen ---
+        $tanggal_format_jadwal = date('Y-m-d', $timestampjadwal);
+        if (jurnalmengajar_cek_libur($tanggal_format_jadwal)) {
+            continue;
+        }
+        if (jurnalmengajar_is_tanggal_asesmen($tanggal_format_jadwal)) {
+            continue;
+        }
+        // -----------------------------------------------------------
+
+        if (jurnalmengajar_is_kbm_ditiadakan($kelas, $tanggal_format_jadwal)) {
             continue;
         }
         
