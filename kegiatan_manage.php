@@ -100,17 +100,13 @@ if (!empty($grouped_data)) {
         $item_jam_bersih = array_filter(array_map('trim', $item_jam));
         $total_jam += count($item_jam_bersih);
         
-        // --- LOGIKA PENAMPILAN KELAS ---
-        $jumlah_kelas = count($row['kelas']);
-        if ($jumlah_kelas > 2) {
-            // Jika lebih dari 2 kelas, anggap seluruh kelas (atau ubah logika sesuai kebutuhan)
-            $namakelas_tampil = 'Seluruh Kelas';
-        } elseif ($jumlah_kelas > 0) {
-            // Jika 1 atau 2 kelas, sebutkan nama kelasnya (misal: "Kelas X, Kelas Y")
-            $namakelas_tampil = implode(', ', $row['kelas']);
-        } else {
-            $namakelas_tampil = 'Kelas Tidak Ditemukan';
-        }
+// --- LOGIKA PENAMPILAN KELAS ---
+$jumlah_kelas = count($row['kelas']);
+if ($jumlah_kelas > 0) {
+    $namakelas_tampil = implode(', ', $row['kelas']);
+} else {
+    $namakelas_tampil = 'Kelas Tidak Ditemukan';
+}
 
         // Memasukkan data ke baris tabel
         $table->data[] = [
