@@ -374,7 +374,7 @@ foreach ($users as $u) {
 
     });
 
-    /* ============================================
+/* ============================================
        TAMPILKAN KELAS
     ============================================ */
 
@@ -386,10 +386,42 @@ foreach ($users as $u) {
         ]
     );
 
-echo html_writer::div(
-    '<strong>Kelas '.$kelas->name.'</strong>',
-    'alert alert-secondary mb-2'
-);
+    // Siapkan wadah untuk tombol copy (khusus wali kelas)
+    $copy_html = '';
+    
+    if (!empty($my_cohortid) && $kelas->id == $my_cohortid) {
+        // Susun teks sesuai format yang diminta
+        $text_to_copy = "Rekap Murid Tidak Hadir s.d. " . tanggal_indo($sampai, 'tanggal') . "\n";
+        $text_to_copy .= "Periode :\n";
+        $text_to_copy .= tanggal_indo($dari, 'tanggal') . " s.d. " . tanggal_indo($sampai, 'tanggal') . "\n";
+        $text_to_copy .= "Kelas " . $kelas->name . "\n";
+        
+        $no_copy = 1;
+        foreach ($hasil as $h) {
+            $text_to_copy .= $no_copy . ". " . $h['nama'] . "   Sakit: " . $h['sakit'] . ", Ijin: " . $h['ijin'] . ", Alpa: " . $h['alpa'] . ", Dispensasi: " . $h['dispensasi'] . ", Jumlah Tidak Hadir: " . $h['jumlah'] . "\n";
+            $no_copy++;
+        }
+
+        $textarea_id = 'copytext_' . $kelas->id;
+        
+        // Buat textarea tersembunyi untuk menyimpan teks
+        $copy_html .= html_writer::tag('textarea', htmlspecialchars($text_to_copy), [
+            'id' => $textarea_id,
+            'style' => 'display:none;'
+        ]);
+        
+        // Buat tombol copy
+        $copy_html .= html_writer::tag('button', '📋 Copy Data Kelas', [
+            'class' => 'btn btn-sm btn-success',
+            'onclick' => "copyRekapToClipboard('$textarea_id')",
+            'style' => 'float: right;' 
+        ]);
+    }
+
+    echo html_writer::div(
+        '<strong>Kelas '.$kelas->name.'</strong>' . $copy_html,
+        'alert alert-secondary mb-2'
+    );
 
 echo html_writer::start_tag('ul',[
     'class'=>'list-unstyled'
@@ -429,5 +461,37 @@ $tombolkembali = html_writer::link(
 );
 
 echo html_writer::div($tombolkembali, 'mb-3');
+
+/* =====================================================
+   SCRIPT COPY CLIPBOARD
+===================================================== */
+echo html_writer::script("
+    function copyRekapToClipboard(elementId) {
+        var text = document.getElementById(elementId).value;
+        
+        // Menggunakan Clipboard API untuk browser modern
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Data rekap kelas berhasil disalin!');
+            });
+        } else {
+            // Fallback untuk browser lama atau HTTP (tanpa SSL)
+            var textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('Data rekap kelas berhasil disalin!');
+            } catch (err) {
+                alert('Gagal menyalin data');
+            }
+            document.body.removeChild(textArea);
+        }
+    }
+");
 
 echo $OUTPUT->footer();
