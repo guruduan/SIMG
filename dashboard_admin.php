@@ -86,63 +86,109 @@ echo $custom_css;
     </div>
 
     <div class="jurnal-menu-grid">
+        <!-- Pengaturan Sistem & Jabatan -->
         <a href="<?php echo new moodle_url('/admin/settings.php', array('section' => 'local_jurnalmengajar')); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Pengaturan Awal
+            <span class="jurnal-emoji">🗓️</span> 1. Pengaturan Awal
         </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/wali_kelas.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Penugasan Wali Kelas
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jabatan.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 2. Penugasan Wakil Kepala Sekolah
         </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jam_pelajaran.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Pengaturan Jam Pelajaran
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/walikelas_manage.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 3. Penugasan Wali Kelas
         </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_manage.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Manajemen Jadwal Mengajar
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/guru_bk.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 4. Penugasan Guru BK
         </a>
         <a href="<?php echo new moodle_url('/local/jurnalmengajar/guruwali_manage.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Pengaturan Guru Wali
+            <span class="jurnal-emoji">🗓️</span> 5. Pengaturan Guru Wali
         </a>
 
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/histori_rekap.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Lihat Semua KBM Guru Tiap Tahun
+        <!-- Manajemen Jadwal & KBM -->
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jam_pelajaran.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 6. Pengaturan Jam Pelajaran
         </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/all_jurnal.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Lihat Semua Jurnal KBM
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_manage.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 7. Manajemen Jadwal Mengajar
         </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/all_jurnalguruwali.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Lihat Semua Jurnal Guru Wali
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/kegiatan_manage.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 8. JP Tidak Belajar
         </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/surat_izin_murid_all.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Lihat Semua Surat Izin Murid
-        </a>
-
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/riwayat_layananbk.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Lihat Riwayat Layanan BK
-        </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/riwayat_pramuka.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Lihat Riwayat Kegiatan Pramuka
-        </a>
-
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/ekstra.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Isi Daftar Ekstrakurikuler
-        </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/pembina_ekstra.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Penugasan Pembina Ekstrakurikuler
-        </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/peserta_ekstra.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Isi Daftar Peserta Ekstrakurikuler
-        </a>
-
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/kartu_ujian.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Generate Kartu Ujian & Daftar Hadir
-        </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_asesmen.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Pengaturan Sesi Asesmen
-        </a>
-        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_pengawas.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Import Jadwal Pengawas Asesmen
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/guru_takhadir.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 9. Guru Tidak Hadir
         </a>
         <a href="<?php echo new moodle_url('/local/jurnalmengajar/izin_guru_hapus.php'); ?>" class="jurnal-menu-item">
-            <span class="jurnal-emoji">🗓️</span> Hapus Surat Izin Guru
+            <span class="jurnal-emoji">🗓️</span> 10. Hapus Surat Izin Guru
+        </a>
+
+        <!-- Riwayat & Rekap Jurnal -->
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/histori_rekap.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 11. Lihat Riwayat KBM Guru Pertahun
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/all_jurnal.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 12. Lihat Semua Jurnal KBM
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/all_pembinaan_mapel.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 13. Lihat Semua Pembinaan Mapel pada KBM
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/all_jurnalguruwali.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 14. Lihat Semua Jurnal Guru Wali
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/surat_izin_murid_all.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 15. Lihat Semua Surat Izin Murid
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/riwayat_layananbk.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 16. Lihat Riwayat Layanan BK
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/riwayat_pramuka.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 17. Lihat Riwayat Kegiatan Pramuka
+        </a>
+
+        <!-- Ekstrakurikuler -->
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/ekstra.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 18. Isi Daftar Ekstrakurikuler
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/pembina_ekstra.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 19. Penugasan Pembina Ekstrakurikuler
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/peserta_ekstra.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 20. Isi Daftar Peserta Ekstrakurikuler
+        </a>
+
+        <!-- Asesmen & Ujian -->
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/kartu_ujian.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 21. Generate Kartu Ujian dan Daftar Hadir
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_asesmen.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 22. Pengaturan Sesi Asesmen
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/jadwal_pengawas.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 23. Import Jadwal Pengawas Asesmen
+        </a>
+
+        <!-- Notifikasi & Lain-lain -->
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/template_notifikasi.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 24. Pengaturan Format Notifikasi WA
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/tujuan_notifikasi.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 25. Pengaturan Tujuan Notifikasi WA
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/preview_notifikasi.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 26. Preview Notifikasi Manual
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/reminder_manual.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 27. Preview Reminder Manual
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/banner.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 28. Pengaturan Banner untuk TV
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/export_siswaaktif.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 29. Ekspor Data Murid Aktif
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/mapping_kristen.php'); ?>" class="jurnal-menu-item">
+            <span class="jurnal-emoji">🗓️</span> 30. Mapping Murid Agama Kristen
+        </a>
+        <a href="<?php echo new moodle_url('/local/jurnalmengajar/simpan_riwayatkelas.php'); ?>" class="jurnal-menu-item" style="background-color: #fed7d7; border-color: #feb2b2; color: #c53030 !important;">
+            <span class="jurnal-emoji">⚠️</span> 31. Simpan Riwayat Kelas (Akhir Tahun)
         </a>
     </div>
 </div>
