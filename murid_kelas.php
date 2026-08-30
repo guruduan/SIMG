@@ -173,26 +173,43 @@ if (empty($murid)) {
 
     $no = 1;
 
-    foreach ($murid as $m) {
+foreach ($murid as $m) {
 
-        // TAMBAHAN: Validasi jika tidak ada guru wali yang di set
-        //$namaguruwali = !empty($m->namaguruwali) ? format_nama_siswa($m->namaguruwali) : '-';
-          $namaguruwali = !empty($m->namaguruwali) ? s($m->namaguruwali) : '-';
+    $namaguruwali = !empty($m->namaguruwali)
+        ? s($m->namaguruwali)
+        : '-';
 
-        $table->data[] = [
+    // URL menuju halaman Riwayat Individu.
+    $riwayaturl = new moodle_url(
+        '/local/jurnalmengajar/riwayat_individu.php',
+        [
+            'muridid' => $m->id
+        ]
+    );
 
-            $no++,
+    // Nama murid dibuat menjadi link.
+    $namamurid = html_writer::link(
+        $riwayaturl,
+        ucwords(strtolower($m->lastname)),
+        [
+            'class' => 'fw-bold'
+        ]
+    );
 
-            s($m->nis),
+    $table->data[] = [
 
-            ucwords(strtolower($m->lastname)),
+        $no++,
 
-            s($m->jeniskelamin),
+        s($m->nis),
 
-            $namaguruwali // TAMBAHAN: Memasukkan variabel ke baris tabel
+        $namamurid,
 
-        ];
-    }
+        s($m->jeniskelamin),
+
+        $namaguruwali
+
+    ];
+}
 
     echo html_writer::start_div(
         'table-responsive'

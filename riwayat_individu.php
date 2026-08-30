@@ -454,7 +454,7 @@ if ($muridid && $murid) {
     ===================================================== */
     echo '<div class="table-responsive">';
     echo '<table class="table table-bordered table-hover bg-white shadow-sm">';
-    echo '<thead class="thead-dark"><tr><th style="width: 15%;">Waktu</th><th style="width: 10%;">Kelas</th><th style="width: 15%;">Kategori</th><th>Detail Catatan</th><th style="width: 18%;">Penginput</th></tr></thead>';
+    echo '<thead class="thead-dark"><tr><th style="width: 15%;">Waktu</th><th style="width: 10%;">Kelas</th><th style="width: 15%;">Kategori</th><th>Detail Catatan</th><th style="width: 18%;">Guru</th></tr></thead>';
     echo '<tbody>';
 
     $jumlahditampilkan = 0;

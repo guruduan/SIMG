@@ -71,6 +71,8 @@ SELECT
 
     gw.id,
 
+    murid.id AS muridid,
+
     murid.lastname AS namamurid,
 
     uid.data AS nis,
@@ -165,35 +167,58 @@ if (!empty($filtered)) {
 
     $no = 1;
 
-    foreach ($filtered as $r) {
+foreach ($filtered as $r) {
 
-        $kelas = !empty($r->kelas)
-            ? s($r->kelas)
-            : 'Belum ada kelas';
-            
-        // Mencocokkan Wali Kelas dari id cohort
-        $nama_walikelas = '-';
-        if (!empty($r->cohortid) && isset($walimapping[$r->cohortid])) {
-            $wali_id = $walimapping[$r->cohortid];
-            if (isset($walinames[$wali_id])) {
-                $nama_walikelas = $walinames[$wali_id];
-            }
+    $kelas = !empty($r->kelas)
+        ? s($r->kelas)
+        : 'Belum ada kelas';
+
+    // Mencocokkan Wali Kelas dari ID cohort
+    $nama_walikelas = '-';
+
+    if (!empty($r->cohortid) &&
+        isset($walimapping[$r->cohortid])) {
+
+        $wali_id = $walimapping[$r->cohortid];
+
+        if (isset($walinames[$wali_id])) {
+            $nama_walikelas = $walinames[$wali_id];
         }
-
-        // Variabel s($r->namaguru) sudah dihapus dari row
-        $row = new html_table_row([
-            $no,
-            s($r->nis),
-            format_nama_siswa($r->namamurid),
-            $kelas,
-            $nama_walikelas
-        ]);
-
-        $table->data[] = $row;
-
-        $no++;
     }
 
+
+    // ==========================================
+    // LINK KE RIWAYAT INDIVIDU MURID
+    // ==========================================
+
+    $riwayaturl = new moodle_url(
+        '/local/jurnalmengajar/riwayat_individu.php',
+        [
+            'muridid' => $r->muridid
+        ]
+    );
+
+    $namamurid = html_writer::link(
+        $riwayaturl,
+        format_nama_siswa($r->namamurid),
+        [
+            'class' => 'font-weight-bold'
+        ]
+    );
+
+
+    $row = new html_table_row([
+        $no,
+        s($r->nis),
+        $namamurid,
+        $kelas,
+        $nama_walikelas
+    ]);
+
+    $table->data[] = $row;
+
+    $no++;
+}
     echo html_writer::table($table);
 
 } else {
