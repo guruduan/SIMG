@@ -29,16 +29,21 @@ $sql = "
 SELECT
     r.id,
     r.userid,
+    r.kelas,
     u.lastname AS nama,
     d.data AS nis,
     r.jenis,
     r.tanggal,
-    r.keterangan
+    r.keterangan,
+    c.name AS namakelas
 
 FROM {local_jurnalmengajar_riwayatakademik} r
 
 JOIN {user} u
     ON u.id = r.userid
+
+LEFT JOIN {cohort} c
+    ON c.id = r.kelas
 
 LEFT JOIN {user_info_field} f
     ON f.shortname = 'nis'
@@ -61,6 +66,7 @@ WHERE r.jenis IN ('berhenti','mutasi')
 
 ORDER BY
     r.tanggal DESC,
+    c.name,
     u.lastname
 ";
 
@@ -108,25 +114,33 @@ $table->head = [
     'No',
     'NIS',
     'Nama',
+    'Kelas',
     'Status',
     'Tanggal',
     'Keterangan'
 ];
 
-$table->attributes['class'] = 'table table-striped table-bordered';
+$table->attributes['class'] =
+    'table table-striped table-bordered';
 
 $no = 1;
 
 foreach ($data as $row) {
 
-$status = ucfirst($row->jenis);
+    $status = ucfirst($row->jenis);
+
+    // Jika data lama belum memiliki kelas.
+    $kelas = !empty($row->namakelas)
+        ? $row->namakelas
+        : '-';
 
     $table->data[] = [
         $no++,
-        s($row->nis),
+        s($row->nis ?? '-'),
         format_nama_siswa($row->nama),
+        s($kelas),
         $status,
-        tanggal_indo($row->tanggal, 'judul'), // Tambahkan parameter 'judul' di sini
+        tanggal_indo($row->tanggal, 'judul'),
         format_text($row->keterangan, FORMAT_PLAIN)
     ];
 }

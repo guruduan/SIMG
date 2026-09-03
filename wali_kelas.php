@@ -11,7 +11,7 @@ global $DB, $PAGE, $OUTPUT;
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/wali_kelas.php'));
-$PAGE->set_pagelayout('standard');
+$PAGE->set_pagelayout('base');
 $PAGE->set_title('Daftar Wali Kelas');
 $PAGE->set_heading('Daftar Wali Kelas');
 
@@ -133,7 +133,7 @@ if (empty($data)) {
         'Kelas',
         'Wali Kelas',
         'Jumlah Murid',
-        'Aksi'
+        'Lihat'
     ];
 
     $no = 1;
@@ -141,7 +141,7 @@ if (empty($data)) {
     foreach ($data as $row) {
 
         // ------------------------------------------------
-        // Tombol (sementara)
+        // Tombol
         // ------------------------------------------------
 
 $jadwal = html_writer::link(
@@ -166,11 +166,24 @@ $murid = html_writer::link(
     ),
     '👨‍🎓 Murid',
     [
-        'class' => 'btn btn-sm btn-outline-success'
+        'class' => 'btn btn-sm btn-outline-success me-1'
     ]
 );
 
-$aksi = $jadwal . ' ' . $murid;
+$kontrol = html_writer::link(
+    new moodle_url(
+        '/local/jurnalmengajar/kontrol_kehadiran_guru.php',
+        [
+            'kelas' => $row['kelas']
+        ]
+    ),
+    '📝 Kontrol Guru',
+    [
+        'class' => 'btn btn-sm btn-outline-danger'
+    ]
+);
+
+$aksi = $jadwal . ' ' . $murid . ' ' . $kontrol;
 
         $table->data[] = [
             $no++,

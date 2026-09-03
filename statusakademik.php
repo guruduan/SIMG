@@ -40,19 +40,21 @@ if (optional_param('simpan', 0, PARAM_BOOL)) {
 
     require_sesskey();
 
-    $userid      = required_param('userid', PARAM_INT);
-    $jenis       = required_param('jenis', PARAM_ALPHA);
-    $jenisvalid = [
-    'masukkelas',
-    'pindahkelas',
-    'mutasi',
-    'berhenti',
-    'lulus'
-];
+    $userid = required_param('userid', PARAM_INT);
+    $jenis  = required_param('jenis', PARAM_ALPHA);
 
-if (!in_array($jenis, $jenisvalid, true)) {
-    throw new moodle_exception('Jenis riwayat tidak valid.');
-}
+    $jenisvalid = [
+        'masukkelas',
+        'pindahkelas',
+        'mutasi',
+        'berhenti',
+        'lulus'
+    ];
+
+    if (!in_array($jenis, $jenisvalid, true)) {
+        throw new moodle_exception('Jenis riwayat tidak valid.');
+    }
+
     $tanggaltext = required_param('tanggal', PARAM_TEXT);
     $keterangan  = optional_param('keterangan', '', PARAM_TEXT);
 
@@ -66,8 +68,37 @@ if (!in_array($jenis, $jenisvalid, true)) {
         throw new moodle_exception('Format tanggal tidak valid.');
     }
 
+    /*
+    =====================================================
+    AMBIL KELAS MURID SAAT INI
+    =====================================================
+    */
+
+    $kelasmurid = $DB->get_record_sql("
+        SELECT c.id, c.name
+        FROM {cohort_members} cm
+        JOIN {cohort} c
+            ON c.id = cm.cohortid
+        WHERE cm.userid = ?
+        ORDER BY c.id DESC
+        LIMIT 1
+    ", [$userid]);
+
+    /*
+    =====================================================
+    SIMPAN RIWAYAT
+    =====================================================
+    */
+
     $record = new stdClass();
-    $record->userid       = $userid;
+
+    $record->userid = $userid;
+
+    // Simpan ID cohort/kelas terakhir.
+    $record->kelas = $kelasmurid
+        ? $kelasmurid->id
+        : 0;
+
     $record->tahunajaran  = $tahunajaran;
     $record->jenis        = $jenis;
     $record->tanggal      = $tanggal;
