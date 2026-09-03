@@ -134,8 +134,17 @@ echo $OUTPUT->header();
         </div> <!-- card-body -->
     </div> <!-- card statistik -->
 
-    <h3>Menu Cepat</h3>
-    <div class="row">
+<h3>Menu Cepat</h3>
+
+<div class="alert alert-light border mb-3">
+    ℹ️ Menu di bawah ini adalah <strong>akses cepat untuk fitur yang sering digunakan</strong>.
+    Untuk melihat <strong>menu lengkap</strong>, silakan buka
+    <a href="<?php echo $CFG->wwwroot; ?>/my/" class="fw-bold">
+        Dashboard
+    </a>.
+</div>
+
+<div class="row">
 
         <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
             <a class="btn fw-bold w-100" style="background:#7fc7f5;color:#000;" href="index.php">
