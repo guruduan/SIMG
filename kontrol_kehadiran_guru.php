@@ -482,7 +482,7 @@ echo html_writer::tag(
 
         border-collapse: collapse;
 
-        font-size: 14px;
+        font-size: 13px;
 
         margin-bottom: 15px;
     }
@@ -618,7 +618,7 @@ echo html_writer::tag(
 
         .kontrol-table {
 
-            font-size: 10px;
+            font-size: 13px;
         }
 
 
@@ -626,7 +626,7 @@ echo html_writer::tag(
 
         .kontrol-table td {
 
-            padding: 4px !important;
+            padding: 8px 4px !important;
         }
 
 
@@ -989,21 +989,21 @@ if (empty($perhari)) {
 
         echo '<tr>';
 
-        echo '<th style="width:5%;">No</th>';
+        echo '<th style="width:4%;">No</th>';
 
         echo '<th style="width:8%;">Jam Ke</th>';
 
-        echo '<th style="width:11%;">Pukul</th>';
+        echo '<th style="width:9%;">Pukul</th>';
 
         echo '<th style="width:15%;">Guru Pengajar</th>';
 
-        echo '<th style="width:9%;">Masuk<br>Tepat Waktu</th>';
+        echo '<th style="width:10%;">Masuk<br>Tepat Waktu</th>';
 
-        echo '<th style="width:9%;">Terlambat</th>';
+        echo '<th style="width:8%;">Terlambat</th>';
 
-        echo '<th style="width:9%;">Tidak<br>Masuk</th>';
+        echo '<th style="width:8%;">Tidak<br>Masuk</th>';
 
-        echo '<th style="width:10%;">Keluar<br>Lebih Awal</th>';
+        echo '<th style="width:8%;">Keluar<br>Lebih Awal</th>';
 
         echo '<th>Catatan</th>';
 
