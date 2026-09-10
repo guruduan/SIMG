@@ -381,15 +381,29 @@ echo '
     font-size: 12px;
 }
 
-.tanda-tangan {
+.ttd-wrapper {
     margin-top: 25px;
     width: 100%;
+}
+
+.tanggal-ttd {
+    text-align: center !important;
+    vertical-align: bottom !important;
+    padding: 0 0 5px 0 !important;
+    font-size: 12px;
+}
+
+.tanda-tangan {
+    margin-top: 0;
+    width: 100%;
+    border-collapse: collapse;
 }
 
 .tanda-tangan td {
     text-align: center;
     vertical-align: top;
     width: 50%;
+    border: none !important;
 }
 
 .spasi-ttd {
@@ -502,9 +516,19 @@ echo '
         font-size: 8px !important;
     }
 
+    .ttd-wrapper {
+        margin-top: 12px !important;
+    }
+
+    .tanggal-ttd {
+        font-size: 9px !important;
+        text-align: center !important;
+        padding-bottom: 3px !important;
+    }
+
     .tanda-tangan {
         font-size: 9px !important;
-        margin-top: 12px !important;
+        margin-top: 0 !important;
     }
 
     .spasi-ttd {
@@ -749,6 +773,70 @@ if (isset($mapping[$kelasid])) {
         }
     }
 }
+
+
+// ======================================================
+// DATA TANDA TANGAN
+// ======================================================
+
+// NIP wali kelas dari User Profile Field "nip"
+// pada akun guru yang ditunjuk oleh wali_kelas_mapping.
+$nipwalikelas = '';
+
+if (isset($mapping[$kelasid])) {
+
+    $walikelasid = (int)$mapping[$kelasid];
+
+    $fieldnip = $DB->get_record(
+        'user_info_field',
+        ['shortname' => 'nip'],
+        'id'
+    );
+
+    if ($fieldnip) {
+
+        $datanipwali = $DB->get_record(
+            'user_info_data',
+            [
+                'userid' => $walikelasid,
+                'fieldid' => $fieldnip->id
+            ],
+            'data'
+        );
+
+        if ($datanipwali) {
+            $nipwalikelas = trim((string)$datanipwali->data);
+        }
+    }
+}
+
+// Kepala sekolah dari setting plugin.
+$tempat_ttd = trim((string)get_config(
+    'local_jurnalmengajar',
+    'tempat_ttd'
+));
+
+$nama_kepsek = trim((string)get_config(
+    'local_jurnalmengajar',
+    'nama_kepsek'
+));
+
+$nip_kepsek = trim((string)get_config(
+    'local_jurnalmengajar',
+    'nip_kepsek'
+));
+
+// Tanggal tanda tangan = tanggal terakhir bulan yang dipilih.
+$tanggal_ttd = strtotime(
+    $bulan . '-' . sprintf('%02d', $jumlahhari) . ' 12:00:00'
+);
+
+$tanggal_ttd_text =
+    ($tempat_ttd !== '' ? $tempat_ttd : 'Hulu Sungai Selatan') .
+    ', ' .
+    (int)date('j', $tanggal_ttd) . ' ' .
+    absensi_bulanan_nama_bulan((int)date('m', $tanggal_ttd)) . ' ' .
+    (int)date('Y', $tanggal_ttd);
 
 
 // ======================================================
@@ -1474,6 +1562,9 @@ foreach ($users as $uid => $user) {
 
 echo html_writer::end_tag('tbody');
 
+echo html_writer::end_tag('table');
+echo html_writer::end_div();
+
 
 // ======================================================
 // KETERANGAN
@@ -1494,34 +1585,43 @@ echo html_writer::end_div();
 
 
 // ======================================================
-// CATATAN
+// TANDA TANGAN
 // ======================================================
 
-//echo html_writer::start_div    'alert alert-info mt-3 no-print');
-
-//echo '<strong>Catatan:</strong> ';
-//echo 'Tanggal yang kosong berarti belum terdapat jurnal '
-//    . 'pada tanggal tersebut.';
-
-//echo html_writer::end_div();
-
-
-// ======================================================
-// TANDA TANGAN WALI KELAS
-// ======================================================
+echo html_writer::start_div('ttd-wrapper');
 
 echo html_writer::start_tag(
     'table',
-    [
-        'class' => 'tanda-tangan'
-    ]
+    ['class' => 'tanda-tangan']
 );
 
+// Baris tempat dan tanggal: berada di kolom kanan.
 echo html_writer::start_tag('tr');
 
 echo html_writer::tag(
     'td',
-    'Mengetahui,<br>Wali Kelas'
+    ''
+);
+
+echo html_writer::tag(
+    'td',
+    s($tanggal_ttd_text),
+    ['class' => 'tanggal-ttd']
+);
+
+echo html_writer::end_tag('tr');
+
+// Baris jabatan.
+echo html_writer::start_tag('tr');
+
+echo html_writer::tag(
+    'td',
+    'Mengetahui,<br>Kepala Sekolah'
+);
+
+echo html_writer::tag(
+    'td',
+    'Wali Kelas'
 );
 
 echo html_writer::end_tag('tr');
@@ -1531,14 +1631,22 @@ echo html_writer::start_tag('tr');
 echo html_writer::tag(
     'td',
     '<div class="spasi-ttd"></div>' .
-    '<strong>' .
-    s($namaguruwali) .
-    '</strong>'
+    '<strong>' . s($nama_kepsek) . '</strong><br>' .
+    'NIP. ' . s($nip_kepsek)
+);
+
+echo html_writer::tag(
+    'td',
+    '<div class="spasi-ttd"></div>' .
+    '<strong>' . s($namaguruwali) . '</strong><br>' .
+    'NIP. ' . s($nipwalikelas)
 );
 
 echo html_writer::end_tag('tr');
 
 echo html_writer::end_tag('table');
+
+echo html_writer::end_div();
 
 
 // ======================================================
