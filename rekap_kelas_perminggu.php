@@ -2,6 +2,7 @@
 require_once(__DIR__ . '/../../config.php');
 require_login();
 require_once($CFG->dirroot.'/local/jurnalmengajar/lib.php');
+jurnalmengajar_log_page_access();
 
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:view', $context);

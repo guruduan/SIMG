@@ -4,6 +4,7 @@ require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib_notifikasi.php');
 
 require_login();
+jurnalmengajar_log_page_access();
 
 use local_jurnalmengajar\form\layananbk_form;
 

@@ -5,6 +5,7 @@ require_once(__DIR__.'/jam_pelajaran_lib.php');
 require_once(__DIR__.'/lib.php');
 
 require_login();
+jurnalmengajar_log_page_access();
 
 $context = context_system::instance();
 $PAGE->set_context($context);

@@ -6,6 +6,7 @@ require_once($CFG->libdir.'/formslib.php');
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib_notifikasi.php');
 require_login();
+jurnalmengajar_log_page_access();
 
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);

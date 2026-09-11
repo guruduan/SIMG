@@ -4,6 +4,7 @@ require_once('../../config.php');
 require_once(__DIR__.'/lib.php');
 
 require_login();
+jurnalmengajar_log_page_access();
 
 global $DB, $USER, $PAGE, $OUTPUT;
 

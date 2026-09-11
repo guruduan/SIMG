@@ -3,6 +3,7 @@ require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
 
 require_login();
+jurnalmengajar_log_page_access();
 
 global $DB, $PAGE, $OUTPUT;
 

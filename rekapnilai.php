@@ -8,6 +8,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 require_login();
+jurnalmengajar_log_page_access();
 
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);

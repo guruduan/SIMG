@@ -15,7 +15,7 @@ $PAGE->set_heading('Jurnal Mengajar');
 
 require_once(__DIR__ . '/lib.php');
 require_once(__DIR__ . '/lib_notifikasi.php');
-
+jurnalmengajar_log_page_access();
 // ================= JS (Tetap dipertahankan, namun disarankan pindah ke AMD) =================
 $PAGE->requires->jquery();
 $PAGE->requires->js_init_code(<<<JS

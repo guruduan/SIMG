@@ -7,6 +7,7 @@ $context = context_system::instance();
 require_capability('local/jurnalmengajar:submit', $context);
 require_once(__DIR__ . '/jadwal_asesmen_lib.php');
 require_once(__DIR__ . '/lib.php');
+jurnalmengajar_log_page_access();
 
 global $USER;
 

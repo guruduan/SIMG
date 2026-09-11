@@ -13,7 +13,7 @@ $PAGE->set_title('Riwayat Jurnal');
 $PAGE->set_heading('Riwayat Jurnal Mengajar');
 
 require_once(__DIR__ . '/lib.php');
-
+jurnalmengajar_log_page_access();
 echo $OUTPUT->header();
 
 // Menggunakan utilitas margin Bootstrap bawaan Moodle

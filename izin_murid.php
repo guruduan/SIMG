@@ -15,6 +15,7 @@ $pengawas = $USER->lastname;
 
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib.php');
 require_once($CFG->dirroot . '/local/jurnalmengajar/lib_notifikasi.php');
+jurnalmengajar_log_page_access();
 
 // ================= DATA AWAL =================
 $cohorts = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');

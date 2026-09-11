@@ -6,6 +6,8 @@ require_once($CFG->dirroot . '/local/jurnalmengajar/classes/form/suratiguru_form
 require_once($CFG->libdir.'/pdflib.php');
 
 require_login();
+jurnalmengajar_log_page_access();
+
 $context = context_system::instance();
 require_capability('local/jurnalmengajar:submitsuratizin', $context);
 
