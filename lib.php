@@ -978,3 +978,116 @@ function jurnalmengajar_filter_peserta_mapel(array $users, string $mapel): array
     }
     return $users;
 }
+
+/**
+ * ==========================================================
+ * LOG AKSES HALAMAN JURNAL MENGAJAR
+ * ==========================================================
+ *
+ * Mencatat:
+ * - waktu
+ * - userid
+ * - nama user
+ * - file PHP
+ * - IP
+ * - URL
+ *
+ * File log:
+ * $CFG->dataroot/logs/jurnalmengajar_access.log
+ */
+function jurnalmengajar_log_page_access($nama_file = null) {
+    global $CFG, $USER;
+
+    // Hanya user yang sudah login.
+    if (!isloggedin() || empty($USER->id)) {
+        return;
+    }
+
+    // Nama file PHP yang sedang dibuka.
+    if (empty($nama_file)) {
+        $nama_file = basename($_SERVER['SCRIPT_FILENAME'] ?? 'unknown');
+    }
+
+    // Folder log Moodle.
+    $logdir = $CFG->dataroot . '/logs';
+
+    // Buat folder jika belum ada.
+    if (!is_dir($logdir)) {
+        if (!mkdir($logdir, 0755, true) && !is_dir($logdir)) {
+            return;
+        }
+    }
+
+    $logfile = $logdir . '/jurnalmengajar_access.log';
+
+    // Nama user.
+    $namaguru = trim(
+        ($USER->firstname ?? '') . ' ' .
+        ($USER->lastname ?? '')
+    );
+
+    if ($namaguru === '') {
+        $namaguru = 'User ID ' . $USER->id;
+    }
+
+    // IP.
+    $ip = getremoteaddr();
+
+    // URL.
+    $url = $_SERVER['REQUEST_URI'] ?? '';
+
+    // User agent/browser.
+    $useragent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+    // Bersihkan karakter pemisah agar log tetap satu baris.
+    $namaguru = str_replace(
+        ['|', "\r", "\n"],
+        ['/', '', ''],
+        $namaguru
+    );
+
+    $nama_file = str_replace(
+        ['|', "\r", "\n"],
+        ['/', '', ''],
+        $nama_file
+    );
+
+    $ip = str_replace(
+        ['|', "\r", "\n"],
+        ['/', '', ''],
+        $ip
+    );
+
+    $url = str_replace(
+        ['|', "\r", "\n"],
+        ['/', '', ''],
+        $url
+    );
+
+    $useragent = str_replace(
+        ['|', "\r", "\n"],
+        ['/', '', ''],
+        $useragent
+    );
+
+    // Susun baris log.
+    $log = sprintf(
+        "%s | userid=%d | guru=%s | file=%s | ip=%s | url=%s | useragent=%s%s",
+        date('Y-m-d H:i:s'),
+        (int)$USER->id,
+        $namaguru,
+        $nama_file,
+        $ip,
+        $url,
+        $useragent,
+        PHP_EOL
+    );
+
+    // Tulis log dengan LOCK agar aman jika beberapa guru
+    // membuka halaman bersamaan.
+    file_put_contents(
+        $logfile,
+        $log,
+        FILE_APPEND | LOCK_EX
+    );
+}
