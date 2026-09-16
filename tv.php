@@ -1074,7 +1074,7 @@ foreach ($jadwal as $j) {
     if (!empty($cutoffkelas[$tingkatkelas])) {
 
         $tanggalcutoff =
-        strtotime($cutoffkelas[$tingkatkelas]);
+            strtotime($cutoffkelas[$tingkatkelas]);
 
         /*
         =========================================
@@ -1083,13 +1083,14 @@ foreach ($jadwal as $j) {
         */
 
         if (
-        strtotime($tanggalhariini)
-        >=
-        $tanggalcutoff
+            strtotime($tanggalhariini)
+            >=
+            $tanggalcutoff
         ) {
-        continue;
+            continue;
         }
     }
+
     /*
     =============================================
     INISIALISASI DATA KELAS
@@ -1099,8 +1100,8 @@ foreach ($jadwal as $j) {
     if (!isset($data[$kelas])) {
 
         $data[$kelas] = [
-            'sekarang' => '-',
-            'berikut'  => '-'
+            'sekarang' => [],
+            'berikut'  => []
         ];
     }
 
@@ -1112,8 +1113,18 @@ foreach ($jadwal as $j) {
 
     if ((int)$j['jamke'] === $jamaktif) {
 
-        $data[$kelas]['sekarang'] =
-            $j['lastname'];
+        $guru = trim($j['lastname']);
+
+        if ($guru !== '' &&
+            !in_array(
+                $guru,
+                $data[$kelas]['sekarang'],
+                true
+            )
+        ) {
+
+            $data[$kelas]['sekarang'][] = $guru;
+        }
     }
 
     /*
@@ -1124,10 +1135,39 @@ foreach ($jadwal as $j) {
 
     if ((int)$j['jamke'] === $jamberikut) {
 
-        $data[$kelas]['berikut'] =
-            $j['lastname'];
+        $guru = trim($j['lastname']);
+
+        if ($guru !== '' &&
+            !in_array(
+                $guru,
+                $data[$kelas]['berikut'],
+                true
+            )
+        ) {
+
+            $data[$kelas]['berikut'][] = $guru;
+        }
     }
 }
+
+/*
+=====================================================
+UBAH ARRAY GURU MENJADI TEKS
+=====================================================
+*/
+
+foreach ($data as $kelas => &$d) {
+
+    $d['sekarang'] = !empty($d['sekarang'])
+        ? implode(' / ', $d['sekarang'])
+        : '-';
+
+    $d['berikut'] = !empty($d['berikut'])
+        ? implode(' / ', $d['berikut'])
+        : '-';
+}
+
+unset($d);
 
 /*
 =====================================================
@@ -2133,7 +2173,7 @@ function autoScrollTable() {
         return;
     }
 
-    container.scrollTop += 1;
+    container.scrollTop += 3;
 
     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
         tablePause = true;
