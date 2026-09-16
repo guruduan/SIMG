@@ -14,11 +14,11 @@ $PAGE->set_context($context);
 $PAGE->set_url(
     new moodle_url('/local/jurnalmengajar/riwayat_nonaktif.php')
 );
-$PAGE->set_title('Riwayat Siswa Nonaktif');
-$PAGE->set_heading('Riwayat Siswa Nonaktif');
+$PAGE->set_title('Riwayat Murid Nonaktif');
+$PAGE->set_heading('Riwayat Murid Nonaktif');
 
 echo $OUTPUT->header();
-echo $OUTPUT->heading('📚 Riwayat Siswa Nonaktif');
+echo $OUTPUT->heading('📚 Riwayat Murid Nonaktif');
 
 /*
 ========================================================
@@ -36,7 +36,19 @@ SELECT
     r.jenis,
     r.tanggal,
     r.keterangan,
-    c.name AS namakelas
+
+    COALESCE(
+        c.name,
+        (
+            SELECT r2.keterangan
+            FROM {local_jurnalmengajar_riwayatakademik} r2
+            WHERE r2.userid = r.userid
+              AND r2.jenis = 'masukkelas'
+              AND r2.tanggal <= r.tanggal
+            ORDER BY r2.tanggal DESC, r2.id DESC
+            LIMIT 1
+        )
+    ) AS namakelas
 
 FROM {local_jurnalmengajar_riwayatakademik} r
 
@@ -53,21 +65,25 @@ LEFT JOIN {user_info_data} d
     ON d.userid = u.id
    AND d.fieldid = f.id
 
-JOIN (
-    SELECT
-        userid,
-        MAX(tanggal) AS maxtanggal
-    FROM {local_jurnalmengajar_riwayatakademik}
-    GROUP BY userid
-) x
-ON x.userid = r.userid
-AND x.maxtanggal = r.tanggal
+WHERE r.jenis IN ('berhenti', 'mutasi')
 
-WHERE r.jenis IN ('berhenti','mutasi')
+AND NOT EXISTS (
+    SELECT 1
+    FROM {local_jurnalmengajar_riwayatakademik} r3
+    WHERE r3.userid = r.userid
+      AND r3.jenis IN ('berhenti', 'mutasi')
+      AND (
+            r3.tanggal > r.tanggal
+            OR (
+                r3.tanggal = r.tanggal
+                AND r3.id > r.id
+            )
+      )
+)
 
 ORDER BY
     r.tanggal DESC,
-    c.name,
+    namakelas,
     u.lastname
 ";
 
