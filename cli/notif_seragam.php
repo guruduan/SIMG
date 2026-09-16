@@ -94,44 +94,63 @@ $pesan = [];
 if ($dowN === 3 && $wom === 1) {
     $pesan[] = "Pengingat seragam $label $tanggal: Rabu Minggu Pertama — *Baju PDL Bungas*.";
 }
+
 // 2) KORPRI tiap tanggal 17
+// Jika tanggal 17 bertepatan dengan hari Kamis,
+// KORPRI tetap dikirim dan Sasirangan tidak ditampilkan.
 if ($dayNum === 17) {
     $pesan[] = "Pengingat seragam $label $tanggal: *Baju KORPRI*";
 }
+
 // 3a) eDialog SKP tgl 1
 if ($dayNum === 1) {
     $pesan[] = "Pengingat $label $tanggal: untuk *mengisi e-Dialog* (periode tanggal 1–5).";
 }
+
 // 3b) eDialog SKP tgl 5
 if ($dayNum === 5) {
     $pesan[] = "Pengingat $label $tanggal: jangan lupa *mengisi eDialog* (periode tanggal 1–5). Abaikan bila sudah";
 }
-// 4) Kamis: Sasirangan (M1 hitam, M2 biru motif ketupat, M3 hijau tua, M4 ungu)
-if ($dowN === 4) {
-    $warna = [1=>'warna biru terbaru', 2=>'warna hitam', 3=>'warna ungu', 4=>'warna hijau lumut', 5=>'warna bebas'];
+
+// 4) Kamis: Sasirangan
+// TIDAK dikirim jika tanggal 17 karena pada tanggal 17 berlaku KORPRI.
+if ($dowN === 4 && $dayNum !== 17) {
+    $warna = [
+        1 => 'warna biru terbaru',
+        2 => 'warna hitam',
+        3 => 'warna ungu',
+        4 => 'warna hijau lumut',
+        5 => 'warna bebas'
+    ];
+
     if (isset($warna[$wom])) {
         $pesan[] = "Pengingat seragam $label $tanggal: Kamis Minggu ke-$wom — *Sasirangan {$warna[$wom]}*.";
     }
 }
 
 // 5) Pengingat Guru Piket
-// Mengambil nama setting secara otomatis (contoh: 'guru_piket_senin', 'guru_piket_selasa')
+// Mengambil nama setting secara otomatis
+// (contoh: 'guru_piket_senin', 'guru_piket_selasa')
 $setting_piket = 'guru_piket_' . strtolower($hariIndo);
 
 if (isset($config->$setting_piket) && trim($config->$setting_piket) !== '') {
     // Memecah teks berdasarkan baris baru (enter)
     $list_nama = explode("\n", trim($config->$setting_piket));
-    // Membersihkan spasi kosong di tiap baris dan membuang baris yang kosong
+
+    // Membersihkan spasi kosong di tiap baris
+    // dan membuang baris yang kosong
     $list_nama = array_filter(array_map('trim', $list_nama));
 
     if (!empty($list_nama)) {
         $pesan_piket = "Pengingat *Guru Piket* $label $tanggal:\n";
         $nomor = 1;
+
         foreach ($list_nama as $nama) {
             $pesan_piket .= "  $nomor. $nama\n";
             $nomor++;
         }
-        $pesan[] = trim($pesan_piket); // Masukkan ke dalam daftar pesan yang akan dikirim
+
+        $pesan[] = trim($pesan_piket);
     }
 }
 
