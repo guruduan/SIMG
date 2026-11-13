@@ -20,6 +20,10 @@ echo $OUTPUT->header();
 
 // ======================================================
 // Ambil Mapping Wali Kelas
+// Format BARU (per tahun ajaran, sejak walikelas_manage.php
+// diubah 2026-11-13):
+//   { "2026/2027": { cohortid: userid }, "2025/2026": { ... } }
+// Format LAMA { cohortid: userid } tetap didukung.
 // ======================================================
 
 $json = get_config(
@@ -33,13 +37,59 @@ if (!is_array($mapping)) {
     $mapping = [];
 }
 
+// Tahun ajaran berjalan: pakai setting plugin 'tahun_ajaran'
+// (yang dipakai simpan_riwayatkelas.php); kalau belum diatur,
+// hitung dari tanggal (tahun ajaran mulai Juli).
+$tahunajaran_config = get_config('local_jurnalmengajar', 'tahun_ajaran');
+if (is_string($tahunajaran_config) && preg_match('/^\d{4}\/\d{4}$/', $tahunajaran_config)) {
+    $tahunajaran_berjalan = $tahunajaran_config;
+} else {
+    $bulan_ini = (int)date('n');
+    $tahun_mulai = ($bulan_ini >= 7) ? (int)date('Y') : (int)date('Y') - 1;
+    $tahunajaran_berjalan = $tahun_mulai . '/' . ($tahun_mulai + 1);
+}
+
+// Tahun ajaran yang ditampilkan (bisa dipilih lewat ?tahunajaran=)
+$tahunajaran_pilih = optional_param('tahunajaran', '', PARAM_TEXT);
+if (!preg_match('/^\d{4}\/\d{4}$/', $tahunajaran_pilih)) {
+    $tahunajaran_pilih = $tahunajaran_berjalan;
+}
+
+// Ambil mapping untuk tahun ajaran yang dipilih saja
+$mapping_tahun_ini = [];
+if (isset($mapping[$tahunajaran_pilih]) && is_array($mapping[$tahunajaran_pilih])) {
+    $mapping_tahun_ini = $mapping[$tahunajaran_pilih];
+} elseif (!empty($mapping)) {
+    // Fallback format lama: cek apakah nilai-nilainya userid (bukan array)
+    $is_flat = true;
+    foreach ($mapping as $nilai) {
+        if (is_array($nilai)) {
+            $is_flat = false;
+            break;
+        }
+    }
+    if ($is_flat) {
+        $mapping_tahun_ini = $mapping;
+    }
+}
+
+// Daftar tahun ajaran yang ada di mapping (untuk dropdown filter)
+$tahunajaran_tersedia = [];
+foreach ($mapping as $kunci => $nilai) {
+    if (is_array($nilai) && preg_match('/^\d{4}\/\d{4}$/', (string)$kunci)) {
+        $tahunajaran_tersedia[$kunci] = $kunci;
+    }
+}
+$tahunajaran_tersedia[$tahunajaran_berjalan] = $tahunajaran_berjalan;
+krsort($tahunajaran_tersedia);
+
 // ======================================================
 // Susun Data
 // ======================================================
 
 $data = [];
 
-foreach ($mapping as $cohortid => $userid) {
+foreach ($mapping_tahun_ini as $cohortid => $userid) {
 
     // Ambil data kelas
     $cohort = $DB->get_record(
@@ -95,6 +145,13 @@ usort($data, function($a, $b) {
 
 echo html_writer::start_div('container-fluid');
 
+// Filter tahun ajaran
+echo html_writer::start_tag('form', ['method' => 'get', 'class' => 'mb-3 form-inline']);
+echo html_writer::label('Tahun Ajaran', 'tahunajaran', ['class' => 'font-weight-bold mr-2']);
+echo html_writer::select($tahunajaran_tersedia, 'tahunajaran', $tahunajaran_pilih, [], ['class' => 'form-control custom-select mr-2', 'id' => 'tahunajaran', 'onchange' => 'this.form.submit()']);
+echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => 'Tampilkan', 'class' => 'btn btn-primary']);
+echo html_writer::end_tag('form');
+
 echo html_writer::start_div('card shadow-sm');
 
 echo html_writer::start_div(
@@ -118,7 +175,7 @@ echo html_writer::start_div('card-body');
 if (empty($data)) {
 
     echo html_writer::div(
-        'Belum ada data wali kelas.',
+        'Belum ada data wali kelas untuk tahun ajaran ' . s($tahunajaran_pilih) . '.',
         'alert alert-info text-center'
     );
 

@@ -38,35 +38,17 @@ if (!preg_match('/^\d{4}-\d{2}$/', $bulan)) {
 
 /* =========================================================
  * DETEKSI WALI KELAS
- * mapping: cohortid => userid
+ * (tahun ajaran berjalan)
  * ========================================================= */
 
-$iswalikelas = false;
-$kelaswaliid = 0;
-
-$jsonwalikelas = get_config(
-    'local_jurnalmengajar',
-    'wali_kelas_mapping'
-);
-
-$mappingwalikelas = json_decode(
-    $jsonwalikelas,
-    true
-);
-
-if (is_array($mappingwalikelas)) {
-
-    foreach ($mappingwalikelas as $cohortid => $useridwali) {
-
-        if ((int)$useridwali === (int)$USER->id) {
-
-            $iswalikelas = true;
-            $kelaswaliid = (int)$cohortid;
-
-            break;
-        }
-    }
-}
+// Pakai helper di lib.php supaya paham format mapping BARU
+// per tahun ajaran (dan tetap paham format lama). Cara lama di
+// sini meloop mapping sebagai {cohortid: userid}, sehingga
+// setelah migrasi $iswalikelas selalu false: wali kelas tidak
+// lagi dikunci ke kelasnya sendiri dan dropdown pilih kelas
+// yang seharusnya tersembunyi malah tampil.
+$kelaswaliid = (int)jurnalmengajar_get_kelas_wali($USER->id);
+$iswalikelas = ($kelaswaliid > 0);
 
 /*
  * Wali kelas otomatis menggunakan kelasnya.

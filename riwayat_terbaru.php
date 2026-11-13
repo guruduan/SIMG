@@ -70,6 +70,26 @@ function jm_get_namaguru($userid) {
     return $namagurucache[$userid];
 }
 
+// HELPER COHORTID DARI NAMA KELAS (untuk tautan ke murid_kelas.php)
+$cohortidkelascache = [];
+
+function jm_get_cohortid_kelas($namakelas) {
+    global $DB, $cohortidkelascache;
+
+    if (empty($namakelas) || $namakelas === '-') {
+        return null;
+    }
+
+    if (isset($cohortidkelascache[$namakelas])) {
+        return $cohortidkelascache[$namakelas];
+    }
+
+    $id = $DB->get_field('cohort', 'id', ['name' => $namakelas]);
+    $cohortidkelascache[$namakelas] = $id ? (int)$id : null;
+
+    return $cohortidkelascache[$namakelas];
+}
+
 //1 SURAT IZIN
 $rows = $DB->get_records_sql(
   "
@@ -112,6 +132,7 @@ foreach ($rows as $r) {
 	    'muridid' => $r->userid,
 	    'murid' => $murid,
 	    'kelas' => $kelas,
+	    'kelasid' => !empty($r->kelasid) ? (int)$r->kelasid : null,
 	    'kategori' => 'izin',
 	    'ringkasan' => $ringkasan,
 	    'guru' => jm_get_namaguru($r->penginput)
@@ -135,6 +156,7 @@ foreach ($rows as $r) {
         'muridid' => $r->muridid,
         'murid' => jm_get_namamurid($r->muridid),
         'kelas' => get_nama_kelas($r->kelas),
+        'kelasid' => is_numeric($r->kelas) ? (int)$r->kelas : null,
         'kategori' => 'mapel',
         'ringkasan' => $r->catatan,
         'guru' => jm_get_namaguru($r->userid)
@@ -159,6 +181,7 @@ foreach ($rows as $r) {
         'muridid' => $r->muridid,
         'murid' => jm_get_namamurid($r->muridid),
         'kelas' => get_nama_kelas($r->kelas),
+        'kelasid' => is_numeric($r->kelas) ? (int)$r->kelas : null,
         'kategori' => 'walikelas',
         'ringkasan' =>
             '<div><b>Permasalahan:</b> ' .
@@ -188,6 +211,7 @@ foreach ($rows as $r) {
         'muridid' => $r->muridid,
         'murid' => jm_get_namamurid($r->muridid),
         'kelas' => $r->kelas,
+        'kelasid' => is_numeric($r->kelas) ? (int)$r->kelas : null,
         'kategori' => 'wali',
         'ringkasan' => '<div><b>Topik:</b> ' . $r->topik . '</div>' .
                '<div><b>Tindak Lanjut:</b> ' . $r->tindaklanjut . '</div>',
@@ -227,6 +251,7 @@ foreach ($rows as $r) {
             'muridid' => $muridid,
             'murid' => jm_get_namamurid($muridid),
             'kelas' => get_nama_kelas($r->kelas),
+            'kelasid' => is_numeric($r->kelas) ? (int)$r->kelas : null,
             'kategori' => 'bk',
             'ringkasan' => $r->topik,
             'guru' => jm_get_namaguru($r->userid)
@@ -268,6 +293,7 @@ foreach ($rows as $r) {
         'muridid' => $muridid,
         'murid' => jm_get_namamurid($muridid),
         'kelas' => get_nama_kelas($r->kelas),
+        'kelasid' => is_numeric($r->kelas) ? (int)$r->kelas : null,
         'kategori' => 'pembinaan',
         'ringkasan' =>
             '<div><b>Permasalahan:</b> ' .
@@ -328,6 +354,7 @@ foreach ($rows as $r) {
             'muridid'   => $muridid,
             'murid'     => jm_get_namamurid($muridid),
             'kelas'     => $kelas,
+            'kelasid'   => is_numeric($r->kelas) ? (int)$r->kelas : null,
             'kategori'  => 'absen',
             'ringkasan' => 'Tidak hadir (' . $status . ')',
             'guru' => jm_get_namaguru($r->userid)
@@ -457,8 +484,19 @@ foreach ($timeline as $t) {
         ) .
         '</td>';
 
+    $kelas_tampil = format_string($t['kelas']);
+    if (!empty($t['kelas']) && $t['kelas'] !== '-') {
+        $cohortid_kelas = !empty($t['kelasid']) ? (int)$t['kelasid'] : jm_get_cohortid_kelas($t['kelas']);
+        if ($cohortid_kelas) {
+            $kelas_tampil = html_writer::link(
+                new moodle_url('/local/jurnalmengajar/murid_kelas.php', ['cohortid' => $cohortid_kelas]),
+                format_string($t['kelas'])
+            );
+        }
+    }
+
     echo '<td>' .
-        format_string($t['kelas']) .
+        $kelas_tampil .
         '</td>';
 
     echo '<td>' .

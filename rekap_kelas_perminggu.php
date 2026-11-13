@@ -61,18 +61,15 @@ $minggu_berjalan = ($diff >= 0) ? $diff + 1 : 1;
 global $USER;
 $default_kelas = key($kelasoptions); // Default awal jika bukan wali kelas (kelas pertama)
 
-// Ambil data mapping wali kelas dari config
-$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
-$mapping = json_decode($json_mapping, true);
-
-if (is_array($mapping)) {
-    foreach ($mapping as $cohortid => $userid) {
-        // Jika ID user login cocok dengan data mapping, dan kelasnya terdaftar di sistem
-        if ($userid == $USER->id && isset($kelasoptions[$cohortid])) {
-            $default_kelas = $cohortid; // Timpa default kelas dengan kelas binaannya
-            break;
-        }
-    }
+// Kelas binaan guru ini (tahun ajaran berjalan).
+// Pakai helper di lib.php supaya paham format mapping BARU
+// per tahun ajaran (dan tetap paham format lama). Cara lama di
+// sini meloop mapping sebagai {cohortid: userid}, sehingga
+// setelah migrasi tidak pernah ketemu dan kelas default selalu
+// jatuh ke kelas pertama (bukan kelas binaannya).
+$kelas_wali = (int)jurnalmengajar_get_kelas_wali($USER->id);
+if ($kelas_wali && isset($kelasoptions[$kelas_wali])) {
+    $default_kelas = $kelas_wali; // Timpa default kelas dengan kelas binaannya
 }
 
 // === Ambil input dengan default kelas (wali kelas / kelas pertama) & minggu berjalan ===

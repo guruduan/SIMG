@@ -18,17 +18,65 @@ $cohort = $DB->get_record(
     MUST_EXIST
 );
 
+// ======================================================
+// Wali Kelas kelas ini (tahun ajaran berjalan)
+// dari mapping wali_kelas_mapping (per tahun ajaran,
+// dengan fallback ke format lama {cohortid: userid})
+// ======================================================
+$tahunajaran_config = get_config('local_jurnalmengajar', 'tahun_ajaran');
+if (is_string($tahunajaran_config) && preg_match('/^\d{4}\/\d{4}$/', $tahunajaran_config)) {
+    $tahunajaran_berjalan = $tahunajaran_config;
+} else {
+    $bulan_ini = (int)date('n');
+    $tahun_mulai = ($bulan_ini >= 7) ? (int)date('Y') : (int)date('Y') - 1;
+    $tahunajaran_berjalan = $tahun_mulai . '/' . ($tahun_mulai + 1);
+}
+
+// Tahun ajaran yang ditampilkan: ?tahunajaran=... kalau ada.
+// Kalau tahun itu BUKAN tahun berjalan, ini tampilan RIWAYAT:
+// daftar murid diambil dari snapshot riwayatkelas tahun itu,
+// bukan dari anggota cohort yang aktif sekarang.
+$tahunajaran_param = optional_param('tahunajaran', '', PARAM_TEXT);
+if (!preg_match('/^\d{4}\/\d{4}$/', $tahunajaran_param)) {
+    $tahunajaran_param = '';
+}
+$tahunajaran_tampil = $tahunajaran_param !== '' ? $tahunajaran_param : $tahunajaran_berjalan;
+$is_riwayat = ($tahunajaran_tampil !== $tahunajaran_berjalan);
+
+$mapping_walikelas = json_decode(get_config('local_jurnalmengajar', 'wali_kelas_mapping'), true);
+if (!is_array($mapping_walikelas)) {
+    $mapping_walikelas = [];
+}
+
+$id_walikelas = null;
+if (isset($mapping_walikelas[$tahunajaran_tampil][$cohortid])) {
+    $id_walikelas = (int)$mapping_walikelas[$tahunajaran_tampil][$cohortid];
+} elseif (isset($mapping_walikelas[$cohortid])) {
+    // Fallback format lama
+    $id_walikelas = (int)$mapping_walikelas[$cohortid];
+}
+
+$nama_walikelas = 'Belum ditetapkan';
+if ($id_walikelas) {
+    $guru_walikelas = $DB->get_record('user', ['id' => $id_walikelas]);
+    if ($guru_walikelas) {
+        $nama_walikelas = !empty($guru_walikelas->lastname) ? trim($guru_walikelas->lastname) : $guru_walikelas->firstname;
+    }
+}
+
 $PAGE->set_context($context);
 $PAGE->set_url(
     new moodle_url(
         '/local/jurnalmengajar/murid_kelas.php',
-        ['cohortid' => $cohortid]
+        $is_riwayat
+            ? ['cohortid' => $cohortid, 'tahunajaran' => $tahunajaran_tampil]
+            : ['cohortid' => $cohortid]
     )
 );
 
 $PAGE->set_pagelayout('standard');
 $PAGE->set_title('Daftar Murid Kelas ' . $cohort->name);
-$PAGE->set_heading('Daftar Murid Kelas ' . $cohort->name);
+$PAGE->set_heading('DAFTAR MURID');
 
 echo $OUTPUT->header();
 
@@ -36,8 +84,18 @@ echo $OUTPUT->header();
 // Ambil Daftar Murid & Guru Wali
 // ======================================================
 
-// TAMBAHAN: Mengambil field guru.lastname sebagai namaguruwali 
+// TAMBAHAN: Mengambil field guru.lastname sebagai namaguruwali
 // dan melakukan LEFT JOIN ke tabel guruwali
+// Sumber murid: cohort_members (kelas aktif sekarang) atau,
+// kalau ini tampilan riwayat, snapshot riwayatkelas tahun itu.
+$from_murid = $is_riwayat
+    ? "FROM {local_jurnalmengajar_riwayatkelas} rk\n\nJOIN {user} u\n     ON u.id = rk.userid"
+    : "FROM {cohort_members} cm\n\nJOIN {user} u\n     ON u.id = cm.userid";
+$where_murid = $is_riwayat
+    ? "WHERE rk.cohortid = ? AND rk.tahunajaran = ?"
+    : "WHERE cm.cohortid = ?";
+$params_murid = $is_riwayat ? [$cohortid, $tahunajaran_tampil] : [$cohortid];
+
 $sql = "
 SELECT
     u.id,
@@ -47,10 +105,7 @@ SELECT
     jk.data  AS jeniskelamin,
     guru.lastname AS namaguruwali
 
-FROM {cohort_members} cm
-
-JOIN {user} u
-     ON u.id = cm.userid
+$from_murid
 
 LEFT JOIN {user_info_data} nis
      ON nis.userid = u.id
@@ -74,14 +129,14 @@ LEFT JOIN {local_jurnalmengajar_guruwali} gw
 LEFT JOIN {user} guru
      ON guru.id = gw.guruid
 
-WHERE cm.cohortid = ?
+$where_murid
 
 ORDER BY u.lastname ASC
 ";
 
 $murid = $DB->get_records_sql(
     $sql,
-    [$cohortid]
+    $params_murid
 );
 
 // ======================================================
@@ -96,27 +151,23 @@ echo html_writer::start_div('container-fluid');
 
 echo html_writer::start_div('card mb-3 shadow-sm');
 
-echo html_writer::start_div(
-    'card-header bg-primary text-white'
-);
-
-echo html_writer::tag(
-    'h4',
-    '👨‍🎓 Daftar Murid Kelas ' . s($cohort->name),
-    ['class' => 'mb-0']
-);
-
+// Bagian biru: nama kelasnya. Judul halaman di atas cukup
+// "DAFTAR MURID", jadi tidak dobel lagi.
+// Kalau ini tampilan riwayat, tahun ajarannya ditulis di sini
+// supaya jelas ini daftar murid tahun lalu, bukan yang sekarang.
+echo html_writer::start_div('card-header bg-primary text-white');
+echo html_writer::tag('h4', '🎓 Kelas ' . s($cohort->name) . ($is_riwayat ? ' — ' . s($tahunajaran_tampil) : ''), ['class' => 'mb-0']);
 echo html_writer::end_div();
 
 echo html_writer::start_div('card-body');
 
 echo html_writer::start_div('row');
 
-echo html_writer::start_div('col-md-6');
-echo '<strong>Kelas :</strong> ' . s($cohort->name);
+echo html_writer::start_div('col-md-8 text-nowrap');
+echo '<strong>Wali Kelas :</strong> <strong>' . s($nama_walikelas) . '</strong>';
 echo html_writer::end_div();
 
-echo html_writer::start_div('col-md-6 text-end');
+echo html_writer::start_div('col-md-4 text-end');
 echo '<strong>Jumlah Murid :</strong> ' . count($murid);
 echo html_writer::end_div();
 
@@ -151,7 +202,9 @@ echo html_writer::start_div('card-body');
 if (empty($murid)) {
 
     echo html_writer::div(
-        'Belum ada murid pada kelas ini.',
+        $is_riwayat
+            ? 'Belum ada murid pada kelas ini untuk tahun ajaran ' . s($tahunajaran_tampil) . '.'
+            : 'Belum ada murid pada kelas ini.',
         'alert alert-warning text-center'
     );
 

@@ -842,21 +842,87 @@ function jurnalmengajar_get_ttd_path() {
 }
 
 // fungsi ambil kelas dari mapping wali kelas
-function jurnalmengajar_get_kelas_wali($userid) {
+// Format BARU (per tahun ajaran, sejak 2026-11-13):
+//   { "2026/2027": { cohortid: userid }, "2025/2026": { ... } }
+// Format LAMA { cohortid: userid } tetap didukung.
+// Tanpa $tahunajaran, yang dicari adalah kelas yang diwalikan
+// guru ini pada tahun ajaran BERJALAN — guru yang hanya wali
+// kelas tahun lalu (bukan tahun ini) bukan wali kelas lagi.
+function jurnalmengajar_get_kelas_wali($userid, $tahunajaran = null) {
     $json = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
     $mapping = json_decode($json, true);
 
     if (!is_array($mapping)) return 0;
 
-    foreach ($mapping as $cohortid => $waliid) {
-        if ((int)$waliid === (int)$userid) return (int)$cohortid;
+    if (empty($tahunajaran)) {
+        $tahunajaran_config = get_config('local_jurnalmengajar', 'tahun_ajaran');
+        if (is_string($tahunajaran_config) && preg_match('/^\d{4}\/\d{4}$/', $tahunajaran_config)) {
+            $tahunajaran = $tahunajaran_config;
+        } else {
+            $tahunajaran = jurnalmengajar_get_tahunajaran_by_timestamp();
+        }
+    }
+
+    // Cek apakah mapping masih format lama (nilainya userid, bukan array)
+    $is_flat = true;
+    foreach ($mapping as $nilai) {
+        if (is_array($nilai)) {
+            $is_flat = false;
+            break;
+        }
+    }
+
+    if ($is_flat) {
+        foreach ($mapping as $cohortid => $waliid) {
+            if ((int)$waliid === (int)$userid) return (int)$cohortid;
+        }
+        return 0;
+    }
+
+    // Format baru: cari hanya di tahun ajaran yang diminta
+    if (isset($mapping[$tahunajaran]) && is_array($mapping[$tahunajaran])) {
+        foreach ($mapping[$tahunajaran] as $cohortid => $waliid) {
+            if ((int)$waliid === (int)$userid) return (int)$cohortid;
+        }
     }
     return 0;
 }
 
+// fungsi ambil wali kelas dari sebuah kelas (kebalikan
+// jurnalmengajar_get_kelas_wali): mengembalikan userid wali
+// kelas untuk $cohortid pada $tahunajaran (default: tahun
+// ajaran berjalan), atau 0 kalau tidak ada. Paham format
+// BARU per tahun ajaran dan format LAMA.
+function jurnalmengajar_get_wali_kelas($cohortid, $tahunajaran = null) {
+    $json = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+    $mapping = json_decode($json, true);
+
+    if (!is_array($mapping)) return 0;
+
+    if (empty($tahunajaran)) {
+        $tahunajaran_config = get_config('local_jurnalmengajar', 'tahun_ajaran');
+        if (is_string($tahunajaran_config) && preg_match('/^\d{4}\/\d{4}$/', $tahunajaran_config)) {
+            $tahunajaran = $tahunajaran_config;
+        } else {
+            $tahunajaran = jurnalmengajar_get_tahunajaran_by_timestamp();
+        }
+    }
+
+    // Format baru: cari di sub-mapping tahun ajaran yang diminta
+    if (isset($mapping[$tahunajaran]) && is_array($mapping[$tahunajaran])) {
+        return (int)($mapping[$tahunajaran][(int)$cohortid] ?? 0);
+    }
+
+    // Format lama {cohortid: userid} — hanya kalau seluruh mapping datar
+    foreach ($mapping as $nilai) {
+        if (is_array($nilai)) return 0;
+    }
+    return (int)($mapping[(int)$cohortid] ?? 0);
+}
+
 // fungsi wali kelas
-function is_wali_kelas($userid) {
-    $kelas = jurnalmengajar_get_kelas_wali($userid);
+function is_wali_kelas($userid, $tahunajaran = null) {
+    $kelas = jurnalmengajar_get_kelas_wali($userid, $tahunajaran);
     return !empty($kelas);
 }
 

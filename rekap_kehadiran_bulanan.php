@@ -38,17 +38,15 @@ $kelaslist = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
 global $USER;
 $default_kelas = 0; // Default awal jika bukan wali kelas
 
-$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
-$mapping = json_decode($json_mapping, true);
-
-if (is_array($mapping)) {
-    foreach ($mapping as $cohortid => $userid) {
-        // Jika ID user login adalah wali kelas, dan kelasnya terdaftar di sistem
-        if ($userid == $USER->id && isset($kelaslist[$cohortid])) {
-            $default_kelas = $cohortid; 
-            break;
-        }
-    }
+// Kelas binaan guru ini (tahun ajaran berjalan).
+// Pakai helper di lib.php supaya paham format mapping BARU
+// per tahun ajaran (dan tetap paham format lama). Cara lama di
+// sini meloop mapping sebagai {cohortid: userid}, sehingga
+// setelah migrasi tidak pernah ketemu dan kelas default selalu
+// 0 ("-- Pilih Kelas --") walau yang login adalah wali kelas.
+$kelas_wali = (int)jurnalmengajar_get_kelas_wali($USER->id);
+if ($kelas_wali && isset($kelaslist[$kelas_wali])) {
+    $default_kelas = $kelas_wali;
 }
 
 // === 2. Ambil parameter form (dengan menerapkan default kelas) ===

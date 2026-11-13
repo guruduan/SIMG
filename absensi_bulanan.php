@@ -31,39 +31,20 @@ $kelaslist = $DB->get_records_menu(
 
 
 // ======================================================
-// MAPPING WALI KELAS
-// Sumber: setting wali_kelas_mapping
-// Format: cohortid => userid
-// ======================================================
-
-$json_mapping = get_config(
-    'local_jurnalmengajar',
-    'wali_kelas_mapping'
-);
-
-$mapping = json_decode($json_mapping, true);
-
-if (!is_array($mapping)) {
-    $mapping = [];
-}
-
-
-// ======================================================
 // DEFAULT KELAS
 // Jika user login adalah wali kelas,
-// otomatis pilih kelasnya.
+// otomatis pilih kelasnya (tahun ajaran berjalan).
+// Pakai helper di lib.php supaya paham format mapping BARU
+// per tahun ajaran (dan tetap paham format lama). Cara lama
+// meloop mapping sebagai {cohortid: userid}, sehingga
+// setelah migrasi kelas default selalu 0.
 // ======================================================
 
 $default_kelas = 0;
 
-foreach ($mapping as $cohortid => $userid) {
-    if (
-        (int)$userid === (int)$USER->id &&
-        isset($kelaslist[$cohortid])
-    ) {
-        $default_kelas = (int)$cohortid;
-        break;
-    }
+$kelas_wali = (int)jurnalmengajar_get_kelas_wali($USER->id);
+if ($kelas_wali && isset($kelaslist[$kelas_wali])) {
+    $default_kelas = $kelas_wali;
 }
 
 
@@ -110,6 +91,15 @@ $tanggalawal = strtotime($bulan . '-01 00:00:00');
 
 $tahun = (int)date('Y', $tanggalawal);
 $bulanangka = (int)date('m', $tanggalawal);
+
+// Tahun ajaran dari bulan yang dipilih — dipakai untuk nama
+// dan NIP wali kelas di cetakan (sama logikanya dengan judul
+// "TAHUN PELAJARAN" di bawah): bulan Jul–Des = tahun ini,
+// bulan Jan–Jun = tahun lalu. Jadi absensi bulan Nov 2025
+// memakai wali kelas 2025/2026, bukan wali kelas sekarang.
+$tahunajaran_bulan = ($bulanangka >= 7)
+    ? $tahun . '/' . ($tahun + 1)
+    : ($tahun - 1) . '/' . $tahun;
 
 $jumlahhari = cal_days_in_month(
     CAL_GREGORIAN,
@@ -749,13 +739,17 @@ $namakelas = $kelaslist[$kelasid];
 
 // ======================================================
 // AMBIL WALI KELAS DARI MAPPING
+// (wali kelas pada tahun ajaran bulan yang dipilih)
 // ======================================================
 
 $namaguruwali = '-';
 
-if (isset($mapping[$kelasid])) {
+// Helper baru di lib.php — paham format mapping per tahun
+// ajaran. Cara lama ($mapping[$kelasid]) tidak pernah ketemu
+// setelah migrasi, sehingga nama wali kelas selalu '-'.
+$walikelasid = (int)jurnalmengajar_get_wali_kelas($kelasid, $tahunajaran_bulan);
 
-    $walikelasid = (int)$mapping[$kelasid];
+if ($walikelasid) {
 
     $guru = $DB->get_record(
         'user',
@@ -782,11 +776,11 @@ if (isset($mapping[$kelasid])) {
 
 // NIP wali kelas dari User Profile Field "nip"
 // pada akun guru yang ditunjuk oleh wali_kelas_mapping.
+// $walikelasid sudah dihitung di blok nama wali kelas di atas
+// (wali kelas pada tahun ajaran bulan yang dipilih).
 $nipwalikelas = '';
 
-if (isset($mapping[$kelasid])) {
-
-    $walikelasid = (int)$mapping[$kelasid];
+if ($walikelasid) {
 
     $fieldnip = $DB->get_record(
         'user_info_field',

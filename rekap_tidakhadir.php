@@ -53,23 +53,20 @@ if (!$kelaslist) {
 }
 
 global $USER;
-$my_cohortid = 0;
-$json_mapping = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
-$mapping = json_decode($json_mapping, true);
+// Kelas yang diwalikan guru ini (tahun ajaran berjalan).
+// Pakai helper di lib.php supaya paham format mapping BARU
+// per tahun ajaran (dan tetap paham format lama). Cara lama di
+// sini meloop mapping sebagai {cohortid: userid}, sehingga
+// setelah migrasi tidak pernah ketemu dan $my_cohortid selalu 0
+// (kelas sendiri tidak naik ke atas, tombol Copy tidak muncul).
+$my_cohortid = (int)jurnalmengajar_get_kelas_wali($USER->id);
 
-if (is_array($mapping)) {
-    foreach ($mapping as $cohortid => $userid) {
-        if ($userid == $USER->id && isset($kelaslist[$cohortid])) {
-            $my_cohortid = $cohortid;
-            break;
-        }
-    }
-}
-
-if ($my_cohortid) {
+if ($my_cohortid && isset($kelaslist[$my_cohortid])) {
     $kelas_wali = $kelaslist[$my_cohortid];
     unset($kelaslist[$my_cohortid]);
     $kelaslist = [$my_cohortid => $kelas_wali] + $kelaslist;
+} else {
+    $my_cohortid = 0;
 }
 
 $priority = [

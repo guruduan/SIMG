@@ -87,6 +87,95 @@ $inputval = trim($murid->lastname);
 }
 
 /* =====================================================
+   GURU WALI MURID
+===================================================== */
+$guruwali = null;
+
+if ($muridid) {
+    $guruwali = $DB->get_record_sql("
+        SELECT u.id, u.firstname, u.lastname
+        FROM {local_jurnalmengajar_guruwali} gw
+        JOIN {user} u ON u.id = gw.guruid
+        WHERE gw.muridid = ?
+        LIMIT 1
+    ", [$muridid]);
+}
+
+/* =====================================================
+   WALI KELAS MURID (dari mapping wali_kelas_mapping)
+   Kelas murid diambil dari riwayat kelas TERKINI
+   (tahun ajaran terbaru), lalu dicocokkan ke mapping
+   PER TAHUN AJARAN di walikelas_manage.php:
+   { "2026/2027": { cohortid: userid }, ... }
+   Format lama { cohortid: userid } tetap didukung
+   sebagai fallback.
+===================================================== */
+$mapping_walikelas = json_decode(get_config('local_jurnalmengajar', 'wali_kelas_mapping'), true);
+if (!is_array($mapping_walikelas)) {
+    $mapping_walikelas = [];
+}
+
+// Cari userid wali kelas untuk (tahun ajaran, kelas) tertentu
+$cari_walikelas = function($tahunajaran, $cohortid) use ($mapping_walikelas) {
+    if ($tahunajaran && isset($mapping_walikelas[$tahunajaran][$cohortid])) {
+        return (int)$mapping_walikelas[$tahunajaran][$cohortid];
+    }
+    // Fallback format lama: { cohortid: userid }
+    if (isset($mapping_walikelas[$cohortid])) {
+        return (int)$mapping_walikelas[$cohortid];
+    }
+    return null;
+};
+
+// Buat nama kelas menjadi tautan ke daftar murid kelas itu
+// (murid_kelas.php?cohortid=...&tahunajaran=...). Kalau cohortid
+// tidak diketahui, dicari dari nama kelasnya; kalau tidak ketemu,
+// tampil teks biasa. Tahun ajaran disertakan supaya klik kelas
+// tahun lalu (misal X-F 2025/2026) membuka daftar murid tahun
+// itu dari snapshot riwayatkelas, bukan murid X-F yang sekarang.
+$tautan_kelas = function($namakelas, $cohortid = null, $tahunajaran = null) use ($DB) {
+    static $cache_cohortid = [];
+    if ($cohortid === null) {
+        if (!isset($cache_cohortid[$namakelas])) {
+            $cache_cohortid[$namakelas] = $DB->get_field('cohort', 'id', ['name' => $namakelas]);
+        }
+        $cohortid = $cache_cohortid[$namakelas];
+    }
+    if ($cohortid) {
+        $params = ['cohortid' => (int)$cohortid];
+        if (!empty($tahunajaran)) {
+            $params['tahunajaran'] = $tahunajaran;
+        }
+        return html_writer::link(
+            new moodle_url('/local/jurnalmengajar/murid_kelas.php', $params),
+            format_string($namakelas)
+        );
+    }
+    return format_string($namakelas);
+};
+
+$kelas_murid_terkini = null;
+$guru_walikelas = null;
+
+if ($muridid) {
+    $kelas_murid_terkini = $DB->get_record_sql("
+        SELECT rk.cohortid, rk.tahunajaran, c.name AS namakelas
+        FROM {local_jurnalmengajar_riwayatkelas} rk
+        JOIN {cohort} c ON c.id = rk.cohortid
+        WHERE rk.userid = ?
+        ORDER BY rk.tahunajaran DESC, rk.id DESC
+        LIMIT 1
+    ", [$muridid]);
+
+    if ($kelas_murid_terkini) {
+        $id_guru_walikelas = $cari_walikelas($kelas_murid_terkini->tahunajaran, $kelas_murid_terkini->cohortid);
+        if ($id_guru_walikelas) {
+            $guru_walikelas = $DB->get_record('user', ['id' => $id_guru_walikelas]);
+        }
+    }
+}
+
+/* =====================================================
    FORM PENCARIAN REAL-TIME
 ===================================================== */
 echo html_writer::start_tag('form', [
@@ -350,10 +439,70 @@ if ($muridid && $murid) {
     usort($timeline, function($a, $b) { return $b['time'] <=> $a['time']; });
 
     /* HEADER NAMA MURID */
-    echo html_writer::start_div('d-flex justify-content-between align-items-center my-4 pb-2 border-bottom');
-    echo html_writer::tag('h3', '<i class="fa fa-user-circle text-muted"></i> ' . format_nama_siswa($murid->lastname), ['class' => 'm-0 font-weight-bold']);
-    
-    echo html_writer::start_div();
+echo html_writer::start_div(
+    'd-flex justify-content-between align-items-center my-4 pb-2 border-bottom'
+);
+
+echo html_writer::start_div();
+
+echo html_writer::tag(
+    'h3',
+    '<i class="fa fa-user-circle text-muted"></i> ' .
+    format_nama_siswa($murid->lastname),
+    ['class' => 'm-0 font-weight-bold']
+);
+
+/* Tampilkan Guru Wali */
+if ($guruwali) {
+
+   $namaguruwali = trim($guruwali->lastname);
+
+    echo html_writer::tag(
+        'div',
+        '<i class="fa fa-user-tie text-primary"></i> ' .
+        '<strong>Guru Wali:</strong> ' .
+        '<strong>' . format_string($namaguruwali) . '</strong>',
+        ['class' => 'mt-2']
+    );
+
+} else {
+
+    echo html_writer::tag(
+        'div',
+        '<i class="fa fa-user-tie text-muted"></i> ' .
+        '<strong>Guru Wali:</strong> Belum ditetapkan',
+        ['class' => 'mt-2 text-muted']
+    );
+}
+
+/* Tampilkan Wali Kelas (di bawah Guru Wali) */
+$labelwalikelas = 'Wali Kelas' . ($kelas_murid_terkini ? ' ' . $tautan_kelas($kelas_murid_terkini->namakelas, $kelas_murid_terkini->cohortid, $kelas_murid_terkini->tahunajaran) : '');
+
+if (is_object($guru_walikelas)) {
+
+    $namawalikelas = trim((string)($guru_walikelas->lastname ?? ''));
+
+    echo html_writer::tag(
+        'div',
+        '<i class="fa fa-chalkboard-teacher text-success"></i> ' .
+        '<strong>' . $labelwalikelas . ':</strong> ' .
+        '<strong>' . format_string($namawalikelas) . '</strong>',
+        ['class' => 'mt-2']
+    );
+
+} else {
+
+    echo html_writer::tag(
+        'div',
+        '<i class="fa fa-chalkboard-teacher text-muted"></i> ' .
+        '<strong>' . $labelwalikelas . ':</strong> Belum ditetapkan',
+        ['class' => 'mt-2 text-muted']
+    );
+}
+
+echo html_writer::end_div();
+
+echo html_writer::start_div();
     if (has_capability('moodle/site:config', $context)) {
         echo html_writer::link(new moodle_url('/local/jurnalmengajar/statusakademik.php', ['userid' => $muridid]), '<i class="fa fa-cog"></i> Kelola Status Akademik', ['class' => 'btn btn-success btn-sm mr-2']);
     }
@@ -364,7 +513,11 @@ if ($muridid && $murid) {
     /* =====================================================
        RIWAYAT KELAS & AKADEMIK
     ===================================================== */
-    $riwayatkelas = $DB->get_records_sql("SELECT rk.tahunajaran, c.name AS namakelas FROM {local_jurnalmengajar_riwayatkelas} rk JOIN {cohort} c ON c.id = rk.cohortid WHERE rk.userid = ? ORDER BY rk.tahunajaran ASC", [$muridid]);
+    $riwayatkelas = $DB->get_records_sql("SELECT rk.cohortid, rk.tahunajaran, c.name AS namakelas FROM {local_jurnalmengajar_riwayatkelas} rk JOIN {cohort} c ON c.id = rk.cohortid WHERE rk.userid = ? ORDER BY rk.tahunajaran ASC", [$muridid]);
+
+    // Nama wali kelas per baris dicari per (tahun ajaran, kelas)
+    // lewat $cari_walikelas yang didefinisikan di atas
+    $cache_nama_walikelas = [];
 
     echo html_writer::start_div('row');
     
@@ -377,7 +530,18 @@ if ($muridid && $murid) {
     echo html_writer::start_div('card-body');
     if ($riwayatkelas) {
         foreach ($riwayatkelas as $r) {
-            echo html_writer::tag('div', '<strong>' . format_string($r->tahunajaran) . '</strong> di kelas <strong>' . format_string($r->namakelas) . '</strong>', ['class' => 'mb-2']);
+            $teks_walikelas_baris = ' — Wali Kelas: <span class="text-muted">Belum ditetapkan</span>';
+            $id_walikelas_baris = $cari_walikelas($r->tahunajaran, $r->cohortid);
+            if ($id_walikelas_baris) {
+                if (!isset($cache_nama_walikelas[$id_walikelas_baris])) {
+                    $user_walikelas_baris = $DB->get_record('user', ['id' => $id_walikelas_baris]);
+                    $cache_nama_walikelas[$id_walikelas_baris] = $user_walikelas_baris ? trim((string)($user_walikelas_baris->lastname ?? '')) : '';
+                }
+                if ($cache_nama_walikelas[$id_walikelas_baris] !== '') {
+                    $teks_walikelas_baris = ' — Wali Kelas: <strong>' . format_string($cache_nama_walikelas[$id_walikelas_baris]) . '</strong>';
+                }
+            }
+            echo html_writer::tag('div', '<strong>' . format_string($r->tahunajaran) . '</strong> di kelas <strong>' . $tautan_kelas($r->namakelas, $r->cohortid, $r->tahunajaran) . '</strong>' . $teks_walikelas_baris, ['class' => 'mb-2']);
         }
     } else {
         echo html_writer::tag('div', '<i>Belum ada riwayat kelas.</i>', ['class' => 'text-muted']);
@@ -401,8 +565,8 @@ if ($muridid && $murid) {
             if (!$pertama) { echo html_writer::empty_tag('hr'); }
             $pertama = false;
             switch ($r->jenis) {
-                case 'masukkelas': $teks = 'Masuk kelas <strong>' . format_string($r->keterangan) . '</strong>'; break;
-                case 'pindahkelas': $teks = 'Pindah kelas <strong>' . format_string($r->keterangan) . '</strong>'; break;
+                case 'masukkelas': $teks = 'Masuk kelas <strong>' . $tautan_kelas($r->keterangan, null, $r->tahunajaran) . '</strong>'; break;
+                case 'pindahkelas': $teks = 'Pindah kelas <strong>' . $tautan_kelas($r->keterangan, null, $r->tahunajaran) . '</strong>'; break;
                 case 'mutasi': $teks = 'Mutasi ke <strong>' . format_string($r->keterangan) . '</strong>'; break;
                 case 'berhenti': $teks = 'Berhenti' . (!empty($r->keterangan) ? '<br><small>'.format_string($r->keterangan).'</small>' : ''); break;
                 case 'lulus': $teks = 'Lulus'; break;
@@ -479,7 +643,15 @@ if ($muridid && $murid) {
         echo '<tr>';
         $jumlahditampilkan++;
         echo '<td class="align-middle" style="font-size: 0.9rem;">' . tanggal_indo($t['time']) . '</td>';
-        echo '<td class="align-middle font-weight-bold">' . s($t['kelas']) . '</td>';
+        // Tahun ajaran dari tanggal kejadian (tahun ajaran mulai Juli),
+        // supaya klik kelas lama membuka daftar murid tahun itu.
+        $bulan_kejadian = (int)date('n', $t['time']);
+        $tahun_kejadian = (int)date('Y', $t['time']);
+        $tahunajaran_kejadian = ($bulan_kejadian >= 7)
+            ? $tahun_kejadian . '/' . ($tahun_kejadian + 1)
+            : ($tahun_kejadian - 1) . '/' . $tahun_kejadian;
+        $kelas_tampil = ($t['kelas'] === '-' || $t['kelas'] === '') ? s($t['kelas']) : $tautan_kelas($t['kelas'], null, $tahunajaran_kejadian);
+        echo '<td class="align-middle font-weight-bold">' . $kelas_tampil . '</td>';
         echo '<td class="align-middle">' . $badge . '</td>';
         echo '<td class="align-middle text-justify lh-base">' . format_text($t['catatan']) . '</td>';
         echo '<td class="align-middle"><i class="fa fa-user mr-1 text-primary"></i> ' . format_string($t['guru']) . '</td>';
