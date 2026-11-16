@@ -984,6 +984,21 @@ if (!$jamaktif) {
 
 /*
 =====================================================
+JAM TERAKHIR: TIDAK ADA JAM BERIKUTNYA
+Jam pelajaran hanya sampai jam ke 11, jadi kalau
+jam aktif sudah 11, $jamberikut hasil hitungan
+($jamaktif + 1 = 12) tidak ada di $jam_pelajaran.
+Kembalikan ke 0 supaya header menampilkan
+'Guru Berikutnya Jam ke -' bukan 'Jam ke 12'.
+=====================================================
+*/
+
+if ($jamberikut && empty($jam_pelajaran[$jamberikut])) {
+    $jamberikut = 0;
+}
+
+/*
+=====================================================
 HITUNG WAKTU AUTO RELOAD & SISA DETIK KBM
 =====================================================
 */
@@ -1210,10 +1225,32 @@ uksort($data, function($a, $b) {
 
 <style>
 
+/* TEMA ADIWIYATA — 14 Nov 2026 (permintaan Edho, dari foto poster)
+   Dinding: #b9d2e6 biru muda. Kertas: #f8f8f3. Kotak hijau: #aec098.
+   Teks: #1a1a1a hitam. Aksen: #2e7d32 hijau pohon, #2b6cb0 biru buku.
+   Hanya warna yang diubah dari tv-4.php; logika tidak disentuh.
+   Revisi 14 Nov: panel jadwal bg #b4e0e7 + bingkai hitam, teks hitam/navy.
+   Revisi 14 Nov: top bar, strip sholat, panel pengawas/pengumuman bg navy #071e48, teks emas #e7b425/putih.
+   Revisi 14 Nov: running text bawah bg navy #071e48, teks emas, garis atas hijau.
+   Revisi 14 Nov: baris jadwal selang-seling navy #071e48 / biru muda #b4e0e8;
+   teks baris navy: kelas emas, sekarang putih, berikut biru muda, jam putih.
+   Revisi 14 Nov: kotak ganti jam bg #b4e0e8 (bukan putih).
+   Revisi 14 Nov: header tabel (Kelas/Guru Sekarang/Jam ke/Guru Berikutnya) bg navy #071e48, teks emas, garis bawah hijau.
+   Revisi 14 Nov: baris ganjil navy -> biru buku #2b6cb0 (lebih lembut); berikut di baris gelap jadi putih.
+   Revisi 14 Nov: kolom Jam ke dihapus; nomor jam pindah ke header (Jam ke $jamaktif di atas Guru Sekarang,
+   Jam ke $jamberikut di bawah Guru Berikutnya) — 3 kolom: Kelas / Guru Sekarang / Guru Berikutnya.
+   Revisi 14 Nov: header jadi SATU baris: 'Jam ke N Guru Sekarang' dan 'Guru Berikutnya Jam ke N+1'.
+   Revisi 14 Nov: 'Jam ke N' di header warna biru muda #b4e0e8, label utama tetap emas.
+   Revisi 14 Nov: scroll tabel KBM jadi loop mulus tanpa henti (baris tbody digandakan,
+   scrollTop dikurangi tinggi satu set baris saat melewatinya) — tidak ada lagi jeda + lompat ke awal.
+   Revisi 16 Nov (tv-5.php): $jamberikut dikembalikan ke 0 kalau tidak ada di $jam_pelajaran
+   (jam aktif 11 -> bukan 'Jam ke 12', header menampilkan 'Jam ke -').
+   Catatan: tv-5.php = tv-4-adiwiyata.php + teks tombol suara '🔊 Suara Aktif' (tanpa '— klik untuk tes'). */
+
 body{
     margin:0;
-    background:#0f172a;
-    color:white;
+    background:#b9d2e6;
+    color:#1a1a1a;
     font-family:Arial,sans-serif;
     overflow:hidden;
 }
@@ -1225,8 +1262,9 @@ HEADER
 */
 
 .header{
-    height:100px;
-    background:linear-gradient(to right,#065f46,#047857);
+    min-height:108px;
+    background:#071e48;
+    border-bottom:3px solid #aec098;
     display:flex;
     justify-content:space-between;
     align-items:center;
@@ -1251,15 +1289,19 @@ HEADER
 .logo{
     font-size:38px;
     font-weight:bold;
+    color:#e7b425;
 }
 
 .subtitle{
     font-size:18px;
+    color:#ffffff;
 }
 
 .clock{
     font-size:56px;
     font-weight:bold;
+    line-height:1.05;
+    color:#e7b425;
 }
 
 .tanggalindo{
@@ -1267,12 +1309,24 @@ HEADER
     margin-top:5px;
     opacity:0.95;
     text-align:right;
+    color:#ffffff;
 }
 
 .datetime-box{
     display:flex;
     flex-direction:column;
     align-items:flex-end;
+}
+
+.strip-sholat{
+    background:#071e48;
+    color:#e7b425;
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+    padding:9px 12px;
+    letter-spacing:0.5px;
+    border-top:2px solid #aec098;
 }
 
 /*
@@ -1303,6 +1357,7 @@ LIBUR
 .libur{
     margin:20px;
     background:#991b1b;
+    color:#ffffff;
     padding:40px;
     border-radius:20px;
     text-align:center;
@@ -1324,7 +1379,7 @@ TOP PANELS
 }
 
 .panel{
-    background:#1e293b;
+    background:#071e48;
     border-radius:18px;
     padding:14px 18px;
     height:130px;
@@ -1335,7 +1390,7 @@ TOP PANELS
 .panel-title{
     font-size:22px;
     font-weight:bold;
-    color:#facc15;
+    color:#e7b425;
     margin-bottom:8px;
 }
 
@@ -1348,16 +1403,18 @@ TOP PANELS
     font-size:28px;
     margin-bottom:6px;
     line-height:1.25;
+    color:#ffffff;
 }
 
 .panel-empty{
     opacity:0.7;
     font-size:20px;
+    color:#ffffff;
 }
 
 /* DESAIN COUNTDOWN PENGUMUMAN (UKURAN DIPERBESAR) */
 .countdown-announcement-box {
-    background: #0f172a;
+    background: #b4e0e8;
     border: 2px solid #ef4444;
     border-left: 8px solid #ef4444;
     padding: 10px 18px;
@@ -1370,7 +1427,7 @@ TOP PANELS
 
 .countdown-announcement-title {
     font-size: 32px; /* Sebelumnya 16px */
-    color: #f1f5f9;
+    color: #1a1a1a;
     font-weight: bold;
     letter-spacing: 0.5px;
 }
@@ -1422,9 +1479,10 @@ TABLE
 .table-container{
     margin:0 20px 20px 20px;
 
-    height:calc(100vh - 350px);
+    height:calc(100vh - 398px);
     overflow:hidden;
-    background:#1e293b;
+    background:#b4e0e7;
+    border:3px solid #1a1a1a;
     border-radius:20px;
 }
 
@@ -1440,36 +1498,55 @@ thead{
 }
 
 th{
-    background:#047857;
+    background:#071e48;
     padding:18px 24px;
     font-size:26px;
     text-align:left;
+    color:#e7b425;
+    border-bottom:3px solid #aec098;
 }
+
+/* Nomor jam di header tabel: biru muda, beda dari label utama yang emas. */
+.th-jam{
+    color:#b4e0e8;
+}
+
 .center{
     text-align:center !important;
 }
 td{
     padding:18px;
     font-size:36px;
-    border-bottom:1px solid #334155;
+    color:#1a1a1a;
+    border-bottom:1px solid rgba(26,26,26,0.15);
+}
+
+tr:nth-child(odd){
+    background:#2b6cb0;
 }
 
 tr:nth-child(even){
-    background:#273549;
+    background:#b4e0e8;
 }
 
+/* Teks di baris gelap (ganjil): warna terang supaya kontras. */
+tr:nth-child(odd) .kelas{ color:#e7b425; }
+tr:nth-child(odd) .sekarang{ color:#ffffff; }
+tr:nth-child(odd) .berikut{ color:#ffffff; }
+tr:nth-child(odd) td{ color:#ffffff; }
+
 .kelas{
-    color:#facc15;
+    color:#071e48;
     font-weight:bold;
 }
 
 .sekarang{
-    color:#4ade80;
+    color:#1a1a1a;
     font-weight:bold;
 }
 
 .berikut{
-    color:#facc15;
+    color:#071e48;
     font-weight:bold;
 }
 
@@ -1483,7 +1560,9 @@ RUNNING TEXT
     position:fixed;
     bottom:0;
     width:100%;
-    background:#047857;
+    background:#071e48;
+    color:#e7b425;
+    border-top:3px solid #aec098;
     padding:14px;
     overflow:hidden;
     white-space:nowrap;
@@ -1560,6 +1639,68 @@ RUNNING TEXT
 
     </div>
 
+<?php
+/* =====================================================
+   JADWAL SHOLAT — KAB. HULU SUNGAI SELATAN (Kandangan)
+   -----------------------------------------------------
+   Sumber: API MyQuran (data Kemenag), id kota 2104.
+   Jadwal diambil 1x per hari lalu disimpan ke cache
+   jadwal_sholat_cache.json di folder ini, supaya
+   halaman tidak bergantung internet setiap reload.
+   Bila internet gagal, cache terakhir tetap dipakai
+   (jam sholat bergeser hanya ±1-2 menit per hari).
+   $pengingat_sholat_menit = bunyi pengingat sekian
+   menit SEBELUM masuk waktu (ubah di sini bila perlu).
+===================================================== */
+$pengingat_sholat_menit = 10;
+$jadwal_sholat = null;
+$cache_sholat = __DIR__ . '/jadwal_sholat_cache.json';
+$hari_ini_sholat = date('Y-m-d');
+$data_cache_sholat = null;
+if (is_readable($cache_sholat)) {
+    $data_cache_sholat = json_decode((string) file_get_contents($cache_sholat), true);
+}
+if (is_array($data_cache_sholat)
+    && ($data_cache_sholat['tanggal'] ?? '') === $hari_ini_sholat
+    && !empty($data_cache_sholat['jadwal'])
+) {
+    $jadwal_sholat = $data_cache_sholat['jadwal'];
+} else {
+    $url_sholat = 'https://api.myquran.com/v2/sholat/jadwal/2104/' . date('Y/m/d');
+    $ctx_sholat = stream_context_create(['http' => ['timeout' => 5]]);
+    $json_sholat = @file_get_contents($url_sholat, false, $ctx_sholat);
+    $hasil_sholat = $json_sholat ? json_decode($json_sholat, true) : null;
+    if (!empty($hasil_sholat['data']['jadwal'])) {
+        $jadwal_sholat = $hasil_sholat['data']['jadwal'];
+        @file_put_contents(
+            $cache_sholat,
+            json_encode(['tanggal' => $hari_ini_sholat, 'jadwal' => $jadwal_sholat])
+        );
+    } elseif (is_array($data_cache_sholat) && !empty($data_cache_sholat['jadwal'])) {
+        $jadwal_sholat = $data_cache_sholat['jadwal'];
+    }
+}
+$sholat_untuk_js = [];
+if (is_array($jadwal_sholat)) {
+    $peta_sholat = [
+        'subuh'   => ['Subuh', 'subuh'],
+        'dzuhur'  => ['Zuhur', 'zuhur'],
+        'ashar'   => ['Asar', 'asar'],
+        'maghrib' => ['Magrib', 'magrib'],
+        'isya'    => ['Isya', 'isya'],
+    ];
+    foreach ($peta_sholat as $kunci_sholat => $peta) {
+        if (!empty($jadwal_sholat[$kunci_sholat])) {
+            $sholat_untuk_js[] = [
+                'label' => $peta[0],
+                'slug'  => $peta[1],
+                'jam'   => $jadwal_sholat[$kunci_sholat],
+            ];
+        }
+    }
+}
+?>
+
     <div class="datetime-box">
 
         <div
@@ -1573,9 +1714,18 @@ RUNNING TEXT
             <?= s($tanggalindo); ?>
         </div>
 
+
     </div>
 
 </div>
+
+<?php if (!empty($sholat_untuk_js)): ?>
+<div class="strip-sholat">
+    🕌 <?= implode(' &nbsp;·&nbsp; ', array_map(function ($j) {
+        return s($j['label']) . ' ' . s($j['jam']);
+    }, $sholat_untuk_js)); ?>
+</div>
+<?php endif; ?>
 
 <?php if ($issimulasi): ?>
 
@@ -1638,14 +1788,14 @@ RUNNING TEXT
     margin:15px 20px;
     padding:15px;
     border-radius:16px;
-    background:#1e293b;
+    background:#f8f8f3;
     text-align:center;
 }
 
 .asesmen-header-title{
     font-size:42px;
     font-weight:bold;
-    color:#facc15;
+    color:#1a1a1a;
     line-height:1.2;
 }
 
@@ -1653,7 +1803,7 @@ RUNNING TEXT
     margin-top:8px;
     font-size:24px;
     font-weight:bold;
-    color:#ffffff;
+    color:#2e7d32;
 }
 
 .asesmen-wrapper{
@@ -1667,7 +1817,7 @@ RUNNING TEXT
 }
 
 .asesmen-card{
-    background:#1e293b;
+    background:#f8f8f3;
     border-radius:20px;
     padding:18px;
 }
@@ -1675,7 +1825,7 @@ RUNNING TEXT
 .asesmen-title{
     font-size:38px;
     font-weight:bold;
-    color:#facc15;
+    color:#1a1a1a;
     margin-bottom:24px;
 }
 
@@ -1689,11 +1839,12 @@ RUNNING TEXT
 }
 
 .asesmen-label{
-    color:#cbd5e1;
+    color:#2e7d32;
 }
 
 .asesmen-value{
     font-weight:bold;
+    color:#1a1a1a;
 }
 
 .ruang-list{
@@ -1705,13 +1856,14 @@ RUNNING TEXT
 .ruang-item{
     display:grid;
     grid-template-columns:100px 1fr;
-    background:#0f172a;
+    background:rgba(174,192,152,0.25);
     border-radius:14px;
     overflow:hidden;
 }
 
 .ruang-label{
-    background:#14b8a6;
+    background:#aec098;
+    color:#1a1a1a;
     padding:18px;
     font-size:36px;
     font-weight:bold;
@@ -1722,11 +1874,12 @@ RUNNING TEXT
     padding:14px 18px;
     font-size:36px;
     font-weight:bold;
+    color:#1a1a1a;
 }
 
 .countdown-box{
     margin:20px;
-    background:#1e293b;
+    background:#f8f8f3;
     border-radius:20px;
     padding:30px;
     text-align:center;
@@ -1741,7 +1894,7 @@ RUNNING TEXT
 
 .countdown-title{
     font-size:34px;
-    color:#facc15;
+    color:#1a1a1a;
     margin-bottom:10px;
     font-weight:bold;
 }
@@ -1750,6 +1903,7 @@ RUNNING TEXT
     font-size:72px;
     font-weight:bold;
     letter-spacing:4px;
+    color:#1a1a1a;
 }
 
 </style>
@@ -2061,9 +2215,8 @@ updateCountdownAsesmen();
         <tr>
 
             <th>Kelas</th>
-            <th>Guru Sekarang</th>
-            <th class="center">Jam ke</th>
-            <th>Guru Berikutnya</th>
+            <th><span class="th-jam">Jam ke <?= $jamaktif ?: '-'; ?></span> Guru Sekarang</th>
+            <th>Guru Berikutnya <span class="th-jam">Jam ke <?= $jamberikut ?: '-'; ?></span></th>
 
         </tr>
 
@@ -2083,10 +2236,6 @@ updateCountdownAsesmen();
                 <?= s($d['sekarang']); ?>
             </td>
 
-            <td class="center">
-                <?= $jamaktif ?: '-'; ?>
-            </td>
-
             <td class="berikut">
                 <?= s($d['berikut']); ?>
             </td>
@@ -2101,6 +2250,64 @@ updateCountdownAsesmen();
 
 </div>
 <?php endif; ?>
+
+<!-- TOMBOL AKTIVASI SUARA TV -->
+<style>
+#tombolSuara{
+    position:fixed;
+    right:20px;
+    bottom:60px;
+    z-index:100000;
+    background:#dc2626;
+    color:#ffffff;
+    border:3px solid #1a1a1a;
+    border-radius:14px;
+    padding:14px 22px;
+    font-size:20px;
+    font-weight:bold;
+    cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,0.5);
+}
+</style>
+<button id="tombolSuara" type="button">🔊 AKTIFKAN SUARA TV</button>
+<audio id="audioJam" preload="auto"></audio>
+
+<!-- OVERLAY AKTIVASI SUARA (muncul hanya bila putar otomatis gagal/diblokir) -->
+<style>
+#overlaySuara{
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.55);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:200000;
+    cursor:pointer;
+}
+#overlaySuara .kotak{
+    background:#dc2626;
+    border:4px solid #1a1a1a;
+    border-radius:20px;
+    padding:34px 44px;
+    text-align:center;
+    color:#ffffff;
+    font-size:36px;
+    font-weight:bold;
+    line-height:1.4;
+    max-width:80%;
+}
+#overlaySuara .kecil{
+    font-size:22px;
+    font-weight:normal;
+    margin-top:10px;
+}
+</style>
+<div id="overlaySuara">
+    <div class="kotak">
+        🔊 AKTIFKAN SUARA TV
+        <div class="kecil">Klik di mana saja pada layar ini, atau tekan tombol OK pada remote</div>
+    </div>
+</div>
 
 <div class="running">
 
@@ -2161,8 +2368,32 @@ const container = document.getElementById('tableContainer');
 let tablePause = false;
 let tableFirstPause = true;
 
+/*
+=====================================================
+SCROLL TABEL TANPA HENTI (loop mulus)
+Caranya: baris tabel digandakan sekali, jadi isinya 2x.
+Saat scroll sudah melewati satu set baris asli, posisi
+dikurangi tinggi satu set baris itu — karena baris
+gandanya identik, lompatannya tidak terlihat sama sekali.
+Thead tetap satu (sticky), hanya baris tbody yang diganda.
+Kalau semua baris muat di layar, scroll dimatikan.
+=====================================================
+*/
+let tableLoopHeight = 0;
+let tableSeamless = false;
+
+if (container) {
+    const tbody = container.querySelector('tbody');
+    if (tbody && container.scrollHeight > container.clientHeight + 1) {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.forEach(row => { tableLoopHeight += row.offsetHeight; });
+        rows.forEach(row => { tbody.appendChild(row.cloneNode(true)); });
+        tableSeamless = true;
+    }
+}
+
 function autoScrollTable() {
-    if (!container || tablePause) return;
+    if (!container || tablePause || !tableSeamless) return;
 
     if (tableFirstPause) {
         tablePause = true;
@@ -2175,15 +2406,8 @@ function autoScrollTable() {
 
     container.scrollTop += 3;
 
-    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
-        tablePause = true;
-        setTimeout(() => {
-            container.scrollTo({ top: 0, behavior: 'smooth' });
-            setTimeout(() => {
-                tablePause = false;
-                tableFirstPause = true;
-            }, 1500); 
-        }, 5000);
+    if (container.scrollTop >= tableLoopHeight) {
+        container.scrollTop -= tableLoopHeight;
     }
 }
 
@@ -2249,6 +2473,280 @@ setInterval(updateCountdownKBM, 1000);
 
 <?php endif; ?>
 
+</script>
+
+<script>
+/*
+=====================================================
+5. SUARA PENGUMUMAN GANTI JAM — VERSI LG webOS (MP3)
+-----------------------------------------------------
+- Browser bawaan TV LG (webOS) TIDAK punya
+  speechSynthesis / text-to-speech, jadi versi ini
+  memutar file MP3 siap pakai dari folder suara/ :
+      suara/jam-1.mp3 ... suara/jam-12.mp3
+      suara/suara-aktif.mp3  (bunyi tes tombol)
+- TIDAK ada lagi suara cadangan robot/TTS. Dulu
+  fallback speechSynthesis inilah yang bersuara
+  laki-laki asing di TV saat MP3 gagal diputar
+  otomatis — dihapus pada perbaikan 2026-11-09.
+  Sekarang: MP3 gagal -> coba sekali lagi -> bila
+  tetap gagal, muncul overlay untuk diklik operator.
+- Halaman SUDAH reload otomatis tepat di pergantian
+  jam, jadi MP3 cukup diputar 1x saat halaman dimuat
+  pada jam yang baru. sessionStorage mencegah bunyi
+  ulang bila halaman di-refresh manual di jam sama.
+- Tombol AKTIFKAN SUARA TV diklik 1x dengan remote
+  untuk membuka izin audio browser; pilihan disimpan
+  di localStorage browser TV.
+=====================================================
+*/
+(function () {
+
+    const MODE_TV   = <?= json_encode($mode_tv); ?>;
+    const JAM_AKTIF = <?= (int)$jamaktif; ?>;
+    const TANGGAL   = <?= json_encode($tanggalhariini); ?>;
+    const VERSI_SUARA = '20261109-7'; // naikkan angka ini setiap mengganti file MP3, agar cache browser TV kalah
+    const FILE_MP3  = JAM_AKTIF > 0 ? 'suara/jam-' + JAM_AKTIF + '.mp3?v=' + VERSI_SUARA : '';
+
+    const btn     = document.getElementById('tombolSuara');
+    const audio   = document.getElementById('audioJam');
+    const overlay = document.getElementById('overlaySuara');
+
+    if (!btn || !audio) {
+        return;
+    }
+
+    function tampilkanOverlay() {
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+    }
+
+    function sembunyikanOverlay() {
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+
+    let tokenPutar = 0;
+
+    function putar(file, sudahUlang) {
+        if (!file) {
+            return;
+        }
+        const token = ++tokenPutar;
+        let ditangani = false;
+        function gagal() {
+            if (ditangani || token !== tokenPutar) {
+                return;
+            }
+            ditangani = true;
+            if (!sudahUlang) {
+                // Coba sekali lagi setelah 2 detik (alamat diberi
+                // penanda ulang agar tidak kena cache gagal)
+                setTimeout(function () {
+                    putar(file + (file.indexOf('?') >= 0 ? '&' : '?') + 'ulang=1', true);
+                }, 2000);
+            } else {
+                // Tetap gagal: jangan bersuara robot — tampilkan
+                // overlay agar operator mengklik / menekan OK
+                tampilkanOverlay();
+            }
+        }
+        audio.onerror = gagal;
+        try {
+            audio.src = file;
+            const janji = audio.play();
+            if (janji && typeof janji.catch === 'function') {
+                janji.catch(gagal);
+            }
+        } catch (e) {
+            gagal();
+        }
+    }
+
+    function bunyikanJam(paksa) {
+        const kunci = 'simtv_suara_terakhir';
+        const idKunci = TANGGAL + '|jamke-' + JAM_AKTIF;
+        let terakhir = null;
+        try {
+            terakhir = sessionStorage.getItem(kunci);
+        } catch (e) {}
+        if (!paksa && terakhir === idKunci) {
+            return;
+        }
+        try {
+            sessionStorage.setItem(kunci, idKunci);
+        } catch (e) {}
+        putar(FILE_MP3, false);
+    }
+
+    function suaraAktif() {
+        try {
+            return localStorage.getItem('simtv_suara_aktif') === '1';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function perbaruiTombol() {
+        if (suaraAktif()) {
+            btn.textContent = '🔊 Suara Aktif';
+            btn.style.opacity = '0.65';
+            btn.style.fontSize = '16px';
+            btn.style.padding = '8px 14px';
+        } else {
+            btn.textContent = '🔊 AKTIFKAN SUARA TV';
+        }
+    }
+
+    btn.addEventListener('click', function () {
+        try {
+            localStorage.setItem('simtv_suara_aktif', '1');
+        } catch (e) {}
+        perbaruiTombol();
+        sembunyikanOverlay();
+        if (JAM_AKTIF > 0) {
+            bunyikanJam(true);
+        } else {
+            putar('suara/suara-aktif.mp3?v=' + VERSI_SUARA, false);
+        }
+    });
+
+    // Overlay: klik di mana saja / tombol remote apa saja = aktifkan
+    // dan putar pengumuman jam yang sedang berjalan.
+    function aktifkanDariOverlay() {
+        try {
+            localStorage.setItem('simtv_suara_aktif', '1');
+        } catch (e) {}
+        sembunyikanOverlay();
+        perbaruiTombol();
+        if (JAM_AKTIF > 0) {
+            bunyikanJam(true);
+        } else {
+            putar('suara/suara-aktif.mp3?v=' + VERSI_SUARA, false);
+        }
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', aktifkanDariOverlay);
+    }
+
+    document.addEventListener('keydown', function () {
+        if (overlay && overlay.style.display === 'flex') {
+            aktifkanDariOverlay();
+        }
+    });
+
+    perbaruiTombol();
+
+    if (suaraAktif() && MODE_TV === 'KBM' && JAM_AKTIF > 0) {
+        setTimeout(function () {
+            bunyikanJam(false);
+        }, 1200);
+    }
+})();
+</script>
+
+<script>
+/*
+=====================================================
+5C. SUARA JADWAL SHOLAT
+-----------------------------------------------------
+- Setiap waktu sholat berbunyi 2x:
+  (1) pengingat SEBELUM_MENIT menit sebelumnya
+      -> suara/ingat-<slug>.mp3
+  (2) tepat saat masuk waktu
+      -> suara/masuk-<slug>.mp3
+- slug: subuh, zuhur, asar, magrib, isya.
+- Pengecekan tiap 1 detik memakai patokan jam SERVER.
+- localStorage mencegah bunyi ulang setelah reload
+  di menit yang sama. Tanpa fallback suara robot:
+  gagal putar = diam.
+=====================================================
+*/
+(function () {
+
+    const DAFTAR = <?= json_encode($sholat_untuk_js); ?>;
+    const SEBELUM_MENIT = <?= (int) $pengingat_sholat_menit; ?>;
+    const VERSI = '20261109-7';
+    // Patokan waktu = JAM SERVER (bukan jam TV!). Jam TV bisa
+    // meleset/salah zona waktu — itu sebabnya pengingat pernah
+    // bunyi hampir 1 jam terlambat pada 2026-11-11. Jam TV di
+    // sini hanya dipakai sebagai stopwatch sejak halaman dimuat;
+    // halaman reload tiap pergantian jam sehingga patokan ini
+    // selalu segar.
+    const EPOCH_SERVER = <?= (int) (time() * 1000); ?>;
+    const T0 = Date.now();
+
+    if (!DAFTAR || !DAFTAR.length) {
+        return;
+    }
+
+    const audio = document.getElementById('audioJam');
+    if (!audio) {
+        return;
+    }
+
+    function sudahBunyi(id) {
+        try {
+            return localStorage.getItem('simtv_sholat_terakhir') === id;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function tandaiBunyi(id) {
+        try {
+            localStorage.setItem('simtv_sholat_terakhir', id);
+        } catch (e) {}
+    }
+
+    function putarSholat(file) {
+        try {
+            audio.src = file;
+            const p = audio.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(function () {});
+            }
+        } catch (e) {}
+    }
+
+    function dua(n) {
+        return (n < 10 ? '0' : '') + n;
+    }
+
+    function cekSholat() {
+        const sekarang = new Date(EPOCH_SERVER + (Date.now() - T0));
+        const tgl = sekarang.getFullYear() + '-' + dua(sekarang.getMonth() + 1) + '-' + dua(sekarang.getDate());
+        const detikIni = sekarang.getHours() * 3600 + sekarang.getMinutes() * 60 + sekarang.getSeconds();
+
+        DAFTAR.forEach(function (item) {
+            const bagian = item.jam.split(':');
+            const target = (+bagian[0]) * 3600 + (+bagian[1]) * 60;
+            const targetIngat = target - SEBELUM_MENIT * 60;
+
+            if (detikIni >= targetIngat && detikIni < targetIngat + 45) {
+                const id = tgl + '|ingat-' + item.slug;
+                if (!sudahBunyi(id)) {
+                    tandaiBunyi(id);
+                    putarSholat('suara/ingat-' + item.slug + '.mp3?v=' + VERSI);
+                }
+            }
+
+            if (detikIni >= target && detikIni < target + 45) {
+                const id = tgl + '|masuk-' + item.slug;
+                if (!sudahBunyi(id)) {
+                    tandaiBunyi(id);
+                    putarSholat('suara/masuk-' + item.slug + '.mp3?v=' + VERSI);
+                }
+            }
+        });
+    }
+
+    cekSholat();
+    setInterval(cekSholat, 1000);
+})();
 </script>
 
 <?php if (!empty($banneraktif)): ?>

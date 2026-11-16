@@ -25,6 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
     'local_jurnalmengajar'
     );
 
+	set_config(
+	    'template_nilai_harian',
+	    trim($_POST['template_nilai_harian']),
+	    'local_jurnalmengajar'
+	);
+
     set_config(
         'template_guru_wali',
         trim($_POST['template_guru_wali']),
@@ -83,6 +89,11 @@ $template_jurnal = get_config(
 $template_pembinaan_mapel = get_config(
     'local_jurnalmengajar',
     'template_pembinaan_mapel'
+);
+
+$template_nilai_harian = get_config(
+    'local_jurnalmengajar',
+    'template_nilai_harian'
 );
 
 $template_guru_wali = get_config(
@@ -171,6 +182,30 @@ if (empty($template_pembinaan_mapel)) {
 
 _Dikirim sebagai informasi_";
 }
+
+if (empty($template_nilai_harian)) {
+
+    $template_nilai_harian =
+"📊 NILAI HARIAN
+
+👨‍🏫 Guru :
+{guru}
+
+📚 Mata Pelajaran :
+{mapel}
+
+🏫 Kelas :
+{kelas}
+
+📅 Tanggal :
+{tanggal}
+
+━━━━━━━━━━━━━━
+DAFTAR NILAI
+━━━━━━━━━━━━━━
+{daftarnilai}";
+}
+
 
 if (empty($template_guru_wali)) {
     $template_guru_wali =
@@ -376,6 +411,29 @@ echo $OUTPUT->header();
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Template Notif Nilai Harian</strong>
+    </div>
+
+    <div class="card-body">
+
+        <p>
+            Placeholder:
+            <code>{guru}</code>
+            <code>{mapel}</code>
+            <code>{kelas}</code>
+            <code>{tanggal}</code>
+            <code>{daftarnilai}</code>
+        </p>
+
+        <textarea
+            name="template_nilai_harian"
+            class="form-control"
+            rows="12"><?php echo s($template_nilai_harian); ?></textarea>
+
+    </div>
+</div>
 	<div class="card mb-4">
 	    <div class="card-header">
 		<strong>Template Notif Jurnal Guru Wali</strong>

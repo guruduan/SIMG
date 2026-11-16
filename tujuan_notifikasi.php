@@ -18,6 +18,7 @@ echo $OUTPUT->header();
 $jenis = [
     'jurnal'        => 'Jurnal Mengajar',
     'pembinaan_mapel'   => 'Pembinaan Guru Mapel',
+    'nilai_harian' => 'Nilai Harian',
     'guruwali'      => 'Jurnal Guru Wali',
     'izinmurid'     => 'Surat Izin Murid',
     'izinguru'      => 'Surat Izin Guru',
@@ -99,11 +100,12 @@ foreach ($jenis as $kode => $judul) {
 
     echo html_writer::start_div('card-body');
 
-	$roles_display = $roles;
+$roles_display = $roles;
 
-	if ($kode !== 'jurnal') {
-	    unset($roles_display['guru_penginput']);
-	}
+// Guru Penginput hanya tampil untuk Jurnal dan Nilai Harian
+if (!in_array($kode, ['jurnal', 'nilai_harian'])) {
+    unset($roles_display['guru_penginput']);
+}
 
 	foreach ($roles_display as $value => $label) {
 

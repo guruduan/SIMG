@@ -286,7 +286,7 @@ $rows = $DB->get_records_sql("
     JOIN {user} u ON u.id=j.muridid
     WHERE j.guruid=?
     ORDER BY j.timecreated DESC
-", [$USER->id], 0, 10);
+", [$USER->id], 0, 18);
 
 $table = new html_table();
 $table->attributes['class'] = 'table table-bordered table-striped table-hover generic_table';

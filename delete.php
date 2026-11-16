@@ -1,4 +1,3 @@
-
 <?php
 require_once(__DIR__ . '/../../config.php');
 require_login();
@@ -14,4 +13,12 @@ $record = $DB->get_record('local_jurnalmengajar', [
 ], '*', MUST_EXIST);
 $DB->delete_records('local_jurnalmengajar', ['id' => $id]);
 
-redirect(new moodle_url('/local/jurnalmengajar/all_jurnal.php'), 'Entri berhasil dihapus.', 2);
+redirect(new moodle_url('/local/jurnalmengajar/all_jurnal.php', [
+    'guru' => optional_param('guru', '', PARAM_TEXT),
+    'kelas' => optional_param('kelas', '', PARAM_TEXT),
+    'mapel' => optional_param('mapel', '', PARAM_TEXT),
+    'tanggal' => optional_param('tanggal', '', PARAM_TEXT),
+    'bulan' => optional_param('bulan', '', PARAM_INT),
+    'tahun' => optional_param('tahun', date('Y'), PARAM_INT),
+    'page' => optional_param('page', 0, PARAM_INT)
+]), 'Entri berhasil dihapus.', 2);

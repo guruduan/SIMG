@@ -14,7 +14,7 @@ $PAGE->set_heading('Semua Jurnal Guru Wali');
 
 // ================= PARAMETER FILTER =================
 $guruid = optional_param('guruid', 0, PARAM_INT);
-$kelas  = optional_param('kelas', 0, PARAM_INT);
+$kelas  = optional_param('kelas', '', PARAM_TEXT);
 $bulan  = optional_param('bulan', 0, PARAM_INT);
 $page   = optional_param('page', 0, PARAM_INT);
 
@@ -50,7 +50,7 @@ if ($bulan) {
 }
 
 if ($kelas) {
-    $where .= " AND c.id = :kelas ";
+    $where .= " AND j.kelas = :kelas ";
     $params['kelas'] = $kelas;
 }
 
@@ -59,8 +59,6 @@ $total = $DB->count_records_sql("
     SELECT COUNT(1)
     FROM {local_jurnalguruwali} j
     JOIN {user} u2 ON u2.id = j.muridid
-    LEFT JOIN {cohort_members} cm ON cm.userid = u2.id
-    LEFT JOIN {cohort} c ON c.id = cm.cohortid
     $where
 ", $params);
 
@@ -73,15 +71,15 @@ if ($kelas) {
 
 // ================= AMBIL DATA =================
 $rows = $DB->get_records_sql("
-    SELECT j.*, 
-           u1.firstname AS gurufirst, u1.lastname AS gurulast,
-           u2.firstname AS muridfirst, u2.lastname AS muridlast,
-           c.name AS kelas
+	SELECT j.*,
+       u1.firstname AS gurufirst,
+       u1.lastname AS gurulast,
+       u2.firstname AS muridfirst,
+       u2.lastname AS muridlast,
+       j.kelas AS kelas
     FROM {local_jurnalguruwali} j
     JOIN {user} u1 ON u1.id = j.guruid
     JOIN {user} u2 ON u2.id = j.muridid
-    LEFT JOIN {cohort_members} cm ON cm.userid = u2.id
-    LEFT JOIN {cohort} c ON c.id = cm.cohortid
     $where
     $order
     LIMIT $perpage OFFSET $offset
@@ -108,7 +106,19 @@ asort($daftarguru);
 echo html_writer::select($daftarguru, 'guruid', $guruid, ['0' => 'Semua Guru']);
 
 echo ' &nbsp; Kelas: ';
-$kelaslist = $DB->get_records_menu('cohort', null, 'name ASC', 'id, name');
+$kelaslist = [];
+
+$kelasrows = $DB->get_records_sql("
+    SELECT DISTINCT kelas AS id,
+           kelas
+    FROM {local_jurnalguruwali}
+    WHERE kelas REGEXP '^(X|XI|XII)-'
+    ORDER BY kelas ASC
+");
+
+foreach ($kelasrows as $k) {
+    $kelaslist[$k->kelas] = $k->kelas;
+}
 echo html_writer::select($kelaslist, 'kelas', $kelas, ['0' => 'Semua Kelas']);
 
 echo ' &nbsp; Bulan: ';

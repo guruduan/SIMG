@@ -205,9 +205,18 @@ if ($entries) {
 
         $editurl = new moodle_url('/local/jurnalmengajar/edit_jurnal.php', ['id' => $e->id]);
         $deleteurl = new moodle_url('/local/jurnalmengajar/delete.php', [
-            'id' => $e->id,
-            'sesskey' => sesskey()
-        ]);
+    'id' => $e->id,
+    'sesskey' => sesskey(),
+
+    // kirim filter aktif
+    'guru' => $guru,
+    'kelas' => $kelas,
+    'mapel' => $mapel,
+    'tanggal' => $tanggal,
+    'bulan' => $bulan,
+    'tahun' => $tahun,
+    'page' => $page
+]);
         
 $status = '<span style="color:green;">Normal</span>';
 

@@ -192,70 +192,265 @@ document.addEventListener('DOMContentLoaded', function () {
 // ==========================
 $select = 'timecreated BETWEEN :s AND :e AND absen IS NOT NULL AND absen <> :empty';
 $params = ['s' => $start, 'e' => $end, 'empty' => ''];
-$fields = 'id, kelas, jamke, absen, timecreated';
+$fields = 'id, kelas, jamke, absen, absenid, timecreated';
 $journals = $DB->get_records_select('local_jurnalmengajar', $select, $params, 'timecreated ASC', $fields);
 
+// ==========================
+// Bangun data absensi
+// ==========================
 // Struktur:
-// $data[kelas][lastname] = [
+// $data[kelas][userid] = [
+//   'userid'    => ID Moodle murid,
+//   'lastname'  => nama murid,
 //   'reasons'   => [...],
 //   'jam'       => [...],
 //   'firsttime' => timestamp
 // ];
+
 $data = [];
+
 foreach ($journals as $jr) {
-    $kelaslabel = cohort_name_from_any($jr->kelas, $cohort_cache, $DB);
-    if ($kelaslabel === '') continue;
+
+    $kelaslabel = cohort_name_from_any(
+        $jr->kelas,
+        $cohort_cache,
+        $DB
+    );
+
+    if ($kelaslabel === '') {
+        continue;
+    }
 
     $jamlist = parse_jamke($jr->jamke);
-    $json = json_decode($jr->absen, true);
-    if (!is_array($json)) continue;
 
-    foreach ($json as $lastname => $alasanraw) {
-        $lastname = trim((string)$lastname);
-        if ($lastname === '') continue;
-        $cls = classify_absent_reason(is_null($alasanraw) ? '' : (string)$alasanraw);
-        if ($cls === '') continue;
+    /*
+     * =====================================================
+     * PRIORITAS 1: absenid
+     * Format:
+     * {
+     *     "123": "Sakit",
+     *     "456": "Ijin"
+     * }
+     * =====================================================
+     */
+    $absenid = [];
 
-        if (!isset($data[$kelaslabel])) $data[$kelaslabel] = [];
-        if (!isset($data[$kelaslabel][$lastname])) {
-            $data[$kelaslabel][$lastname] = [
-                'reasons'   => ['sakit'=>0, 'ijin'=>0, 'alpa'=>0, 'dispensasi'=>0],
-                'jam'       => [],
-                'firsttime' => $jr->timecreated,
-            ];
-        } else {
-            // ambil waktu paling awal
-            if ($jr->timecreated < $data[$kelaslabel][$lastname]['firsttime']) {
-                $data[$kelaslabel][$lastname]['firsttime'] = $jr->timecreated;
+    if (!empty($jr->absenid)) {
+        $decoded = json_decode($jr->absenid, true);
+
+        if (is_array($decoded)) {
+            $absenid = $decoded;
+        }
+    }
+
+    /*
+     * Jika absenid tersedia, gunakan userid langsung.
+     */
+    if (!empty($absenid)) {
+
+        foreach ($absenid as $userid => $alasanraw) {
+
+            $userid = (int)$userid;
+
+            if ($userid <= 0) {
+                continue;
+            }
+
+            $cls = classify_absent_reason(
+                is_null($alasanraw)
+                    ? ''
+                    : (string)$alasanraw
+            );
+
+            if ($cls === '') {
+                continue;
+            }
+
+            // Ambil data murid berdasarkan userid.
+            $murid = $DB->get_record(
+                'user',
+                ['id' => $userid],
+                'id, lastname'
+            );
+
+            if (!$murid) {
+                continue;
+            }
+
+            if (!isset($data[$kelaslabel])) {
+                $data[$kelaslabel] = [];
+            }
+
+            if (!isset($data[$kelaslabel][$userid])) {
+
+                $data[$kelaslabel][$userid] = [
+                    'userid'    => $userid,
+                    'lastname'  => trim($murid->lastname),
+                    'reasons'   => [
+                        'sakit'      => 0,
+                        'ijin'       => 0,
+                        'alpa'       => 0,
+                        'dispensasi' => 0
+                    ],
+                    'jam'       => [],
+                    'firsttime' => $jr->timecreated,
+                ];
+
+            } else {
+
+                if (
+                    $jr->timecreated <
+                    $data[$kelaslabel][$userid]['firsttime']
+                ) {
+                    $data[$kelaslabel][$userid]['firsttime']
+                        = $jr->timecreated;
+                }
+            }
+
+            $data[$kelaslabel][$userid]['reasons'][$cls]++;
+
+            foreach ($jamlist as $j) {
+                $data[$kelaslabel][$userid]['jam'][$j] = true;
             }
         }
 
-        $data[$kelaslabel][$lastname]['reasons'][$cls]++;
+        // Sudah diproses berdasarkan userid.
+        continue;
+    }
+
+    /*
+     * =====================================================
+     * PRIORITAS 2: data lama yang hanya memiliki "absen"
+     * Format lama:
+     * {
+     *     "Nama Murid": "Sakit"
+     * }
+     *
+     * Data lama tetap ditampilkan, tetapi link riwayat
+     * hanya dibuat jika nama tersebut menghasilkan satu
+     * user yang unik.
+     * =====================================================
+     */
+    $json = json_decode($jr->absen, true);
+
+    if (!is_array($json)) {
+        continue;
+    }
+
+    foreach ($json as $lastname => $alasanraw) {
+
+        $lastname = trim((string)$lastname);
+
+        if ($lastname === '') {
+            continue;
+        }
+
+        $cls = classify_absent_reason(
+            is_null($alasanraw)
+                ? ''
+                : (string)$alasanraw
+        );
+
+        if ($cls === '') {
+            continue;
+        }
+
+        /*
+         * Cari user berdasarkan lastname.
+         *
+         * get_records digunakan agar TIDAK muncul error
+         * "found more than one record".
+         */
+        $users = $DB->get_records(
+            'user',
+            ['lastname' => $lastname],
+            'id ASC',
+            'id, lastname'
+        );
+
+        /*
+         * Hanya gunakan userid jika benar-benar unik.
+         */
+        $userid = 0;
+
+        if (count($users) === 1) {
+            $user = reset($users);
+            $userid = (int)$user->id;
+        }
+
+        /*
+         * Key data:
+         * - userid jika diketahui
+         * - fallback nama jika userid tidak diketahui
+         */
+        $datakey = $userid > 0
+            ? (string)$userid
+            : 'nama_' . md5($lastname);
+
+        if (!isset($data[$kelaslabel])) {
+            $data[$kelaslabel] = [];
+        }
+
+        if (!isset($data[$kelaslabel][$datakey])) {
+
+            $data[$kelaslabel][$datakey] = [
+                'userid'    => $userid,
+                'lastname'  => $lastname,
+                'reasons'   => [
+                    'sakit'      => 0,
+                    'ijin'       => 0,
+                    'alpa'       => 0,
+                    'dispensasi' => 0
+                ],
+                'jam'       => [],
+                'firsttime' => $jr->timecreated,
+            ];
+
+        } else {
+
+            if (
+                $jr->timecreated <
+                $data[$kelaslabel][$datakey]['firsttime']
+            ) {
+                $data[$kelaslabel][$datakey]['firsttime']
+                    = $jr->timecreated;
+            }
+        }
+
+        $data[$kelaslabel][$datakey]['reasons'][$cls]++;
+
         foreach ($jamlist as $j) {
-            $data[$kelaslabel][$lastname]['jam'][$j] = true;
+            $data[$kelaslabel][$datakey]['jam'][$j] = true;
         }
     }
 }
-
 // ==========================
 // Flatten & tampilkan
 // ==========================
 $rows = [];
+
 foreach ($data as $kelas => $students) {
-    foreach ($students as $lastname => $info) {
+
+    foreach ($students as $info) {
+
         arsort($info['reasons'], SORT_NUMERIC);
+
         $absen = key($info['reasons']);
+
         $jams = array_keys($info['jam']);
         sort($jams, SORT_NUMERIC);
+
         $rows[] = (object)[
             'kelas'     => $kelas,
-            'lastname'  => $lastname,
+            'userid'    => (int)$info['userid'],
+            'lastname'  => $info['lastname'],
             'absen'     => $absen,
             'jamke'     => implode(',', $jams),
             'timeinput' => $info['firsttime'],
         ];
     }
 }
+
 usort($rows, function($a, $b) {
     $c = strnatcasecmp($a->kelas, $b->kelas);
     if ($c !== 0) return $c;
@@ -282,14 +477,51 @@ $table->attributes['class'] = 'generaltable boxaligncenter';
 $table->data = [];
 
 $no = 1;
+
 foreach ($rows as $r) {
+
+    /*
+     * Jika userid tersedia, nama murid menjadi link
+     * langsung ke riwayat_individu.php.
+     */
+    if (!empty($r->userid)) {
+
+        $namamurid = html_writer::link(
+            new moodle_url(
+                '/local/jurnalmengajar/riwayat_individu.php',
+                [
+                    'muridid' => $r->userid
+                ]
+            ),
+            ucwords(strtolower($r->lastname)),
+            [
+                'class' => 'font-weight-bold text-primary',
+                'title' => 'Lihat riwayat individu murid'
+            ]
+        );
+
+    } else {
+
+        /*
+         * Data lama yang userid-nya tidak bisa ditentukan
+         * tetap ditampilkan sebagai teks biasa.
+         */
+        $namamurid = ucwords(strtolower($r->lastname));
+    }
+
     $table->data[] = [
         $no++,
-        $r->kelas,
-        $r->lastname,
-        $r->absen,
-        $r->jamke === '' ? '-' : $r->jamke,
-        tanggal_indo($r->timeinput, 'jam'),
+        format_string($r->kelas),
+        $namamurid,
+        format_string($r->absen),
+        format_string(
+            $r->jamke === ''
+                ? '-'
+                : $r->jamke
+        ),
+        format_string(
+            tanggal_indo($r->timeinput, 'jam')
+        ),
     ];
 }
 

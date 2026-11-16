@@ -1,12 +1,14 @@
 <?php
 require('../../config.php');
+require_once(__DIR__ . '/lib.php');
+
 require_once(__DIR__.'/jam_pelajaran_lib.php');
 
 require_login();
-jurnalmengajar_log_page_access();
 
 $context = context_system::instance();
 $PAGE->set_context($context);
+jurnalmengajar_log_page_access();
 
 $PAGE->set_url(new moodle_url('/local/jurnalmengajar/jam_pelajaran_view.php'));
 $PAGE->set_pagelayout('standard');
