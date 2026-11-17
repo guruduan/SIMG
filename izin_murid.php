@@ -77,79 +77,134 @@ $do_save = ($action === 'save');
 
 if (($do_submit || $do_save) && confirm_sesskey()) {
 
-    $record = new stdClass();
-    $record->userid        = required_param('siswaid', PARAM_INT);
-    $record->kelasid       = required_param('kelasid', PARAM_INT);
-    $record->kelas         = get_nama_kelas($record->kelasid);
-    $record->guru_pengajar = required_param('guru_pengajar', PARAM_INT);
-    $record->alasan        = required_param('alasan', PARAM_TEXT);
-    $record->keperluan     = required_param('keperluan', PARAM_TEXT);
-    $record->catatan       = optional_param('catatan', '', PARAM_TEXT);
-    $record->penginput     = $USER->id;
-    $record->timecreated   = time();
+    // Bisa 1 murid atau lebih — semuanya dari kelas yang sama (kelas
+    // sudah dipilih di atas), keperluan & alasan yang sama, dicetak
+    // jadi SATU surat dengan nama digabung ("Ahmad dan Budi").
+    $siswaids = optional_param_array('siswaid', [], PARAM_INT);
+    $siswaids = array_values(array_unique(array_filter(array_map('intval', $siswaids))));
 
-    // Anti duplikat (10 menit)
-    $cek = $DB->get_record_sql("
-        SELECT id
-          FROM {local_jurnalmengajar_suratizin}
-         WHERE userid = :userid
-           AND kelasid = :kelas
-           AND timecreated >= :waktu
-         LIMIT 1
-    ", [
-        'userid' => $record->userid,
-        'kelas' => $record->kelasid,
-        'waktu' => time() - 600
-    ]);
-
-    if ($cek) {
-        $id = $cek->id;
-    } else {
-
-$id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
-
+    if (empty($siswaids)) {
+        redirect(
+            new moodle_url('/local/jurnalmengajar/izin_murid.php', ['kelasid' => $kelasid]),
+            'Pilih minimal satu murid.',
+            null,
+            \core\output\notification::NOTIFY_ERROR
+        );
     }
 
-    // ================= KIRIM WA =================
-    $siswa = $DB->get_record('user', ['id' => $record->userid]);
-    if ($siswa) {
-        $kelas = get_nama_kelas($record->kelasid);
-        $nama  = ucwords(strtolower($siswa->lastname));
-        $gurunama = $DB->get_field('user', 'lastname', ['id' => $record->guru_pengajar]);
-        $waktu_full = tanggal_indo($record->timecreated);
+    $kelasid_form  = required_param('kelasid', PARAM_INT);
+    $guru_pengajar = required_param('guru_pengajar', PARAM_INT);
+    $alasan        = required_param('alasan', PARAM_TEXT);
+    $keperluan     = required_param('keperluan', PARAM_TEXT);
+    $catatan       = optional_param('catatan', '', PARAM_TEXT);
+    $now           = time();
 
-	$datawa = [
-	    '{waktu}'     => $waktu_full,
-	    '{nama}'      => $nama,
-	    '{kelas}'     => $kelas,
-	    '{guru}'      => $gurunama,
-	    '{alasan}'    => $record->alasan,
-	    '{keperluan}' => $record->keperluan,
-	    '{pengawas}'  => $pengawas,
+    // Satu record per murid (riwayat tetap per murid), tapi semuanya
+    // memakai keperluan/alasan/guru/penginput/waktu yang sama.
+    $ids       = [];
+    $namamurid = [];
 
-	    // dipakai resolver tujuan
-	    'kelas'       => $record->kelasid
-	];
+    foreach ($siswaids as $siswaid) {
+        $record = new stdClass();
+        $record->userid        = $siswaid;
+        $record->kelasid       = $kelasid_form;
+        $record->kelas         = get_nama_kelas($record->kelasid);
+        $record->guru_pengajar = $guru_pengajar;
+        $record->alasan        = $alasan;
+        $record->keperluan     = $keperluan;
+        $record->catatan       = $catatan;
+        $record->penginput     = $USER->id;
+        $record->timecreated   = $now;
 
-	jm_kirim_template_auto(
-	    'izinmurid',
-	    $datawa
-	);
+        // Anti duplikat (10 menit) per murid
+        $cek = $DB->get_record_sql("
+            SELECT id
+              FROM {local_jurnalmengajar_suratizin}
+             WHERE userid = :userid
+               AND kelasid = :kelas
+               AND timecreated >= :waktu
+             LIMIT 1
+        ", [
+            'userid' => $record->userid,
+            'kelas' => $record->kelasid,
+            'waktu' => $now - 600
+        ]);
+
+        if ($cek) {
+            $id = $cek->id;
+        } else {
+            $id = $DB->insert_record('local_jurnalmengajar_suratizin', $record);
+        }
+
+        $ids[] = $id;
+
+        $siswa = $DB->get_record('user', ['id' => $siswaid]);
+        if ($siswa) {
+            $namamurid[] = ucwords(strtolower($siswa->lastname));
+        }
+    }
+
+    // ================= KIRIM WA (sekali saja, nama digabung) =================
+    // Satu surat = satu kejadian, jadi wali kelas cukup menerima satu
+    // pesan berisi semua nama, bukan satu pesan per murid.
+    if (!empty($namamurid)) {
+        if (count($namamurid) === 1) {
+            $namagabung = $namamurid[0];
+        } else if (count($namamurid) === 2) {
+            $namagabung = $namamurid[0] . ' dan ' . $namamurid[1];
+        } else {
+            $namagabung = implode(', ', array_slice($namamurid, 0, -1))
+                . ', dan ' . end($namamurid);
+        }
+
+        $kelas = get_nama_kelas($kelasid_form);
+        $gurunama = $DB->get_field('user', 'lastname', ['id' => $guru_pengajar]);
+        $waktu_full = tanggal_indo($now);
+
+        $datawa = [
+            '{waktu}'     => $waktu_full,
+            '{nama}'      => $namagabung,
+            '{kelas}'     => $kelas,
+            '{guru}'      => $gurunama,
+            '{alasan}'    => $alasan,
+            '{keperluan}' => $keperluan,
+            '{pengawas}'  => $pengawas,
+
+            // dipakai resolver tujuan
+            'kelas'       => $kelasid_form,
+            // penginput (pengawas) — supaya resolver tidak mengirim WA
+            // ke diri sendiri kalau pengawas juga wali kelas
+            'userid'      => $USER->id
+        ];
+
+        jm_kirim_template_auto(
+            'izinmurid',
+            $datawa
+        );
     }
 
     // ================= REDIRECT =================
     if ($do_save) {
         redirect(
-            new moodle_url('/local/jurnalmengajar/izin_murid.php', ['kelasid' => $record->kelasid]),
+            new moodle_url('/local/jurnalmengajar/izin_murid.php', ['kelasid' => $kelasid_form]),
             'Data berhasil disimpan.',
             1
         );
     } else {
-        redirect(
-            new moodle_url('/local/jurnalmengajar/cetak_surat_izin.php', ['id' => $id])
-        );
+        // 1 murid: URL lama (?id=). Lebih dari 1: ?ids=1,2,3 untuk
+        // dicetak jadi satu surat gabungan.
+        if (count($ids) === 1) {
+            redirect(
+                new moodle_url('/local/jurnalmengajar/cetak_surat_izin.php', ['id' => $ids[0]])
+            );
+        } else {
+            redirect(
+                new moodle_url('/local/jurnalmengajar/cetak_surat_izin.php', ['ids' => implode(',', $ids)])
+            );
+        }
     }
 }
+
 
 // ================= TAMPILAN MCOODLE =================
 echo $OUTPUT->header();
@@ -179,20 +234,26 @@ if ($kelasid) {
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'kelasid', 'value' => $kelasid]);
 
-    // Row 1: Baris Nama Murid & Guru Pengajar sejajar (Dua Kolom)
-    echo html_writer::start_div('row mb-3');
-    
-    echo html_writer::start_div('col-md-6 col-sm-12');
-    echo html_writer::tag('label', 'Nama Murid <span class="text-danger">*</span>', ['class' => 'font-weight-bold', 'for' => 'siswaid']);
-    echo html_writer::select($siswaoptions, 'siswaid', '', ['' => 'Pilih Murid...'], ['required' => 'required', 'class' => 'form-control custom-select', 'id' => 'siswaid']);
+    // Row 1: Nama Murid (boleh centang lebih dari satu — satu surat)
+    // + Guru Pengajar
+    echo html_writer::start_div('form-group mb-3');
+    echo html_writer::tag('label', 'Nama Murid <span class="text-danger">*</span>', ['class' => 'font-weight-bold']);
+    echo html_writer::start_div('border rounded p-2 bg-light');
+    echo html_writer::start_div('row');
+    foreach ($siswaoptions as $sid => $snama) {
+        echo html_writer::start_div('col-md-6 col-sm-12 mb-1');
+        echo html_writer::checkbox('siswaid[]', $sid, false, $snama, ['class' => 'siswa-checkbox']);
+        echo html_writer::end_div();
+    }
+    echo html_writer::end_div();
+    echo html_writer::end_div();
+    echo html_writer::tag('small', 'Centang satu murid atau lebih — semua murid yang dicentang dicetak dalam satu surat yang sama.', ['class' => 'text-muted']);
     echo html_writer::end_div();
 
-    echo html_writer::start_div('col-md-6 col-sm-12 mt-3 mt-md-0');
+    echo html_writer::start_div('form-group mb-3');
     echo html_writer::tag('label', 'Guru Pengajar Saat Ini <span class="text-danger">*</span>', ['class' => 'font-weight-bold', 'for' => 'guru_pengajar']);
     echo html_writer::select($guruoptions, 'guru_pengajar', '', ['' => 'Pilih Guru...'], ['required' => 'required', 'class' => 'form-control custom-select', 'id' => 'guru_pengajar']);
     echo html_writer::end_div();
-
-    echo html_writer::end_div(); // End Row 1
 
     // Row 2: Keperluan
     echo html_writer::start_div('form-group mb-3');

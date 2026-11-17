@@ -53,14 +53,27 @@ function get_nomor_wali_kelas($kelas) {
         );
     }
 
-    $json = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
-    $mapping = json_decode($json, true);
-
-    if (empty($mapping[$kelas])) {
+    if (empty($kelas)) {
         return null;
     }
 
-    return get_user_nowa($mapping[$kelas]);
+    // Mapping wali kelas bersarang per tahun ajaran sejak 13 Nov 2026:
+    // {"2026/2027": {cohortid: userid}}. Pakai helper di lib.php yang
+    // paham format baru maupun format lama {cohortid: userid}.
+    if (function_exists('jurnalmengajar_get_wali_kelas')) {
+        $waliid = jurnalmengajar_get_wali_kelas((int)$kelas);
+    } else {
+        // Fallback kalau lib.php di server masih lama.
+        $json = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
+        $mapping = json_decode($json, true);
+        $waliid = $mapping[$kelas] ?? null;
+    }
+
+    if (empty($waliid)) {
+        return null;
+    }
+
+    return get_user_nowa($waliid);
 }
 
 /**
@@ -258,7 +271,18 @@ function jm_render_template($kode, array $data) {
         return '';
     }
 
-    return strtr($template, $data);
+    // Hanya kunci placeholder {nama} yang boleh diganti. Kunci polos
+    // ('kelas', 'userid', 'pesertaid') hanya untuk resolver tujuan —
+    // kalau ikut ke strtr(), kata "kelas" di dalam kalimat template
+    // (mis. "Wali kelas sebagai laporan") ikut tertimpa id cohort.
+    $placeholders = [];
+    foreach ($data as $kunci => $nilai) {
+        if (is_string($kunci) && strlen($kunci) > 2 && $kunci[0] === '{' && substr($kunci, -1) === '}') {
+            $placeholders[$kunci] = $nilai;
+        }
+    }
+
+    return strtr($template, $placeholders);
 }
 
 /**
@@ -369,14 +393,15 @@ function jm_get_nomor_tujuan($kode, array $data = []) {
                         $kelas_cek = $DB->get_field('cohort', 'id', ['name' => $kelas_cek]);
                     }
                     
-                    // Ambil mapping wali kelas
-                    $json_map = get_config('local_jurnalmengajar', 'wali_kelas_mapping');
-                    $map_wk = json_decode($json_map, true);
-                    $walikelas_userid = $map_wk[$kelas_cek] ?? null;
+                    // Ambil wali kelas via helper lib.php (paham mapping
+                    // per tahun ajaran maupun format lama).
+                    $walikelas_userid = function_exists('jurnalmengajar_get_wali_kelas')
+                        ? jurnalmengajar_get_wali_kelas((int)$kelas_cek)
+                        : 0;
 
                     // Jika guru yang menginput Jurnal adalah Wali Kelas tersebut, lewati (jangan kirim)
-                    if (!empty($data['userid']) && $walikelas_userid == $data['userid']) {
-                        break; 
+                    if (!empty($data['userid']) && !empty($walikelas_userid) && (int)$walikelas_userid === (int)$data['userid']) {
+                        break;
                     }
 
                     $wa = get_nomor_wali_kelas($data['kelas']);
@@ -403,6 +428,10 @@ function jm_get_nomor_tujuan($kode, array $data = []) {
             case 'gurubk':
                 $list = get_nomor_guru_bk();
                 if (!empty($list)) {
+                    // Jangan kirim ke diri sendiri (guru BK penginput).
+                    if (!empty($nomor_penginput)) {
+                        $list = array_diff($list, [$nomor_penginput]);
+                    }
                     $nomor = array_merge($nomor, $list);
                 }
                 break;
@@ -563,16 +592,22 @@ case 'nilai_harian':
         ? $guru->lastname
         : $guru->firstname;
 
-    $rows = json_decode($record->nilaijson);
+    $rows = json_decode($record->nilaijson ?? '');
 
     $daftarnilai = '';
 
-    foreach ($rows as $r) {
+    if (is_array($rows) || is_object($rows)) {
+        foreach ($rows as $r) {
 
-        $daftarnilai .=
-            $r->no . '. ' .
-            $r->name . ' : ' .
-            $r->nilai . "\n";
+            if (!is_object($r)) {
+                continue;
+            }
+
+            $daftarnilai .=
+                ($r->no ?? '-') . '. ' .
+                ($r->name ?? '-') . ' : ' .
+                ($r->nilai ?? '-') . "\n";
+        }
     }
 
     return [
@@ -630,7 +665,9 @@ case 'izinmurid':
         '{pengawas}'  => $namapengawas,
 
         // dipakai resolver tujuan
-        'kelas'       => $record->kelasid
+        'kelas'       => $record->kelasid,
+        // penginput (pengawas), bukan murid — untuk blokir kirim ke diri sendiri
+        'userid'      => $record->penginput ?? 0
     ];
 
 case 'layanan_bk':
@@ -675,6 +712,7 @@ case 'layanan_bk':
 
         // dipakai resolver tujuan
         'kelas'           => $record->kelas,
+        'userid'          => $record->userid,
 
         // dipakai resolver peserta (jika diperlukan)
         'pesertaid'       => $record->pesertaid
@@ -720,6 +758,7 @@ case 'pembinaan':
 
         // dipakai resolver tujuan
         'kelas'          => $record->kelas,
+        'userid'         => $record->userid,
 
         // dipakai resolver peserta
         'pesertaid'      => $record->pesertaid
@@ -758,9 +797,10 @@ case 'guruwali':
         '{guruwali}'     => $namaguru,
 
         // dipakai resolver tujuan
-        'kelas'          => $record->kelas
+        'kelas'          => $record->kelas,
+        'userid'         => $record->guruid ?? 0
     ];
-    
+
     }
 
     return [];
