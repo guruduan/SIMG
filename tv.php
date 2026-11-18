@@ -1245,7 +1245,10 @@ uksort($data, function($a, $b) {
    scrollTop dikurangi tinggi satu set baris saat melewatinya) — tidak ada lagi jeda + lompat ke awal.
    Revisi 16 Nov (tv-5.php): $jamberikut dikembalikan ke 0 kalau tidak ada di $jam_pelajaran
    (jam aktif 11 -> bukan 'Jam ke 12', header menampilkan 'Jam ke -').
-   Catatan: tv-5.php = tv-4-adiwiyata.php + teks tombol suara '🔊 Suara Aktif' (tanpa '— klik untuk tes'). */
+   Catatan: tv-5.php = tv-4-adiwiyata.php + teks tombol suara '🔊 Suara Aktif' (tanpa '— klik untuk tes').
+   Revisi 18 Nov (tv-7.php): header tabel (Kelas / Jam ke N Guru Sekarang /
+   Guru Berikutnya Jam ke N+1) dibuat sticky di th — sebelumnya sticky dipasang
+   di thead yang tidak berfungsi, jadi header ikut terscroll. */
 
 body{
     margin:0;
@@ -1488,16 +1491,19 @@ TABLE
 
 table{
     width:100%;
-    border-collapse:collapse;
+    border-collapse:separate;
+    border-spacing:0;
 }
 
-thead{
+/* Header tabel tetap di atas saat baris di-scroll: sticky HARUS di th,
+   bukan di thead (thead tidak bisa sticky di browser). border-collapse
+   diubah ke separate supaya background navy th tetap terlukis saat menempel.
+   Ditambah -webkit-sticky untuk browser LG webOS/Signage lama. */
+th{
+    position:-webkit-sticky;
     position:sticky;
     top:0;
     z-index:100;
-}
-
-th{
     background:#071e48;
     padding:18px 24px;
     font-size:26px;
