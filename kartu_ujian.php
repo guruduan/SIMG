@@ -47,6 +47,156 @@ $allcohorts = $DB->get_records('cohort', null, 'name ASC');
 
 $action = optional_param('action', '', PARAM_ALPHA);
 
+// ===== pengaturan tersimpan (tombol Simpan) =====
+// Disimpan sebagai satu JSON di config plugin 'local_jurnalmengajar'
+// (kunci 'kartu_ujian_settings'), mengikuti pola guru_bk_mapping.
+$saved_json = get_config('local_jurnalmengajar', 'kartu_ujian_settings');
+$saved = json_decode($saved_json ? (string)$saved_json : '', true);
+if (!is_array($saved)) {
+    $saved = [];
+}
+$def_nama_ujian = trim((string)($saved['nama_ujian'] ?? '')) !== '' ? $saved['nama_ujian'] : 'ASESMEN AKHIR SEMESTER';
+$def_nama_sekolah = trim((string)($saved['nama_sekolah'] ?? '')) !== '' ? $saved['nama_sekolah'] : (get_config('local_jurnalmengajar', 'nama_sekolah') ?: 'SMA NEGERI 2 KANDANGAN');
+$def_tahun_ajaran = trim((string)($saved['tahun_ajaran'] ?? '')) !== '' ? $saved['tahun_ajaran'] : (get_config('local_jurnalmengajar', 'tahun_ajaran') ?: '2026/2027');
+$def_tanggal_mulai = (string)($saved['tanggal_mulai'] ?? '');
+$def_jumlah_hari = max(1, (int)($saved['jumlah_hari'] ?? 1));
+$def_jumlah_ruang = max(1, (int)($saved['jumlah_ruang'] ?? 1));
+$def_mode_urut = in_array($saved['mode_urut'] ?? '', ['normal', 'selang', 'random'], true) ? $saved['mode_urut'] : 'normal';
+$saved_rooms = (isset($saved['rooms']) && is_array($saved['rooms'])) ? array_values($saved['rooms']) : [];
+$saved_cohorts = (isset($saved['cohorts']) && is_array($saved['cohorts'])) ? array_map('intval', $saved['cohorts']) : [];
+if (!empty($saved_rooms)) {
+    $def_jumlah_ruang = max($def_jumlah_ruang, count($saved_rooms));
+}
+
+// ===== ACTION: SIMPAN PENGATURAN =====
+if ($action === 'simpan' && confirm_sesskey()) {
+    $simpan = [];
+    $simpan['nama_ujian'] = trim((string)optional_param('nama_ujian', 'ASESMEN AKHIR SEMESTER', PARAM_TEXT));
+    if ($simpan['nama_ujian'] === '') {
+        $simpan['nama_ujian'] = 'ASESMEN AKHIR SEMESTER';
+    }
+    $simpan['nama_sekolah'] = trim((string)optional_param('nama_sekolah', 'SMA NEGERI 2 KANDANGAN', PARAM_TEXT));
+    $simpan['tahun_ajaran'] = trim((string)optional_param('tahun_ajaran', '2026/2027', PARAM_TEXT));
+    $simpan['tanggal_mulai'] = trim((string)optional_param('tanggal_mulai', '', PARAM_RAW_TRIMMED));
+    $simpan['jumlah_hari'] = max(1, optional_param('jumlah_hari', 1, PARAM_INT));
+    $simpan['jumlah_ruang'] = max(1, optional_param('jumlah_ruang', 1, PARAM_INT));
+    $simpan['mode_urut'] = optional_param('mode_urut', 'normal', PARAM_ALPHA);
+    if (!in_array($simpan['mode_urut'], ['normal', 'selang', 'random'], true)) {
+        $simpan['mode_urut'] = 'normal';
+    }
+    $simpan['cohorts'] = array_values(array_map('intval', optional_param_array('cohorts', [], PARAM_INT)));
+    $simpan['rooms'] = [];
+    for ($r = 1; $r <= $simpan['jumlah_ruang']; $r++) {
+        $rname = trim((string)optional_param('ruang_'.$r, '', PARAM_RAW_TRIMMED));
+        $rkap = optional_param('ruang_'.$r.'_kapasitas', 0, PARAM_INT);
+        $rkelompok = optional_param('ruang_'.$r.'_kelompok', 0, PARAM_INT);
+        if ($rkelompok < 1) {
+            $rkelompok = optional_param('ruang_'.$r.'_berdua', 0, PARAM_INT) ? 2 : 1;
+        }
+        if ($rname !== '' && $rkap > 0) {
+            $simpan['rooms'][] = ['name' => $rname, 'capacity' => $rkap, 'kelompok' => $rkelompok, 'berdua' => ($rkelompok > 1 ? 1 : 0)];
+        }
+    }
+    set_config('kartu_ujian_settings', json_encode($simpan), 'local_jurnalmengajar');
+    redirect(
+        new moodle_url('/local/jurnalmengajar/kartu_ujian.php'),
+        'Pengaturan kartu ujian berhasil disimpan.',
+        null,
+        \core\output\notification::NOTIFY_SUCCESS
+    );
+}
+
+// ===== pasangan sejenis kelamin di ruang bermeja dua =====
+function normalisasi_jeniskelamin($v): string {
+    $v = trim((string)$v);
+    if ($v === '') {
+        return '';
+    }
+    $u = strtoupper($v);
+    if ($u === 'L' || strpos($u, 'LAKI') === 0) {
+        return 'L';
+    }
+    if ($u === 'P' || strpos($u, 'PEREMPUAN') === 0) {
+        return 'P';
+    }
+    return '';
+}
+
+// Tingkat (X, XI, XII, ...) dari nama cohort, mis. 'XI-F' -> 'XI'.
+function tingkat_dari_cohort($name): string {
+    if (preg_match('/\b(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\b/i', (string)$name, $m)) {
+        return strtoupper($m[1]);
+    }
+    return '';
+}
+
+// Susun satu daftar murid (satu ruang) supaya tiap kelompok meja
+// berdekatan (meja 1-5, 6-10, ... untuk kelompok 5; 1-2, 3-4, ...
+// untuk kelompok 2) terisi sejenis kelamin: L dulu, lalu P, lalu
+// yang gendernya tidak diketahui. Urutan asal di dalam tiap gender
+// dipertahankan. Kelompok terakhir tiap gender boleh berisi kurang
+// dari $ukuran (sisa) — tetap sejenis kelamin. Satu-satunya
+// pengecualian: di batas pergantian gender, satu kelompok fisik bisa
+// tercampur (sisa L + awal P) bila jumlah satu gender di ruang itu
+// bukan kelipatan $ukuran; itu paling banyak 1 kelompok per ruang.
+//
+// Kalau $beda_tingkat true (mode 'Selang-seling kelas beda'), murid
+// di dalam tiap gender disusun bergiliran antar tingkat (X, XI, XII,
+// X, ...) sebelum dipotong per kelompok, supaya satu kelompok berisi
+// campuran tingkat, bukan semuanya selevel. Untuk kelompok 2 ini
+// sama artinya dengan pasangan beda tingkat (X-XI, XII-X).
+function susun_tingkat_bergilir(array $list): array {
+    $by_level = [];
+    foreach ($list as $stu) {
+        $by_level[tingkat_dari_cohort($stu->cohortname ?? '')][] = $stu;
+    }
+    $levels = array_keys($by_level);
+    $idx = array_fill_keys($levels, 0);
+    $out = [];
+    $remaining = count($list);
+    while ($remaining > 0) {
+        $moved = false;
+        foreach ($levels as $lv) {
+            if ($idx[$lv] < count($by_level[$lv])) {
+                $out[] = $by_level[$lv][$idx[$lv]++];
+                $remaining--;
+                $moved = true;
+            }
+        }
+        if (!$moved) {
+            break;
+        }
+    }
+    return $out;
+}
+
+function reorder_kelompok_sejenis(array $students, int $ukuran = 2, bool $beda_tingkat = false): array {
+    if ($ukuran < 2) {
+        return $students;
+    }
+    $groups = ['L' => [], 'P' => [], '' => []];
+    foreach ($students as $stu) {
+        $g = normalisasi_jeniskelamin($stu->jeniskelamin ?? '');
+        $groups[$g][] = $stu;
+    }
+    $out = [];
+    foreach (['L', 'P', ''] as $g) {
+        $list = $groups[$g];
+        if ($beda_tingkat) {
+            $list = susun_tingkat_bergilir($list);
+        }
+        foreach ($list as $stu) {
+            $out[] = $stu;
+        }
+    }
+    return $out;
+}
+
+// Nama lama, dipertahankan supaya pemanggil lama tetap jalan.
+function reorder_pasangan_sejenis(array $students, bool $beda_tingkat = false): array {
+    return reorder_kelompok_sejenis($students, 2, $beda_tingkat);
+}
+
 // ===== fungsi build plan (sama) =====
 function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari, $mode_urut = 'normal') {
     global $DB;
@@ -60,11 +210,17 @@ function build_plan($allcohorts, $rooms, $tanggal_mulai, $jumlah_hari, $mode_uru
                u.lastname,
                u.idnumber,
                u.password,
+               jk.data AS jeniskelamin,
                c.id   AS cohortid,
                c.name AS cohortname
           FROM {cohort_members} cm
           JOIN {user} u ON u.id = cm.userid
           JOIN {cohort} c ON c.id = cm.cohortid
+          LEFT JOIN {user_info_data} jk
+            ON jk.userid = u.id
+           AND jk.fieldid = (
+               SELECT id FROM {user_info_field} WHERE shortname = 'gender'
+           )
          WHERE c.id = :cid
       ORDER BY u.lastname ASC, u.firstname ASC";
         $stus = $DB->get_records_sql($sql, ['cid' => $cid]);
@@ -78,11 +234,13 @@ $ordered_students = [];
 $seen = [];
 
 // fungsi bantu: ambil level romawi dari nama cohort
+if (!function_exists('extract_level')) {
 function extract_level($name) {
     if (preg_match('/\b(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\b/i', $name, $m)) {
         return strtoupper($m[1]);
     }
     return null;
+}
 }
 
 // urutan level (penting!)
@@ -113,7 +271,7 @@ foreach ($students_by_cohort as $cid => $arr) {
     if (!isset($map[$level])) $map[$level] = [];
     if (!isset($map[$level][$suffix])) $map[$level][$suffix] = [];
 
-    $map[$level][$suffix] = array_values($arr);
+    $map[$level][$suffix] = array_merge($map[$level][$suffix] ?? [], array_values($arr));
 }
 
 // kumpulkan semua suffix unik
@@ -135,6 +293,7 @@ foreach ($map as $lv => $groups) {
         if ($cnt > $maxcount) $maxcount = $cnt;
     }
 }
+if (!function_exists('zigzag_outer_in')) {
 function zigzag_outer_in($arr) {
     $result = [];
     $left = 0;
@@ -151,6 +310,7 @@ function zigzag_outer_in($arr) {
         $right--;
     }
     return $result;
+}
 }
 
 // interleave: suffix → level → index
@@ -237,7 +397,11 @@ if ($mode_urut === 'normal') {
                     $idx = $index_map[$lv][$suf];
 
                     if (isset($map[$lv][$suf][$idx])) {
-                        $ordered_students[] = $map[$lv][$suf][$idx];
+                        $stu_r = $map[$lv][$suf][$idx];
+                        if (!isset($seen[$stu_r->id])) {
+                            $ordered_students[] = $stu_r;
+                            $seen[$stu_r->id] = true;
+                        }
                         $index_map[$lv][$suf]++;
                     }
                 }
@@ -273,6 +437,35 @@ if ($mode_urut === 'normal') {
             }
         }
         $seating_by_session[$sno] = $fullslots;
+    }
+
+    // ===== kelompok meja sejenis kelamin per ruang =====
+    // Hanya mengubah urutan murid di dalam tiap ruang (nomor meja);
+    // sesi dan ruang tiap murid tidak berubah. Pada mode random
+    // ('Selang-seling kelas beda'), isi tiap kelompok dicampur
+    // antar tingkat; pada mode lain, sejenis kelamin saja sudah
+    // cukup karena urutannya memang per tingkat.
+    $beda_tingkat = ($mode_urut === 'random');
+    foreach ($sessions as $sno => $stulist) {
+        $newlist = [];
+        $offset = 0;
+        foreach ($rooms as $rinfo) {
+            $cap = (int)$rinfo['capacity'];
+            $segment = array_slice($stulist, $offset, $cap);
+            $kelompok = (int)($rinfo['kelompok'] ?? (!empty($rinfo['berdua']) ? 2 : 1));
+            if ($kelompok < 1) {
+                $kelompok = 1;
+            }
+            if ($kelompok > 1) {
+                $segment = reorder_kelompok_sejenis($segment, $kelompok, $beda_tingkat);
+            }
+            $newlist = array_merge($newlist, $segment);
+            $offset += $cap;
+        }
+        if ($offset < count($stulist)) {
+            $newlist = array_merge($newlist, array_slice($stulist, $offset));
+        }
+        $sessions[$sno] = $newlist;
     }
 
     // exam dates (Mon-Fri)
@@ -322,7 +515,11 @@ if (empty($selected_cohorts)) {
     for ($r = 1; $r <= $jumlah_ruang; $r++) {
         $rname = optional_param('ruang_'.$r, '', PARAM_RAW_TRIMMED);
         $rkap  = optional_param('ruang_'.$r.'_kapasitas', 0, PARAM_INT);
-        if ($rname !== '' && $rkap > 0) $rooms[] = ['name' => $rname, 'capacity' => $rkap];
+        $rkelompok = optional_param('ruang_'.$r.'_kelompok', 0, PARAM_INT);
+        if ($rkelompok < 1) {
+            $rkelompok = optional_param('ruang_'.$r.'_berdua', 0, PARAM_INT) ? 2 : 1;
+        }
+        if ($rname !== '' && $rkap > 0) $rooms[] = ['name' => $rname, 'capacity' => $rkap, 'kelompok' => $rkelompok, 'berdua' => ($rkelompok > 1 ? 1 : 0)];
     }
     if (empty($rooms)) {
         echo $OUTPUT->header();
@@ -381,6 +578,11 @@ $oldasesmen = $DB->get_records(
 );
 
 foreach ($oldasesmen as $old) {
+
+    $DB->delete_records(
+        'local_jurnalmengajar_asesmen_jadwal',
+        ['asesmenid' => $old->id]
+    );
 
     $DB->delete_records(
         'local_jurnalmengajar_asesmen_detail',
@@ -444,14 +646,6 @@ foreach ($assignments as $a) {
             'local_jurnalmengajar_asesmen',
             $rec
         );
-//debugging sementara
-error_log(
-    'ASESMEN: ' .
-    $asesmenid .
-    ' sesi=' . $a['session'] .
-    ' ruang=' . $a['room']
-);
-//
         $asesmenmap[$key] = $asesmenid;
     }
 }
@@ -511,8 +705,9 @@ SIMPAN JADWAL ASESMEN
 =====================================================
 */
 
-$DB->delete_records('local_jurnalmengajar_asesmen_jadwal');
-
+// JANGAN delete_records jadwal tanpa kondisi di sini: asesmen baru di atas
+// memakai id baru sehingga belum punya jadwal; menghapus global akan
+// menghilangkan jadwal semua asesmen lama (berita acara/riwayat ikut hilang).
 foreach ($assignments as $a) {
 
     $key = $a['session'] . '|' . $a['room'];
@@ -557,45 +752,7 @@ foreach ($assignments as $a) {
             );
         }
 
-        /*
-         * Senin-Kamis ada gelombang kedua
-         */
-        $ts = strtotime($ed);
-
-        if ($ts !== false) {
-
-            $w = (int)date('N', $ts);
-
-            $is_last =
-                ($didx === (count($plan->exam_dates) - 1));
-
-            if (!$is_last && $w >= 1 && $w <= 4) {
-
-                $second =
-                    $s_on_day + $plan->num_sessions;
-
-                if (!$DB->record_exists(
-                    'local_jurnalmengajar_asesmen_jadwal',
-                    [
-                        'asesmenid'  => $asesmenid,
-                        'tanggal'    => $tanggal,
-                        'sesiaktual' => $second
-                    ]
-                )) {
-
-                    $jadwal2 = new stdClass();
-
-                    $jadwal2->asesmenid  = $asesmenid;
-                    $jadwal2->tanggal    = $tanggal;
-                    $jadwal2->sesiaktual = $second;
-
-                    $DB->insert_record(
-                        'local_jurnalmengajar_asesmen_jadwal',
-                        $jadwal2
-                    );
-                }
-            }
-        }
+        // Gelombang kedua tidak dipakai lagi: satu sesi per hari.
     }
 }
 
@@ -661,8 +818,14 @@ $pdf->SetXY($headerAreaX, $y + $pady);
 $pdf->Cell($headerAreaW,5,'KARTU PESERTA',0,1,'C');
 $pdf->SetFont('helvetica','',10);
 $pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,$nama_ujian,0,1,'C');
-$pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,$nama_sekolah,0,1,'C');
-$pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,'Tahun Ajaran '.$tahun_ajaran,0,1,'C');
+// Nama sekolah + tahun ajaran dalam satu baris.
+$sekolah_tahun = $nama_sekolah . ' - Tahun Ajaran ' . $tahun_ajaran;
+$fontSekolah = 10;
+while ($fontSekolah > 8 && $pdf->GetStringWidth($sekolah_tahun, 'helvetica', '', $fontSekolah) > $headerAreaW) {
+    $fontSekolah--;
+}
+$pdf->SetFont('helvetica','', $fontSekolah);
+$pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,$sekolah_tahun,0,1,'C');
 
 // tanggal ujian juga di headerArea agar tidak tertutup logo
 $student_dates = $plan->exam_dates;
@@ -674,6 +837,7 @@ $student_dates = is_array($student_dates) ? array_values(array_filter($student_d
 if (empty($student_dates) && !empty($plan->exam_dates)) $student_dates = array_values($plan->exam_dates);
 
 $tanggal_ujian_teks = build_tanggal_range($student_dates[0] ?? '', end($student_dates) ?? '');
+$pdf->SetFont('helvetica','',10);
 $pdf->SetX($headerAreaX); $pdf->Cell($headerAreaW,5,$tanggal_ujian_teks,0,1,'C');
 $pdf->Ln(1);
 
@@ -717,13 +881,15 @@ $pdf->SetTextColor(0, 0, 0);
         $pdf->Ln(1);
         // gunakan tanggal spesifik per siswa (XI/XII mungkin dipendekkan)
         $numDates = max(1, count($student_dates));
-        $cellw = ($cardw - 2*$padx) / $numDates;
+        $labelW = 12; // mm, kolom label kiri (Hari/Tgl/Sesi)
+        $cellw = ($cardw - 2*$padx - $labelW) / $numDates;
         if ($numDates <= 6) { $fontDay = 8; $fontSession = 10; }
         elseif ($numDates <= 10) { $fontDay = 7; $fontSession = 9; }
         else { $fontDay = 6; $fontSession = 8; }
         // Hari labels
         $pdf->SetFont('helvetica','B',$fontDay);
         $pdf->SetX($leftX);
+        $pdf->Cell($labelW,5,'Hari',1,0,'L');
         foreach ($student_dates as $ed) {
             $wday = null;
             if (!empty($ed)) {
@@ -732,25 +898,27 @@ $pdf->SetTextColor(0, 0, 0);
 
             }
             $label = '';
-            if ($wday !== null) $label = ['','Sen','Sel','Rab','Kam','Jum'][$wday] ?? '';
-            $pdf->Cell($cellw,5,$label,0,0,'C');
+            if ($wday !== null) $label = ['','Senin','Selasa','Rabu','Kamis','Jumat'][$wday] ?? '';
+            $pdf->Cell($cellw,5,$label,1,0,'C');
         }
         $pdf->Ln(5);
         // Tanggal labels
         $pdf->SetFont('helvetica','',$fontDay);
         $pdf->SetX($leftX);
+        $pdf->Cell($labelW,5,'Tanggal',1,0,'L');
         foreach ($student_dates as $ed) {
             $lab = '';
             if (!empty($ed)) {
                 $dt = date_create_from_format('Y-m-d',$ed);
                 $lab = $dt ? intval($dt->format('j')).'/'.$dt->format('n') : '';
             }
-            $pdf->Cell($cellw,5,$lab,0,0,'C');
+            $pdf->Cell($cellw,5,$lab,1,0,'C');
         }
         $pdf->Ln(5);
-        // Sesi labels (per tanggal): for Sen-Thu two-wave as requested
+        // Sesi labels (per tanggal): satu sesi per hari
         $pdf->SetFont('helvetica','B',$fontSession);
         $pdf->SetX($leftX);
+        $pdf->Cell($labelW,6,'Sesi',1,0,'L');
         for ($didx = 0; $didx < $numDates; $didx++) {
             if (!isset($student_dates[$didx]) || empty($student_dates[$didx])) {
                 $ed = $plan->exam_dates[$didx] ?? null;
@@ -761,29 +929,8 @@ $pdf->SetTextColor(0, 0, 0);
            $s_on_day = ((($sno - 1) + $didx) % $plan->num_sessions) + 1;
 $txt = (string)$s_on_day;
 
-// treat last date as single-session always
-$is_last_date_for_student = ($didx === ($numDates - 1));
 
-if ($ed !== null && $ed !== '') {
-    $ts = @strtotime((string)$ed);
-    if ($ts !== false && $ts !== -1) {
-        $w = (int) date('N', $ts);
-        // only show two-wave if NOT the last date AND weekday is Mon-Thu
-        if (!$is_last_date_for_student && $w >= 1 && $w <= 4) {
-            $second = $s_on_day + $plan->num_sessions;
-            $txt = $s_on_day . ' & ' . $second;
-        } else {
-            $txt = (string)$s_on_day;
-        }
-    } else {
-        $txt = (string)$s_on_day;
-    }
-} else {
-    $txt = '-';
-}
-
-
-            $pdf->Cell($cellw,6,$txt,0,0,'C');
+            $pdf->Cell($cellw,6,$txt,1,0,'C');
         }
         $pdf->Ln(6);
 
@@ -794,7 +941,7 @@ if ($ed !== null && $ed !== '') {
     exit;
 }
 
-// ---------------- ACTION: attendance (landscape, paginated, two subcols for Sen-Thu) ----------------
+// ---------------- ACTION: attendance (landscape, paginated, one subcol per date) ----------------
 if ($action === 'attendance' && confirm_sesskey()) {
     global $CFG;
     require_once($CFG->libdir . '/pdflib.php');
@@ -839,7 +986,7 @@ if ($action === 'attendance' && confirm_sesskey()) {
             foreach ($slots as $idx => $slot) {
                 if ($slot['room'] === $rname) {
                     $stu = $slot_student[$idx] ?? null;
-                    $all_rows[] = ['slotindex' => $idx, 'student' => $stu];
+                    $all_rows[] = ['slotindex' => $idx, 'student' => $stu, 'meja' => $slot['meja']];
                 }
             }
 
@@ -907,33 +1054,15 @@ if ($totalNeeded > $printableW) {
         }
     }
 }
-// Determine number of subcolumns: for each date Sen-Thu => 2 subcols, Fri =>1
-// BUT force the last date in the sequence to be single subcol (1)
-$subcols_count = 0;
-$date_subcounts = []; // per date, value 2 or 1
-$total_exam_dates = count($exam_dates);
-foreach ($exam_dates as $di => $ed) {
-    $is_last_date_global = ($di === ($total_exam_dates - 1));
-    $w = null;
-    if (!empty($ed)) {
-        $ts = @strtotime((string)$ed);
-        if ($ts !== false && $ts !== -1) $w = (int) date('N', $ts);
-    }
-    // if it's the last date, force 1 subcol
-    if ($is_last_date_global) {
-        $sc = 1;
-    } else {
-        $sc = ($w !== null && $w >= 1 && $w <= 4) ? 2 : 1;
-    }
-    $date_subcounts[] = $sc;
-    $subcols_count += $sc;
-}
+// Satu subkolom per tanggal: gelombang kedua tidak dipakai lagi.
+$subcols_count = count($exam_dates);
+$date_subcounts = array_fill(0, count($exam_dates), 1);
 
             // remaining width for subcolumns
             $remainingW = $printableW - ($colNoW + $colNamaW + $colKelasW);
             if ($remainingW < 10) $remainingW = 10;
             $subcolW = floor($remainingW / max(1,$subcols_count));
-            // build array of subcol widths per date (if date has 2 subcols, two entries)
+            // build array of subcol widths per date (one entry per date)
             $subcolWidths = [];
             foreach ($date_subcounts as $sc) {
                 for ($k=0;$k<$sc;$k++) $subcolWidths[] = $subcolW;
@@ -1078,27 +1207,12 @@ $pdf->Ln(2); // jarak ke konten tabel
                 $pdf->Cell($colNamaW, $tableHeaderH, 'Murid', 1, 0, 'C');
                 $pdf->Cell($colKelasW, $tableHeaderH, 'Sesi->', 1, 0, 'C');
 
-                // For each date, print its subcols: Sen-Thu => two cells with sesi labels; Fri => one cell
+                // For each date, print its single subcol with the session label.
                 $subidx = 0;
                 foreach ($date_subcounts as $di => $sc) {
-                    $ed = $exam_dates[$di] ?? null;
                     $s_on_day = ((($s - 1) + $di) % $num_sessions) + 1;
-                    $w = null;
-                    if (!empty($ed)) {
-                        $ts = @strtotime((string)$ed);
-                        if ($ts !== false && $ts !== -1) $w = (int) date('N', $ts);
-                    }
-                    if ($sc == 2) {
-                        // left subcol: s_on_day
-                        $pdf->Cell($subcolWidths[$subidx], $tableHeaderH, (string)$s_on_day, 1, 0, 'C');
-                        // right subcol: s_on_day + num_sessions
-                        $pdf->Cell($subcolWidths[$subidx+1], $tableHeaderH, (string)($s_on_day + $num_sessions), 1, 0, 'C');
-                        $subidx += 2;
-                    } else {
-                        // single subcol (Friday) - put s_on_day centered
-                        $pdf->Cell($subcolWidths[$subidx], $tableHeaderH, (string)$s_on_day, 1, 0, 'C');
-                        $subidx += 1;
-                    }
+                    $pdf->Cell($subcolWidths[$subidx], $tableHeaderH, (string)$s_on_day, 1, 0, 'C');
+                    $subidx += 1;
                 }
                 $pdf->Ln();
 
@@ -1107,7 +1221,7 @@ $pdf->Ln(2); // jarak ke konten tabel
                 $no = ($pageIndex * $rows_per_page) + 1;
                 foreach ($pageRows as $rrow) {
                     $stu = $rrow['student'];
-                    $pdf->Cell($colNoW, $rowh, $no, 1, 0, 'C');
+                    $pdf->Cell($colNoW, $rowh, $rrow['meja'] ?? $no, 1, 0, 'C');
                     $nameText = $stu ? format_string($stu->lastname) : '';
                     $pdf->Cell($colNamaW, $rowh, $nameText, 1, 0, 'L');
                     $kelasText = $stu ? format_string($stu->cohortname) : '';
@@ -1158,8 +1272,7 @@ echo html_writer::tag('h3', 'Generate Kartu Peserta Ujian dan Daftar Hadir');
 echo html_writer::start_tag('form', [
     'method'=>'post',
     'action'=>$PAGE->url,
-    'id'=>'form-kartu-ujian',
-    'target'=>'_blank'
+    'id'=>'form-kartu-ujian'
 ]);
 
 echo html_writer::empty_tag('br');
@@ -1174,7 +1287,7 @@ echo html_writer::empty_tag('input', [
     'type'=>'text',
     'name'=>'nama_ujian',
     'id'=>'nama_ujian',
-    'value'=>'ASESMEN AKHIR SEMESTER',
+    'value'=>$def_nama_ujian,
     'size'=>60,
     'required'=>'required'
 ]);
@@ -1186,7 +1299,7 @@ echo html_writer::empty_tag('input', [
     'type'=>'text',
     'name'=>'nama_sekolah',
     'id'=>'nama_sekolah',
-    'value'=>'SMA NEGERI 2 KANDANGAN',
+    'value'=>$def_nama_sekolah,
     'size'=>60,
     'required'=>'required'
 ]);
@@ -1198,7 +1311,7 @@ echo html_writer::empty_tag('input', [
     'type'=>'text',
     'name'=>'tahun_ajaran',
     'id'=>'tahun_ajaran',
-    'value'=>'2025/2026',
+    'value'=>$def_tahun_ajaran,
     'size'=>20,
     'required'=>'required'
 ]);
@@ -1210,6 +1323,7 @@ echo html_writer::empty_tag('input', [
     'type'=>'date',
     'name'=>'tanggal_mulai',
     'id'=>'tanggal_mulai',
+    'value'=>$def_tanggal_mulai,
     'required'=>'required'
 ]);
 
@@ -1220,7 +1334,7 @@ echo html_writer::empty_tag('input', [
     'type'=>'number',
     'name'=>'jumlah_hari',
     'id'=>'jumlah_hari',
-    'value'=>1,
+    'value'=>$def_jumlah_hari,
     'min'=>1,
     'required'=>'required'
 ]);
@@ -1232,7 +1346,7 @@ echo html_writer::empty_tag('input', [
     'type'=>'number',
     'name'=>'jumlah_ruang',
     'id'=>'jumlah_ruang',
-    'value'=>1,
+    'value'=>$def_jumlah_ruang,
     'min'=>1,
     'required'=>'required',
     'oninput'=>'renderRuangInputs()'
@@ -1251,7 +1365,7 @@ echo html_writer::empty_tag('input', [
     'name' => 'mode_urut',
     'value' => 'normal',
     'id' => 'mode_normal',
-    'checked' => 'checked'
+    'checked' => ($def_mode_urut === 'normal' ? 'checked' : null)
 ]);
 echo html_writer::label(' Normal', 'mode_normal');
 
@@ -1261,7 +1375,8 @@ echo html_writer::empty_tag('input', [
     'type' => 'radio',
     'name' => 'mode_urut',
     'value' => 'selang',
-    'id' => 'mode_selang'
+    'id' => 'mode_selang',
+    'checked' => ($def_mode_urut === 'selang' ? 'checked' : null)
 ]);
 echo html_writer::label(' Selang-seling rombel kelas', 'mode_selang');
 
@@ -1271,7 +1386,8 @@ echo html_writer::empty_tag('input', [
     'type' => 'radio',
     'name' => 'mode_urut',
     'value' => 'random',
-    'id' => 'mode_random'
+    'id' => 'mode_random',
+    'checked' => ($def_mode_urut === 'random' ? 'checked' : null)
 ]);
 echo html_writer::label(' Selang-seling kelas beda', 'mode_random');
 
@@ -1314,7 +1430,8 @@ foreach ($allcohorts as $c) {
         'type' => 'checkbox',
         'name' => 'cohorts[]',
         'value' => $c->id,
-        'id' => 'cohort_'.$c->id
+        'id' => 'cohort_'.$c->id,
+        'checked' => in_array((int)$c->id, $saved_cohorts, true) ? 'checked' : null
     ]);
     
     echo html_writer::label($c->name, 'cohort_'.$c->id);
@@ -1329,13 +1446,16 @@ echo html_writer::tag('div','',['id'=>'ruang-container']);
 echo html_writer::empty_tag('input',['type'=>'hidden','name'=>'sesskey','value'=>sesskey()]);
 
 // tombol
-echo html_writer::tag('button','🖨️ Generate PDF Kartu',['type'=>'submit','name'=>'action','value'=>'generate','class'=>'btn btn-primary']);
+echo html_writer::tag('button','💾 Simpan Pengaturan',['type'=>'submit','name'=>'action','value'=>'simpan','class'=>'btn btn-success']);
 echo ' ';
-echo html_writer::tag('button','📋 Generate Daftar Hadir',['type'=>'submit','name'=>'action','value'=>'attendance','class'=>'btn btn-secondary']);
+echo html_writer::tag('button','🖨️ Generate PDF Kartu',['type'=>'submit','name'=>'action','value'=>'generate','class'=>'btn btn-primary','formtarget'=>'_blank']);
+echo ' ';
+echo html_writer::tag('button','📋 Generate Daftar Hadir',['type'=>'submit','name'=>'action','value'=>'attendance','class'=>'btn btn-secondary','formtarget'=>'_blank']);
 
 echo html_writer::end_tag('form');
 ?>
 <script>
+const SAVED_ROOMS = <?php echo json_encode($saved_rooms, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 function renderRuangInputs(){
     const j = parseInt(document.getElementById('jumlah_ruang').value || '0');
     const container = document.getElementById('ruang-container');
@@ -1348,7 +1468,19 @@ function renderRuangInputs(){
             <input type="text" name="ruang_${i}" required style="min-width:180px;" placeholder="Nama ruang ${i}">
             &nbsp; Jumlah peserta:
             <input type="number" name="ruang_${i}_kapasitas" required min="1" value="30" style="width:80px;">
+            &nbsp; Meja sekelompok:
+            <input type="number" name="ruang_${i}_kelompok" min="1" max="10" value="1" style="width:60px;">
         `;
+        const saved = (Array.isArray(SAVED_ROOMS) && SAVED_ROOMS[i-1]) ? SAVED_ROOMS[i-1] : {};
+        const nameInput = wrap.querySelector('input[name="ruang_' + i + '"]');
+        const kapInput = wrap.querySelector('input[name="ruang_' + i + '_kapasitas"]');
+        if (saved.name) nameInput.value = saved.name;
+        if (saved.capacity) kapInput.value = saved.capacity;
+        const kelompokInput = wrap.querySelector('input[name="ruang_' + i + '_kelompok"]');
+        if (kelompokInput) {
+            if (saved.kelompok) kelompokInput.value = saved.kelompok;
+            else if (saved.berdua) kelompokInput.value = 2;
+        }
         container.appendChild(wrap);
     }
 }
@@ -1385,6 +1517,7 @@ function get_student_plain_password(stdClass $user): string {
 function build_tanggal_range(string $mulai, string $sampai): string {
     if (!$mulai) return '';
     if (!$sampai) return format_tanggal_indonesia($mulai);
+    if ($mulai === $sampai) return format_tanggal_indonesia($mulai);
     return format_tanggal_indonesia($mulai) . ' s.d. ' . format_tanggal_indonesia($sampai);
 }
 
