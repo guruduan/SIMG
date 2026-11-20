@@ -1162,7 +1162,7 @@ $subtitleFontSize = 10;
 // Title (center)
 $pdf->SetFont('helvetica','B', $titleFontSize);
 $pdf->SetXY(0, $centerY - 6);              // -6 agar garis tengah judul sedikit di atas center
-$pdf->Cell(0, 7, 'Daftar Hadir - ' . $nama_ujian, 0, 1, 'C');
+$pdf->Cell(0, 7, 'DAFTAR HADIR - ' . $nama_ujian, 0, 1, 'C');
 
 // Subtitle (center)
 $pdf->SetFont('helvetica','', $subtitleFontSize);
